@@ -1,12 +1,14 @@
-import { type FormEvent, useEffect, useMemo, useState } from 'react'
+import { type FormEvent, type ReactNode, useEffect, useMemo, useState } from 'react'
 import {
   AlertCircle,
   Archive,
+  ArrowLeft,
   BarChart3,
   BookOpen,
   BrainCircuit,
   CheckCircle2,
   ChevronRight,
+  Crown,
   Database,
   Download,
   ExternalLink,
@@ -32,6 +34,7 @@ import {
   Star,
   Sun,
   Tag,
+  UserPlus,
   Users,
   X,
 } from 'lucide-react'
@@ -43,7 +46,7 @@ const BRAND_HERO_URL =
   'https://raw.githubusercontent.com/Purinut1997/web-images/c70597729a1ba58a7b7b672d2bcace2f673a5a49/bdbeb65d-b4f5-4f65-a388-e95d950eac84%20%281%29.png'
 
 type Theme = 'light' | 'dark'
-type View = 'home' | 'media' | 'detail' | 'admin' | 'login'
+type View = 'home' | 'media' | 'detail' | 'admin' | 'login' | 'register'
 type AccessLevel = 'สาธารณะ' | 'สมาชิก' | 'VIP' | 'ซื้อแยก'
 type MediaStatus = 'เผยแพร่' | 'แบบร่าง' | 'ซ่อน'
 
@@ -85,6 +88,15 @@ type MediaFormState = {
   resourceUrl: string
   previewUrl: string
   description: string
+}
+
+type SiteSettings = {
+  vipRegistrationEnabled: boolean
+  vipPrice: number
+  vipQrUrl: string
+  vipBankName: string
+  vipAccountNumber: string
+  vipAccountName: string
 }
 
 const mediaItems: MediaItem[] = [
@@ -163,6 +175,14 @@ const sourceOptions: MediaItem['source'][] = [
   'YouTube',
   'External Link',
 ]
+const defaultSiteSettings: SiteSettings = {
+  vipRegistrationEnabled: true,
+  vipPrice: 499,
+  vipQrUrl: '',
+  vipBankName: 'พร้อมเพย์ (PromptPay)',
+  vipAccountNumber: '',
+  vipAccountName: 'MIKPURINUT',
+}
 
 function createEmptyMediaForm(topic = 'โรงเรียน'): MediaFormState {
   return {
@@ -239,6 +259,7 @@ function App() {
   const [dataStatus, setDataStatus] = useState<'loading' | 'ready' | 'fallback'>(
     'loading',
   )
+  const [siteSettings, setSiteSettings] = useState<SiteSettings>(defaultSiteSettings)
   const [refreshToken, setRefreshToken] = useState(0)
   const [view, setView] = useState<View>('home')
   const [selected, setSelected] = useState<MediaItem>(mediaItems[0])
@@ -302,12 +323,13 @@ function App() {
 
     async function loadData() {
       try {
-        const [mediaResponse, categoriesResponse] = await Promise.all([
+        const [mediaResponse, categoriesResponse, settingsResponse] = await Promise.all([
           fetch('/api/media'),
           fetch('/api/categories'),
+          fetch('/api/settings'),
         ])
 
-        if (!mediaResponse.ok || !categoriesResponse.ok) {
+        if (!mediaResponse.ok || !categoriesResponse.ok || !settingsResponse.ok) {
           throw new Error('API response was not ok')
         }
 
@@ -316,6 +338,9 @@ function App() {
         }
         const categoriesJson = (await categoriesResponse.json()) as {
           categories?: Array<{ name: string }>
+        }
+        const settingsJson = (await settingsResponse.json()) as {
+          settings?: SiteSettings
         }
 
         if (!active) return
@@ -327,11 +352,13 @@ function App() {
           'ทั้งหมด',
           ...(categoriesJson.categories?.map((item) => item.name) ?? topics.slice(1)),
         ])
+        setSiteSettings(settingsJson.settings ?? defaultSiteSettings)
         setDataStatus('ready')
       } catch {
         if (!active) return
         setMediaRecords(mediaItems)
         setTopicOptions(topics)
+        setSiteSettings(defaultSiteSettings)
         setDataStatus('fallback')
       }
     }
@@ -444,7 +471,17 @@ function App() {
             />
           )}
           {view === 'login' && (
-            <LoginPanel onLogin={handleLogin} />
+            <LoginPanel onLogin={handleLogin} setView={setView} />
+          )}
+          {view === 'register' && (
+            <RegisterPanel
+              onRegistered={(user) => {
+                handleLogin(user)
+                notifySuccess('สมัครสมาชิกสำเร็จ')
+              }}
+              setView={setView}
+              settings={siteSettings}
+            />
           )}
           {view === 'admin' && currentUser?.role === 'superadmin' && (
             <AdminPanel
@@ -453,11 +490,16 @@ function App() {
                 setRefreshToken((value) => value + 1)
                 notifySuccess('เพิ่มสื่อใหม่ลง Neon แล้ว')
               }}
+              onSettingsSaved={(settings) => {
+                setSiteSettings(settings)
+                notifySuccess('บันทึกการตั้งค่า VIP แล้ว')
+              }}
+              settings={siteSettings}
               topics={topicOptions.filter((item) => item !== 'ทั้งหมด')}
             />
           )}
           {view === 'admin' && currentUser?.role !== 'superadmin' && (
-            <LoginPanel onLogin={handleLogin} />
+            <LoginPanel onLogin={handleLogin} setView={setView} />
           )}
         </main>
 
@@ -623,13 +665,22 @@ function Header({
               {currentUser.role === 'superadmin' ? 'หลังบ้าน' : 'ออกจากระบบ'}
             </button>
           ) : (
-            <button
-              className="hidden min-h-11 rounded-xl bg-slate-950 px-5 text-sm font-black text-cyan-200 shadow-lg shadow-slate-900/15 transition hover:-translate-y-0.5 dark:bg-cyan-300 dark:text-slate-950 sm:inline-flex sm:items-center"
-              onClick={() => setView('login')}
-              type="button"
-            >
-              เข้าสู่ระบบ
-            </button>
+            <>
+              <button
+                className="hidden min-h-11 rounded-xl border border-slate-200 bg-white px-5 text-sm font-black text-slate-700 shadow-sm transition hover:-translate-y-0.5 dark:border-white/10 dark:bg-white/10 dark:text-white sm:inline-flex sm:items-center"
+                onClick={() => setView('login')}
+                type="button"
+              >
+                เข้าสู่ระบบ
+              </button>
+              <button
+                className="hidden min-h-11 rounded-xl bg-slate-950 px-5 text-sm font-black text-cyan-200 shadow-lg shadow-slate-900/15 transition hover:-translate-y-0.5 dark:bg-cyan-300 dark:text-slate-950 sm:inline-flex sm:items-center"
+                onClick={() => setView('register')}
+                type="button"
+              >
+                สมัครสมาชิก
+              </button>
+            </>
           )}
           <button
             aria-label="เปิดเมนู"
@@ -671,6 +722,18 @@ function Header({
           >
             {currentUser ? 'ออกจากระบบ' : 'เข้าสู่ระบบ'}
           </button>
+          {!currentUser && (
+            <button
+              className="mt-2 block min-h-12 w-full rounded-xl bg-slate-950 px-4 text-left text-sm font-black text-cyan-200 dark:bg-cyan-300 dark:text-slate-950"
+              onClick={() => {
+                setView('register')
+                setMenuOpen(false)
+              }}
+              type="button"
+            >
+              สมัครสมาชิก
+            </button>
+          )}
         </div>
       )}
     </header>
@@ -1168,7 +1231,13 @@ function InfoTile({
   )
 }
 
-function LoginPanel({ onLogin }: { onLogin: (user: CurrentUser) => void }) {
+function LoginPanel({
+  onLogin,
+  setView,
+}: {
+  onLogin: (user: CurrentUser) => void
+  setView: (view: View) => void
+}) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -1327,7 +1396,11 @@ function LoginPanel({ onLogin }: { onLogin: (user: CurrentUser) => void }) {
 
         <div className="mt-6 rounded-2xl border border-dashed border-blue-200 bg-blue-50/60 p-4 text-center text-sm font-bold text-slate-500 dark:border-cyan-300/20 dark:bg-cyan-300/10 dark:text-slate-300">
           ยังไม่มีบัญชีสมาชิก?{' '}
-          <button className="font-black text-blue-600 dark:text-cyan-200" type="button">
+          <button
+            className="font-black text-blue-600 dark:text-cyan-200"
+            onClick={() => setView('register')}
+            type="button"
+          >
             สมัครฟรี!
           </button>
         </div>
@@ -1336,24 +1409,373 @@ function LoginPanel({ onLogin }: { onLogin: (user: CurrentUser) => void }) {
   )
 }
 
+function RegisterPanel({
+  onRegistered,
+  setView,
+  settings,
+}: {
+  onRegistered: (user: CurrentUser) => void
+  setView: (view: View) => void
+  settings: SiteSettings
+}) {
+  const [form, setForm] = useState({
+    name: '',
+    phone: '',
+    email: '',
+    password: '',
+    confirmPassword: '',
+    membership: 'member' as 'member' | 'vip',
+  })
+  const [agree, setAgree] = useState(false)
+  const [slipName, setSlipName] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState('')
+
+  const updateForm = (name: keyof typeof form, value: string) => {
+    setForm((current) => ({ ...current, [name]: value }))
+  }
+
+  const submitRegister = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    setError('')
+
+    if (form.password !== form.confirmPassword) {
+      setError('รหัสผ่านและยืนยันรหัสผ่านไม่ตรงกัน')
+      return
+    }
+
+    if (!agree) {
+      setError('กรุณายืนยันว่าข้อมูลถูกต้องก่อนสมัครสมาชิก')
+      return
+    }
+
+    setSubmitting(true)
+    try {
+      const response = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          ...form,
+          slipName,
+        }),
+      })
+      const result = (await response.json()) as {
+        user?: CurrentUser
+        error?: string
+      }
+
+      if (!response.ok || !result.user) {
+        throw new Error(result.error ?? 'สมัครสมาชิกไม่สำเร็จ')
+      }
+
+      onRegistered(result.user)
+    } catch (registerError) {
+      setError(
+        registerError instanceof Error
+          ? registerError.message
+          : 'สมัครสมาชิกไม่สำเร็จ',
+      )
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const vipSelected = form.membership === 'vip'
+
+  return (
+    <section className="mx-auto grid min-h-[calc(100vh-88px)] max-w-7xl overflow-hidden rounded-none bg-white shadow-2xl shadow-slate-950/10 lg:grid-cols-[0.78fr_1.22fr] dark:bg-slate-950">
+      <div className="relative grid min-h-[360px] place-items-center overflow-hidden bg-gradient-to-br from-blue-700 via-indigo-600 to-blue-500 p-8 text-white lg:min-h-full">
+        <div className="absolute inset-0 opacity-20 [background-image:linear-gradient(30deg,rgba(255,255,255,.3)_12%,transparent_12.5%,transparent_87%,rgba(255,255,255,.3)_87.5%,rgba(255,255,255,.3)),linear-gradient(150deg,rgba(255,255,255,.3)_12%,transparent_12.5%,transparent_87%,rgba(255,255,255,.3)_87.5%,rgba(255,255,255,.3)),linear-gradient(30deg,rgba(255,255,255,.3)_12%,transparent_12.5%,transparent_87%,rgba(255,255,255,.3)_87.5%,rgba(255,255,255,.3)),linear-gradient(150deg,rgba(255,255,255,.3)_12%,transparent_12.5%,transparent_87%,rgba(255,255,255,.3)_87.5%,rgba(255,255,255,.3))] [background-position:0_0,0_0,24px_42px,24px_42px] [background-size:48px_84px]" />
+        <div className="relative max-w-md text-center">
+          <img
+            alt="MIKPURINUT"
+            className="mx-auto mb-8 h-24 w-24 rounded-full border-4 border-white/30 object-cover shadow-2xl"
+            src={LOGO_URL}
+          />
+          <h2 className="text-4xl font-black">มาร่วมเป็นส่วนหนึ่งกับเรา</h2>
+          <p className="mt-5 text-lg font-bold text-blue-100">
+            เข้าถึงซอฟต์แวร์คุณภาพเพื่อยกระดับองค์กรของคุณ
+          </p>
+          <div className="mx-auto mt-8 grid max-w-xs gap-3 text-left text-blue-50">
+            {['ดาวน์โหลดโปรแกรมฟรีทันที', 'อัปเดตเวอร์ชันใหม่ตลอด', 'ทีมงานดูแลตลอดการใช้งาน'].map((item) => (
+              <p className="flex items-center gap-3 font-bold" key={item}>
+                <CheckCircle2 className="shrink-0 text-blue-100" size={19} />
+                {item}
+              </p>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <form className="px-5 py-8 sm:px-10 lg:px-14" onSubmit={submitRegister}>
+        <div className="mb-6 flex items-center gap-4">
+          <button
+            className="grid h-12 w-16 place-items-center rounded-full border border-slate-300 text-slate-700 transition hover:border-blue-500 hover:text-blue-600 dark:border-white/10 dark:text-white"
+            onClick={() => setView('login')}
+            type="button"
+          >
+            <ArrowLeft size={22} />
+          </button>
+          <div>
+            <h2 className="text-3xl font-black text-slate-950 dark:text-white">
+              สมัครสมาชิกใหม่
+            </h2>
+            <p className="mt-1 text-sm font-black text-slate-500 dark:text-slate-400">
+              ข้อมูลบัญชี
+            </p>
+          </div>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-2">
+          <RegisterField
+            label="ชื่อ-นามสกุล"
+            onChange={(value) => updateForm('name', value)}
+            placeholder="เช่น สมชาย ใจดี"
+            value={form.name}
+          />
+          <RegisterField
+            label="เบอร์โทรศัพท์"
+            onChange={(value) => updateForm('phone', value)}
+            placeholder="08xxxxxxxx"
+            value={form.phone}
+          />
+          <RegisterField
+            className="md:col-span-2"
+            label="อีเมล"
+            onChange={(value) => updateForm('email', value)}
+            placeholder="name@example.com"
+            type="email"
+            value={form.email}
+          />
+          <RegisterField
+            label="รหัสผ่าน"
+            onChange={(value) => updateForm('password', value)}
+            placeholder="อย่างน้อย 8 ตัวอักษร"
+            type="password"
+            value={form.password}
+          />
+          <RegisterField
+            label="ยืนยันรหัสผ่าน"
+            onChange={(value) => updateForm('confirmPassword', value)}
+            placeholder="ระบุรหัสผ่านอีกครั้ง"
+            type="password"
+            value={form.confirmPassword}
+          />
+        </div>
+
+        <p className="mt-6 text-sm font-black text-slate-600 dark:text-slate-300">
+          เลือกประเภทสมาชิก
+        </p>
+        <div className="mt-3 grid gap-4 md:grid-cols-2">
+          <MembershipCard
+            active={form.membership === 'member'}
+            detail="ดาวน์โหลดไฟล์พื้นฐาน"
+            icon={<Users size={34} />}
+            onClick={() => updateForm('membership', 'member')}
+            title="สมาชิกทั่วไป (ฟรี)"
+          />
+          <MembershipCard
+            active={vipSelected}
+            badge="แนะนำ"
+            detail={`${settings.vipPrice.toLocaleString('th-TH')} บาท / ตลอดชีพ`}
+            disabled={!settings.vipRegistrationEnabled}
+            icon={<Crown size={36} />}
+            onClick={() => updateForm('membership', 'vip')}
+            title="สมาชิก VIP"
+          />
+        </div>
+
+        {vipSelected && settings.vipRegistrationEnabled && (
+          <div className="mt-6 rounded-3xl bg-slate-50 p-5 shadow-lg shadow-slate-950/5 dark:bg-white/[0.06]">
+            <h3 className="text-center text-xl font-black text-blue-700 dark:text-cyan-200">
+              ข้อมูลการชำระเงิน VIP
+            </h3>
+            <p className="mt-2 text-center text-sm font-bold text-slate-500 dark:text-slate-400">
+              กรุณาโอนเงินและแนบสลิปเพื่อยืนยันสิทธิ์
+            </p>
+            <div className="mt-5 grid gap-5 md:grid-cols-[220px_1fr] md:items-center">
+              <div className="text-center">
+                {settings.vipQrUrl ? (
+                  <img
+                    alt="VIP QR"
+                    className="mx-auto h-44 w-44 rounded-xl border border-slate-200 bg-white object-cover p-2"
+                    src={settings.vipQrUrl}
+                  />
+                ) : (
+                  <div className="mx-auto grid h-44 w-44 place-items-center rounded-xl border border-dashed border-slate-300 bg-white text-sm font-bold text-slate-400">
+                    QR Code
+                  </div>
+                )}
+                <p className="mt-3 text-sm font-bold text-slate-500 dark:text-slate-300">
+                  สแกนเพื่อจ่ายเงิน
+                </p>
+              </div>
+              <div className="space-y-3 text-sm font-bold text-slate-700 dark:text-slate-200">
+                <p>ธนาคาร: {settings.vipBankName}</p>
+                <p>เลขที่บัญชี: {settings.vipAccountNumber || '-'}</p>
+                <p>ชื่อบัญชี: {settings.vipAccountName}</p>
+                <p className="text-red-500">
+                  ยอดโอน: {settings.vipPrice.toLocaleString('th-TH')} บาท
+                </p>
+                <label className="block">
+                  <span className="mb-2 block font-black">แนบสลิปโอนเงิน</span>
+                  <input
+                    className="w-full rounded-xl border border-slate-300 bg-white px-3 py-3 text-sm dark:border-white/10 dark:bg-white/10"
+                    onChange={(event) => setSlipName(event.target.files?.[0]?.name ?? '')}
+                    type="file"
+                  />
+                </label>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="mx-auto mt-6 grid h-20 max-w-xs place-items-center border border-slate-300 bg-white text-sm text-slate-500">
+          ฉันไม่ใช่โปรแกรมอัตโนมัติ
+        </div>
+
+        <label className="mt-5 flex items-start gap-3 text-sm font-bold text-slate-500 dark:text-slate-300">
+          <input
+            checked={agree}
+            className="mt-1 h-4 w-4"
+            onChange={(event) => setAgree(event.target.checked)}
+            type="checkbox"
+          />
+          ข้อมูลถูกต้องและยอมรับเงื่อนไขการใช้งาน
+        </label>
+
+        {error && (
+          <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 p-3 text-sm font-bold text-red-700 dark:border-red-400/20 dark:bg-red-400/10 dark:text-red-200">
+            {error}
+          </div>
+        )}
+
+        <button
+          className="mt-6 inline-flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-rose-500 to-orange-500 px-5 text-lg font-black text-white shadow-2xl shadow-rose-500/20 disabled:opacity-60"
+          disabled={submitting}
+          type="submit"
+        >
+          {submitting ? <Loader2 className="animate-spin" size={22} /> : <UserPlus size={22} />}
+          {submitting ? 'กำลังลงทะเบียน...' : 'ลงทะเบียนสมาชิก'}
+        </button>
+        <p className="mt-5 text-center text-sm font-bold text-slate-500 dark:text-slate-300">
+          มีบัญชีผู้ใช้งานแล้ว?{' '}
+          <button className="font-black text-blue-600 dark:text-cyan-200" onClick={() => setView('login')} type="button">
+            เข้าสู่ระบบ
+          </button>
+        </p>
+      </form>
+    </section>
+  )
+}
+
+function RegisterField({
+  className = '',
+  label,
+  onChange,
+  placeholder,
+  type = 'text',
+  value,
+}: {
+  className?: string
+  label: string
+  onChange: (value: string) => void
+  placeholder: string
+  type?: string
+  value: string
+}) {
+  return (
+    <label className={className}>
+      <span className="text-sm font-black text-slate-700 dark:text-slate-200">
+        {label}
+      </span>
+      <input
+        className="mt-2 min-h-13 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-base font-semibold outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 dark:border-white/10 dark:bg-white/10"
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+        type={type}
+        value={value}
+      />
+    </label>
+  )
+}
+
+function MembershipCard({
+  active,
+  badge,
+  detail,
+  disabled,
+  icon,
+  onClick,
+  title,
+}: {
+  active: boolean
+  badge?: string
+  detail: string
+  disabled?: boolean
+  icon: ReactNode
+  onClick: () => void
+  title: string
+}) {
+  return (
+    <button
+      className={`relative min-h-32 rounded-2xl border p-5 text-center transition ${
+        active
+          ? 'border-pink-500 bg-pink-50 text-pink-600 shadow-xl shadow-pink-500/15'
+          : 'border-slate-200 bg-white text-slate-700 dark:border-white/10 dark:bg-white/5 dark:text-white'
+      } ${disabled ? 'cursor-not-allowed opacity-50' : 'hover:-translate-y-0.5'}`}
+      disabled={disabled}
+      onClick={onClick}
+      type="button"
+    >
+      {badge && (
+        <span className="absolute right-4 top-[-12px] rounded-lg bg-pink-500 px-3 py-1 text-xs font-black text-white">
+          {badge}
+        </span>
+      )}
+      <div className="mx-auto mb-3 grid place-items-center text-current">{icon}</div>
+      <p className="font-black">{title}</p>
+      <p className="mt-1 text-sm font-bold text-slate-500">{disabled ? 'ปิดรับสมัครชั่วคราว' : detail}</p>
+    </button>
+  )
+}
+
 function AdminPanel({
   mediaItems,
   onCreated,
+  onSettingsSaved,
+  settings,
   topics,
 }: {
   mediaItems: MediaItem[]
   onCreated: () => void
+  onSettingsSaved: (settings: SiteSettings) => void
+  settings: SiteSettings
   topics: string[]
 }) {
   const [form, setForm] = useState<MediaFormState>(() =>
     createEmptyMediaForm(topics[0]),
   )
   const [adminToken, setAdminToken] = useState('')
+  const [settingsForm, setSettingsForm] = useState({
+    ...settings,
+    vipPrice: String(settings.vipPrice),
+  })
   const [saving, setSaving] = useState(false)
+  const [savingSettings, setSavingSettings] = useState(false)
   const [error, setError] = useState('')
+  const [settingsError, setSettingsError] = useState('')
 
   const updateForm = (name: keyof typeof form, value: string) => {
     setForm((current) => ({ ...current, [name]: value }))
+  }
+
+  const updateSettings = (
+    name: keyof typeof settingsForm,
+    value: string | boolean,
+  ) => {
+    setSettingsForm((current) => ({ ...current, [name]: value }))
   }
 
   const submitMedia = async (event: FormEvent<HTMLFormElement>) => {
@@ -1386,6 +1808,42 @@ function AdminPanel({
       setError(saveError instanceof Error ? saveError.message : 'เกิดข้อผิดพลาด')
     } finally {
       setSaving(false)
+    }
+  }
+
+  const submitSettings = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    setSettingsError('')
+    setSavingSettings(true)
+
+    const nextSettings: SiteSettings = {
+      ...settingsForm,
+      vipPrice: Number(settingsForm.vipPrice || 0),
+    }
+
+    try {
+      const response = await fetch('/api/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(nextSettings),
+      })
+      const result = (await response.json().catch(() => null)) as {
+        settings?: SiteSettings
+        error?: string
+      } | null
+
+      if (!response.ok || !result?.settings) {
+        throw new Error(result?.error ?? 'บันทึกการตั้งค่าไม่สำเร็จ')
+      }
+
+      onSettingsSaved(result.settings)
+    } catch (saveError) {
+      setSettingsError(
+        saveError instanceof Error ? saveError.message : 'บันทึกการตั้งค่าไม่สำเร็จ',
+      )
+    } finally {
+      setSavingSettings(false)
     }
   }
 
@@ -1449,6 +1907,83 @@ function AdminPanel({
           </aside>
 
           <div className="grid gap-6">
+          <form
+            className="rounded-3xl border border-pink-300/20 bg-white/[0.06] p-4"
+            onSubmit={submitSettings}
+          >
+            <div className="mb-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+              <div>
+                <h3 className="text-xl font-black">ตั้งค่าสมัคร VIP และ QR Code</h3>
+                <p className="mt-1 text-sm font-semibold text-slate-400">
+                  เปิด/ปิดแพ็กเกจ VIP และเปลี่ยนข้อมูลชำระเงินที่หน้า สมัครสมาชิก
+                </p>
+              </div>
+              <label className="inline-flex min-h-11 items-center gap-3 rounded-2xl bg-black/24 px-4 font-black">
+                <input
+                  checked={settingsForm.vipRegistrationEnabled}
+                  onChange={(event) =>
+                    updateSettings('vipRegistrationEnabled', event.target.checked)
+                  }
+                  type="checkbox"
+                />
+                เปิดรับ VIP
+              </label>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <AdminField
+                label="ราคา VIP"
+                name="vipPrice"
+                onChange={updateSettings}
+                placeholder="499"
+                type="number"
+                value={settingsForm.vipPrice}
+              />
+              <AdminField
+                label="URL QR Code"
+                name="vipQrUrl"
+                onChange={updateSettings}
+                placeholder="https://..."
+                value={settingsForm.vipQrUrl}
+              />
+              <AdminField
+                label="ธนาคาร / ช่องทาง"
+                name="vipBankName"
+                onChange={updateSettings}
+                placeholder="พร้อมเพย์ (PromptPay)"
+                value={settingsForm.vipBankName}
+              />
+              <AdminField
+                label="เลขที่บัญชี / เบอร์พร้อมเพย์"
+                name="vipAccountNumber"
+                onChange={updateSettings}
+                placeholder="08x-xxx-xxxx"
+                value={settingsForm.vipAccountNumber}
+              />
+              <AdminField
+                label="ชื่อบัญชี"
+                name="vipAccountName"
+                onChange={updateSettings}
+                placeholder="MIKPURINUT"
+                value={settingsForm.vipAccountName}
+              />
+            </div>
+
+            {settingsError && (
+              <div className="mt-4 rounded-2xl border border-red-400/20 bg-red-400/10 p-3 text-sm font-bold text-red-200">
+                {settingsError}
+              </div>
+            )}
+            <button
+              className="mt-5 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-pink-400 px-5 font-black text-white shadow-lg shadow-pink-500/20 disabled:opacity-60 sm:w-auto"
+              disabled={savingSettings}
+              type="submit"
+            >
+              {savingSettings ? <Loader2 className="animate-spin" size={20} /> : <Settings size={20} />}
+              {savingSettings ? 'กำลังบันทึก...' : 'บันทึกตั้งค่า VIP'}
+            </button>
+          </form>
+
           <form
             className="rounded-3xl border border-cyan-300/15 bg-white/[0.06] p-4"
             id="admin-create-media"
@@ -1631,7 +2166,7 @@ function AdminPanel({
   )
 }
 
-function AdminField({
+function AdminField<K extends string>({
   label,
   name,
   onChange,
@@ -1640,8 +2175,8 @@ function AdminField({
   value,
 }: {
   label: string
-  name: keyof MediaFormState
-  onChange: (name: keyof MediaFormState, value: string) => void
+  name: K
+  onChange: (name: K, value: string) => void
   placeholder: string
   type?: string
   value: string

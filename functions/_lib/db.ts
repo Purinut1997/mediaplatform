@@ -100,6 +100,28 @@ export async function ensureSchema(env: Env) {
   `
 
   await sql`
+    create table if not exists vip_requests (
+      id serial primary key,
+      user_id integer references users(id) on delete set null,
+      name text not null,
+      email text not null,
+      phone text,
+      slip_name text,
+      status text not null default 'pending' check (status in ('pending', 'approved', 'rejected')),
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now()
+    )
+  `
+
+  await sql`
+    create table if not exists app_settings (
+      key text primary key,
+      value jsonb not null,
+      updated_at timestamptz not null default now()
+    )
+  `
+
+  await sql`
     create index if not exists media_status_topic_idx on media(status, topic)
   `
 
@@ -111,7 +133,12 @@ export async function ensureSchema(env: Env) {
     create index if not exists sessions_user_idx on sessions(user_id, expires_at)
   `
 
+  await sql`
+    create index if not exists vip_requests_status_idx on vip_requests(status, created_at)
+  `
+
   await seedInitialData(env)
+  await seedSettings(env)
   await seedBootstrapAdmin(env)
 }
 
@@ -196,6 +223,26 @@ async function seedBootstrapAdmin(env: Env) {
       access_level = 'VIP',
       status = 'active',
       updated_at = now()
+  `
+}
+
+async function seedSettings(env: Env) {
+  const sql = getSql(env)
+
+  await sql`
+    insert into app_settings (key, value)
+    values (
+      'site',
+      ${JSON.stringify({
+        vipRegistrationEnabled: true,
+        vipPrice: 499,
+        vipQrUrl: '',
+        vipBankName: 'พร้อมเพย์ (PromptPay)',
+        vipAccountNumber: '',
+        vipAccountName: 'MIKPURINUT',
+      })}::jsonb
+    )
+    on conflict (key) do nothing
   `
 }
 

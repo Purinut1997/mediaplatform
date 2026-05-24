@@ -89,8 +89,11 @@ GET /api/media
 GET /api/categories
 POST /api/media
 POST /api/auth/login
+POST /api/auth/register
 GET /api/auth/me
 POST /api/auth/logout
+GET /api/settings
+PUT /api/settings
 ```
 
 `POST /api/media` accepts title, topic, access, status, price, cover,

@@ -66,6 +66,25 @@ create table if not exists sessions (
   created_at timestamptz not null default now()
 );
 
+create table if not exists vip_requests (
+  id serial primary key,
+  user_id integer references users(id) on delete set null,
+  name text not null,
+  email text not null,
+  phone text,
+  slip_name text,
+  status text not null default 'pending' check (status in ('pending', 'approved', 'rejected')),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists app_settings (
+  key text primary key,
+  value jsonb not null,
+  updated_at timestamptz not null default now()
+);
+
 create index if not exists media_status_topic_idx on media(status, topic);
 create index if not exists media_access_idx on media(access_level);
 create index if not exists sessions_user_idx on sessions(user_id, expires_at);
+create index if not exists vip_requests_status_idx on vip_requests(status, created_at);
