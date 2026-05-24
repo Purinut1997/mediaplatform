@@ -133,6 +133,20 @@ export async function ensureSchema(env: Env) {
   await sql`alter table users drop constraint if exists users_role_check`
   await sql`alter table users drop constraint if exists users_status_check`
   await sql`alter table vip_requests drop constraint if exists vip_requests_status_check`
+  await sql`
+    do $$
+    declare item record;
+    begin
+      for item in
+        select conrelid::regclass::text as table_name, conname
+        from pg_constraint
+        where contype = 'c'
+          and conrelid in ('media'::regclass, 'media_links'::regclass, 'users'::regclass, 'vip_requests'::regclass)
+      loop
+        execute format('alter table %s drop constraint %I', item.table_name, item.conname);
+      end loop;
+    end $$;
+  `
 
   await sql`
     create index if not exists media_status_topic_idx on media(status, topic)
