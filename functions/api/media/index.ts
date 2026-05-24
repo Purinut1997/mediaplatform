@@ -94,88 +94,100 @@ export const onRequestGet = async ({ env, request }: { env: Env; request: Reques
 }
 
 export const onRequestPost = async ({ env, request }: { env: Env; request: Request }) => {
-  const currentUser = await getCurrentUser(env, request)
-  const hasToken =
-    Boolean(env.ADMIN_WRITE_TOKEN) &&
-    request.headers.get('x-admin-token') === env.ADMIN_WRITE_TOKEN
-  const isSuperAdmin = currentUser?.role === 'superadmin'
+  try {
+    const currentUser = await getCurrentUser(env, request)
+    const hasToken =
+      Boolean(env.ADMIN_WRITE_TOKEN) &&
+      request.headers.get('x-admin-token') === env.ADMIN_WRITE_TOKEN
+    const isSuperAdmin = currentUser?.role === 'superadmin'
 
-  if (!isSuperAdmin && !hasToken) {
-    return Response.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
-  }
+    if (!isSuperAdmin && !hasToken) {
+      return Response.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+    }
 
-  await ensureSchema(env)
-  const sql = getSql(env)
-  const body = (await request.json()) as MediaPayload
-  const title = String(body.title ?? '').trim()
+    await ensureSchema(env)
+    const sql = getSql(env)
+    const body = (await request.json()) as MediaPayload
+    const title = String(body.title ?? '').trim()
 
-  if (!title) {
-    return Response.json({ ok: false, error: 'title is required' }, { status: 400 })
-  }
+    if (!title) {
+      return Response.json({ ok: false, error: 'title is required' }, { status: 400 })
+    }
 
-  const slugBase =
-    String(body.slug || title)
-      .trim()
-      .toLowerCase()
-      .replace(/[^a-z0-9ก-๙]+/g, '-')
-      .replace(/^-|-$/g, '') || 'media'
-  const slug = `${slugBase}-${Date.now()}`
-  const coverUrl = String(body.cover ?? '').trim() || DEFAULT_COVER_URL
+    const slugBase =
+      String(body.slug || title)
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9ก-๙]+/g, '-')
+        .replace(/^-|-$/g, '') || 'media'
+    const slug = `${slugBase}-${Date.now()}`
+    const coverUrl = String(body.cover ?? '').trim() || DEFAULT_COVER_URL
 
-  const [row] = (await sql`
-    insert into media (
-      title,
-      slug,
-      topic,
-      access_level,
-      status,
-      price,
-      cover_url,
-      source_type,
-      description
-    )
-    values (
-      ${title},
-      ${slug},
-      ${body.topic ?? 'โรงเรียน'},
-      ${body.access ?? 'สาธารณะ'},
-      ${body.status ?? 'แบบร่าง'},
-      ${body.price ?? 0},
-      ${coverUrl},
-      ${body.source ?? 'Google Drive'},
-      ${body.description ?? ''}
-    )
-    returning *
-  `) as MediaRow[]
-
-  const resourceUrl = String(body.resourceUrl ?? '').trim()
-  const previewUrl = String(body.previewUrl ?? '').trim()
-
-  if (resourceUrl) {
-    await sql`
-      insert into media_links (
-        media_id,
-        label,
-        type,
-        url,
-        preview_url,
-        access_level
+    const [row] = (await sql`
+      insert into media (
+        title,
+        slug,
+        topic,
+        access_level,
+        status,
+        price,
+        cover_url,
+        source_type,
+        description
       )
       values (
-        ${row.id},
         ${title},
+        ${slug},
+        ${body.topic ?? 'โรงเรียน'},
+        ${body.access ?? 'สาธารณะ'},
+        ${body.status ?? 'แบบร่าง'},
+        ${body.price ?? 0},
+        ${coverUrl},
         ${body.source ?? 'Google Drive'},
-        ${resourceUrl},
-        ${previewUrl || null},
-        ${body.access ?? 'สาธารณะ'}
+        ${body.description ?? ''}
       )
+      returning *
+    `) as MediaRow[]
+
+    const resourceUrl = String(body.resourceUrl ?? '').trim()
+    const previewUrl = String(body.previewUrl ?? '').trim()
+
+    if (resourceUrl) {
+      await sql`
+        insert into media_links (
+          media_id,
+          label,
+          type,
+          url,
+          preview_url,
+          access_level
+        )
+        values (
+          ${row.id},
+          ${title},
+          ${body.source ?? 'Google Drive'},
+          ${resourceUrl},
+          ${previewUrl || null},
+          ${body.access ?? 'สาธารณะ'}
+        )
+      `
+    }
+
+    await sql`
+      insert into audit_logs (actor, action, target_type, target_id, detail)
+      values (${currentUser?.email ?? 'token-superadmin'}, 'create', 'media', ${String(row.id)}, ${JSON.stringify({ title })}::jsonb)
     `
+
+    return Response.json({ ok: true, media: toMedia(row) }, { status: 201 })
+  } catch (error) {
+    console.error('Create media failed', error)
+    return Response.json(
+      {
+        ok: false,
+        error: 'บันทึกข้อมูลไม่สำเร็จ',
+        detail: error instanceof Error ? error.message : 'unknown error',
+      },
+      { status: 500 },
+    )
   }
-
-  await sql`
-    insert into audit_logs (actor, action, target_type, target_id, detail)
-    values (${currentUser?.email ?? 'token-superadmin'}, 'create', 'media', ${String(row.id)}, ${JSON.stringify({ title })}::jsonb)
-  `
-
-  return Response.json({ ok: true, media: toMedia(row) }, { status: 201 })
 }
