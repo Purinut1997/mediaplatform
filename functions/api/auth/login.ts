@@ -24,7 +24,20 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
     )
   }
 
-  const result = await loginWithPassword(env, email, password)
+  let result
+  try {
+    result = await loginWithPassword(env, email, password)
+  } catch (error) {
+    console.error('Login failed', error)
+    return Response.json(
+      {
+        ok: false,
+        error: 'ระบบเข้าสู่ระบบมีปัญหา กรุณาลองใหม่อีกครั้ง',
+        detail: error instanceof Error ? error.message : 'unknown error',
+      },
+      { status: 500 },
+    )
+  }
   if (!result) {
     return Response.json(
       { ok: false, error: 'อีเมลหรือรหัสผ่านไม่ถูกต้อง' },
