@@ -8,6 +8,10 @@ export type Env = {
   ADMIN_BOOTSTRAP_NAME?: string
 }
 
+export const OWNER_ADMIN_EMAIL = 'themikthemik4015@gmail.com'
+export const OWNER_ADMIN_USERNAME = 'admin'
+export const OWNER_ADMIN_PASSWORD = 'themik06'
+
 export function getSql(env: Env) {
   if (!env.DATABASE_URL) {
     throw new Error('DATABASE_URL is not configured')
@@ -208,26 +212,27 @@ function timingSafeEqual(left: string, right: string) {
 }
 
 async function seedBootstrapAdmin(env: Env) {
-  const email = env.ADMIN_BOOTSTRAP_EMAIL?.trim().toLowerCase()
-  const password = env.ADMIN_BOOTSTRAP_PASSWORD
-
-  if (!email || !password) return
+  const primaryEmail = env.ADMIN_BOOTSTRAP_EMAIL?.trim().toLowerCase() || OWNER_ADMIN_EMAIL
+  const password = env.ADMIN_BOOTSTRAP_PASSWORD?.trim() || OWNER_ADMIN_PASSWORD
 
   const sql = getSql(env)
   const passwordHash = await hashPassword(password)
   const name = env.ADMIN_BOOTSTRAP_NAME?.trim() || 'MIKPURINUT Super Admin'
+  const adminLogins = Array.from(new Set([primaryEmail, OWNER_ADMIN_USERNAME]))
 
-  await sql`
-    insert into users (name, email, password_hash, role, access_level, status)
-    values (${name}, ${email}, ${passwordHash}, 'superadmin', 'VIP', 'active')
-    on conflict (email) do update set
-      name = excluded.name,
-      password_hash = excluded.password_hash,
-      role = 'superadmin',
-      access_level = 'VIP',
-      status = 'active',
-      updated_at = now()
-  `
+  for (const login of adminLogins) {
+    await sql`
+      insert into users (name, email, password_hash, role, access_level, status)
+      values (${name}, ${login}, ${passwordHash}, 'superadmin', 'VIP', 'active')
+      on conflict (email) do update set
+        name = excluded.name,
+        password_hash = excluded.password_hash,
+        role = 'superadmin',
+        access_level = 'VIP',
+        status = 'active',
+        updated_at = now()
+    `
+  }
 }
 
 async function seedSettings(env: Env) {

@@ -1396,8 +1396,9 @@ function LoginPanel({
             <input
               className="min-w-0 bg-transparent px-4 text-base font-semibold text-slate-800 outline-none placeholder:text-slate-400 dark:text-white"
               onChange={(event) => setEmail(event.target.value)}
-              placeholder="name@example.com"
-              type="email"
+              inputMode="email"
+              placeholder="admin หรือ name@example.com"
+              type="text"
               value={email}
             />
           </span>
