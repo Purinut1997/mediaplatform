@@ -1,5 +1,8 @@
 import { ensureSchema, getSql, type Env } from '../_lib/db'
 
+const DEFAULT_COVER_URL =
+  'https://raw.githubusercontent.com/Purinut1997/web-images/ab67fea68788dc5db9514475e8f2b8cb1c32d8b3/ChatGPT%20Image%2023%20%E0%B8%9E.%E0%B8%84.%202569%2008_05_56.png'
+
 type MediaRow = {
   id: number
   title: string
@@ -14,8 +17,15 @@ type MediaRow = {
   cover_url: string
   source_type: string
   description: string
+  resource_url?: string | null
+  preview_url?: string | null
   created_at: string
   updated_at: string
+}
+
+type MediaPayload = Partial<ReturnType<typeof toMedia>> & {
+  resourceUrl?: string
+  previewUrl?: string
 }
 
 function toMedia(row: MediaRow) {
@@ -33,6 +43,8 @@ function toMedia(row: MediaRow) {
     cover: row.cover_url,
     source: row.source_type,
     description: row.description,
+    resourceUrl: row.resource_url ?? '',
+    previewUrl: row.preview_url ?? '',
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }
@@ -48,15 +60,29 @@ export const onRequestGet = async ({ env, request }: { env: Env; request: Reques
   const rows =
     topic && topic !== 'ทั้งหมด'
       ? await sql`
-          select *
+          select media.*, link.url as resource_url, link.preview_url
           from media
-          where status = ${status} and topic = ${topic}
+          left join lateral (
+            select url, preview_url
+            from media_links
+            where media_links.media_id = media.id
+            order by sort_order asc, id asc
+            limit 1
+          ) link on true
+          where media.status = ${status} and media.topic = ${topic}
           order by updated_at desc, id desc
         `
       : await sql`
-          select *
+          select media.*, link.url as resource_url, link.preview_url
           from media
-          where status = ${status}
+          left join lateral (
+            select url, preview_url
+            from media_links
+            where media_links.media_id = media.id
+            order by sort_order asc, id asc
+            limit 1
+          ) link on true
+          where media.status = ${status}
           order by updated_at desc, id desc
         `
 
@@ -67,21 +93,34 @@ export const onRequestGet = async ({ env, request }: { env: Env; request: Reques
 }
 
 export const onRequestPost = async ({ env, request }: { env: Env; request: Request }) => {
+  if (!env.ADMIN_WRITE_TOKEN) {
+    return Response.json(
+      { ok: false, error: 'ADMIN_WRITE_TOKEN is not configured' },
+      { status: 501 },
+    )
+  }
+
+  if (request.headers.get('x-admin-token') !== env.ADMIN_WRITE_TOKEN) {
+    return Response.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+  }
+
   await ensureSchema(env)
   const sql = getSql(env)
-  const body = await request.json<Partial<ReturnType<typeof toMedia>>>()
+  const body = (await request.json()) as MediaPayload
   const title = String(body.title ?? '').trim()
 
   if (!title) {
     return Response.json({ ok: false, error: 'title is required' }, { status: 400 })
   }
 
-  const slug =
-    String(body.slug ?? '')
+  const slugBase =
+    String(body.slug || title)
       .trim()
       .toLowerCase()
       .replace(/[^a-z0-9ก-๙]+/g, '-')
-      .replace(/^-|-$/g, '') || `media-${Date.now()}`
+      .replace(/^-|-$/g, '') || 'media'
+  const slug = `${slugBase}-${Date.now()}`
+  const coverUrl = String(body.cover ?? '').trim() || DEFAULT_COVER_URL
 
   const [row] = (await sql`
     insert into media (
@@ -102,12 +141,36 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
       ${body.access ?? 'สาธารณะ'},
       ${body.status ?? 'แบบร่าง'},
       ${body.price ?? 0},
-      ${body.cover ?? ''},
+      ${coverUrl},
       ${body.source ?? 'Google Drive'},
       ${body.description ?? ''}
     )
     returning *
   `) as MediaRow[]
+
+  const resourceUrl = String(body.resourceUrl ?? '').trim()
+  const previewUrl = String(body.previewUrl ?? '').trim()
+
+  if (resourceUrl) {
+    await sql`
+      insert into media_links (
+        media_id,
+        label,
+        type,
+        url,
+        preview_url,
+        access_level
+      )
+      values (
+        ${row.id},
+        ${title},
+        ${body.source ?? 'Google Drive'},
+        ${resourceUrl},
+        ${previewUrl || null},
+        ${body.access ?? 'สาธารณะ'}
+      )
+    `
+  }
 
   await sql`
     insert into audit_logs (actor, action, target_type, target_id, detail)

@@ -2,6 +2,7 @@ import { neon } from '@neondatabase/serverless'
 
 export type Env = {
   DATABASE_URL?: string
+  ADMIN_WRITE_TOKEN?: string
 }
 
 export function getSql(env: Env) {

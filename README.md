@@ -44,6 +44,13 @@ Also add `DATABASE_URL` in Cloudflare Pages:
 Project > Settings > Environment variables
 ```
 
+For Super Admin writes, add one more secret variable and use the same value in
+the admin form:
+
+```text
+ADMIN_WRITE_TOKEN="choose-a-long-random-admin-token"
+```
+
 ## First API Check
 
 After deploying to Cloudflare Pages, open:
@@ -72,5 +79,11 @@ GET /api/media
 GET /api/categories
 POST /api/media
 ```
+
+`POST /api/media` accepts title, topic, access, status, price, cover,
+description, source, resourceUrl, and previewUrl. The resource link is stored in
+`media_links` so Google Drive, Google Sheet, YouTube, or external files can be
+managed without editing code. Writes require `x-admin-token` to match
+`ADMIN_WRITE_TOKEN`.
 
 Reference SQL is kept in `database/schema.sql`.
