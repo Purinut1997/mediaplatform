@@ -28,12 +28,14 @@ import {
   Moon,
   PlayCircle,
   Plus,
+  Pencil,
   Search,
   Settings,
   ShieldCheck,
   Star,
   Sun,
   Tag,
+  Trash2,
   UserPlus,
   Users,
   X,
@@ -247,13 +249,6 @@ const portalTiles = [
   { label: 'AI Lab', detail: 'Prompt และคู่มือ AI', icon: BrainCircuit, view: 'media' as View },
   { label: 'ห้องอบรม', detail: 'บทเรียนและวิดีโอ', icon: GraduationCap, view: 'media' as View },
   { label: 'VIP Preview', detail: 'ดูสิ่งที่จะปลดล็อก', icon: ShieldCheck, view: 'media' as View },
-]
-
-const adminStats = [
-  { label: 'สมาชิกทั้งหมด', value: '1,284', icon: Users },
-  { label: 'สื่อเผยแพร่', value: '168', icon: Layers3 },
-  { label: 'ดาวน์โหลดเดือนนี้', value: '4,920', icon: Download },
-  { label: 'คำขอรอตรวจ', value: '12', icon: AlertCircle },
 ]
 
 function canViewMedia(user: CurrentUser | null, item: MediaItem) {
@@ -1934,6 +1929,7 @@ function AdminPanel({
     ...settings,
     vipPrice: String(settings.vipPrice),
   })
+  const [editingMediaId, setEditingMediaId] = useState<number | null>(null)
   const [saving, setSaving] = useState(false)
   const [savingSettings, setSavingSettings] = useState(false)
   const [adminUsers, setAdminUsers] = useState<AdminUser[]>([])
@@ -1944,6 +1940,16 @@ function AdminPanel({
   const [memberError, setMemberError] = useState('')
 
   const pendingVipRequests = vipRequests.filter((request) => request.status === 'pending')
+  const adminMetrics = [
+    { label: 'สมาชิกทั้งหมด', value: adminUsers.length.toLocaleString('th-TH'), icon: Users },
+    { label: 'สื่อเผยแพร่', value: mediaItems.length.toLocaleString('th-TH'), icon: Layers3 },
+    {
+      label: 'ดาวน์โหลดรวม',
+      value: mediaItems.reduce((sum, item) => sum + item.downloads, 0).toLocaleString('th-TH'),
+      icon: Download,
+    },
+    { label: 'คำขอรอตรวจ', value: pendingVipRequests.length.toLocaleString('th-TH'), icon: AlertCircle },
+  ]
 
   const loadMembers = async () => {
     setLoadingMembers(true)
@@ -1998,6 +2004,28 @@ function AdminPanel({
     setForm((current) => ({ ...current, [name]: value }))
   }
 
+  const startEditMedia = (item: MediaItem) => {
+    setEditingMediaId(item.id)
+    setForm({
+      title: item.title,
+      topic: item.topic,
+      access: item.access,
+      status: item.status,
+      price: String(item.price ?? 0),
+      source: item.source,
+      cover: item.cover,
+      resourceUrl: item.resourceUrl ?? '',
+      previewUrl: item.previewUrl ?? '',
+      description: item.description,
+    })
+    document.getElementById('admin-create-media')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
+  const resetMediaForm = () => {
+    setEditingMediaId(null)
+    setForm(createEmptyMediaForm(topics[0]))
+  }
+
   const updateSettings = (
     name: keyof typeof settingsForm,
     value: string | boolean,
@@ -2011,8 +2039,8 @@ function AdminPanel({
     setSaving(true)
 
     try {
-      const response = await fetch('/api/media', {
-        method: 'POST',
+      const response = await fetch(editingMediaId ? `/api/media/${editingMediaId}` : '/api/media', {
+        method: editingMediaId ? 'PUT' : 'POST',
         headers: {
           'Content-Type': 'application/json',
           'x-admin-token': adminToken,
@@ -2029,10 +2057,30 @@ function AdminPanel({
         throw new Error(result?.error ?? 'บันทึกข้อมูลไม่สำเร็จ')
       }
 
-      setForm(createEmptyMediaForm(topics[0]))
+      resetMediaForm()
       onCreated()
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : 'เกิดข้อผิดพลาด')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const deleteMedia = async (item: MediaItem) => {
+    if (!window.confirm(`ลบสื่อ "${item.title}" ใช่ไหม?`)) return
+    setError('')
+    setSaving(true)
+    try {
+      const response = await fetch(`/api/media/${item.id}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      })
+      const result = await readJson<{ error?: string }>(response)
+      if (!response.ok) throw new Error(result.error ?? 'ลบสื่อไม่สำเร็จ')
+      if (editingMediaId === item.id) resetMediaForm()
+      onCreated()
+    } catch (deleteError) {
+      setError(deleteError instanceof Error ? deleteError.message : 'ลบสื่อไม่สำเร็จ')
     } finally {
       setSaving(false)
     }
@@ -2076,19 +2124,22 @@ function AdminPanel({
 
   return (
     <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
-      <div className="overflow-hidden rounded-[2rem] border border-cyan-300/10 bg-[#080d18] p-4 text-white shadow-2xl shadow-slate-950/30 sm:p-6">
-        <div className="mb-6 flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
+      <div className="overflow-hidden rounded-[1.75rem] border border-white/10 bg-[linear-gradient(135deg,rgba(15,23,42,.96),rgba(8,13,24,.98)_52%,rgba(12,35,50,.92))] p-4 text-white shadow-2xl shadow-slate-950/30 ring-1 ring-cyan-300/10 sm:p-6">
+        <div className="mb-6 grid gap-4 lg:grid-cols-[1fr_auto] lg:items-center">
           <div>
-            <p className="mb-2 inline-flex items-center gap-2 rounded-xl bg-cyan-300 px-3 py-1 text-sm font-black text-slate-950">
+            <p className="mb-3 inline-flex items-center gap-2 rounded-full border border-cyan-300/30 bg-cyan-300/12 px-3 py-1.5 text-sm font-black text-cyan-100">
               <Gauge size={16} />
               Super Admin Control Center
             </p>
-            <h2 className="text-3xl font-black">
+            <h2 className="text-3xl font-black leading-tight sm:text-4xl">
               หลังบ้านดาร์กแบบ programmer dashboard
             </h2>
+            <p className="mt-2 max-w-2xl text-sm font-semibold leading-7 text-slate-400">
+              จัดการสื่อ สมาชิก VIP และข้อความหน้าเว็บจากพื้นที่เดียว ออกแบบให้สแกนง่ายบนคอมและมือถือ
+            </p>
           </div>
           <a
-            className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-cyan-300 px-5 font-black text-slate-950 shadow-lg shadow-cyan-500/20"
+            className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-cyan-300 to-sky-400 px-5 font-black text-slate-950 shadow-lg shadow-cyan-500/20 transition hover:-translate-y-0.5"
             href="#admin-create-media"
           >
             <Plus size={20} />
@@ -2096,21 +2147,21 @@ function AdminPanel({
           </a>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          {adminStats.map((stat) => (
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {adminMetrics.map((stat) => (
             <article
-              className="rounded-3xl border border-white/10 bg-white/[0.06] p-5 shadow-sm"
+              className="rounded-2xl border border-white/10 bg-white/[0.07] p-4 shadow-sm ring-1 ring-white/[0.03]"
               key={stat.label}
             >
-              <stat.icon className="mb-5 text-cyan-300" size={28} />
+              <stat.icon className="mb-4 text-cyan-300" size={24} />
               <p className="text-sm font-bold text-slate-400">{stat.label}</p>
-              <p className="mt-1 text-3xl font-black text-white">{stat.value}</p>
+              <p className="mt-1 text-3xl font-black tracking-tight text-white">{stat.value}</p>
             </article>
           ))}
         </div>
 
-        <div className="mt-6 grid gap-6 lg:grid-cols-[270px_1fr]">
-          <aside className="rounded-3xl border border-white/10 bg-black/24 p-4">
+        <div className="mt-5 grid gap-5 lg:grid-cols-[230px_1fr]">
+          <aside className="h-max rounded-2xl border border-white/10 bg-black/25 p-3 lg:sticky lg:top-24">
             {[
               ['Dashboard', BarChart3],
               ['จัดการสื่อ', Layers3],
@@ -2122,7 +2173,7 @@ function AdminPanel({
               const MenuIcon = Icon as typeof BarChart3
               return (
                 <button
-                  className="mb-2 flex min-h-12 w-full items-center gap-3 rounded-2xl px-4 text-left font-black text-slate-200 hover:bg-cyan-300/10"
+                  className="mb-1 flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-left text-sm font-black text-slate-300 transition hover:bg-cyan-300/10 hover:text-cyan-100"
                   key={label as string}
                   type="button"
                 >
@@ -2134,7 +2185,7 @@ function AdminPanel({
           </aside>
 
           <div className="grid gap-6">
-          <section className="rounded-3xl border border-emerald-300/20 bg-white/[0.06] p-4">
+          <section className="rounded-2xl border border-emerald-300/20 bg-white/[0.07] p-4 ring-1 ring-white/[0.03]">
             <div className="mb-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
               <div>
                 <h3 className="flex items-center gap-2 text-xl font-black">
@@ -2163,7 +2214,7 @@ function AdminPanel({
             )}
 
             <div className="grid gap-4 xl:grid-cols-[1fr_1.2fr]">
-              <div className="rounded-3xl border border-white/10 bg-black/20 p-4">
+              <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
                 <div className="mb-3 flex items-center justify-between gap-3">
                   <p className="font-black text-white">คำขอ VIP รอตรวจ</p>
                   <span className="rounded-full bg-amber-300 px-3 py-1 text-xs font-black text-slate-950">
@@ -2216,7 +2267,7 @@ function AdminPanel({
                 </div>
               </div>
 
-              <div className="rounded-3xl border border-white/10 bg-black/20 p-4">
+              <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
                 <p className="mb-3 font-black text-white">สมาชิกทั้งหมด</p>
                 <div className="grid max-h-[520px] gap-3 overflow-y-auto pr-1">
                   {adminUsers.length === 0 && (
@@ -2279,7 +2330,7 @@ function AdminPanel({
           </section>
 
           <form
-            className="rounded-3xl border border-sky-300/20 bg-white/[0.06] p-4"
+            className="rounded-2xl border border-sky-300/20 bg-white/[0.07] p-4 ring-1 ring-white/[0.03]"
             onSubmit={submitSettings}
           >
             <div className="mb-4">
@@ -2343,7 +2394,7 @@ function AdminPanel({
           </form>
 
           <form
-            className="rounded-3xl border border-pink-300/20 bg-white/[0.06] p-4"
+            className="rounded-2xl border border-pink-300/20 bg-white/[0.07] p-4 ring-1 ring-white/[0.03]"
             onSubmit={submitSettings}
           >
             <div className="mb-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
@@ -2455,20 +2506,33 @@ function AdminPanel({
           </form>
 
           <form
-            className="rounded-3xl border border-cyan-300/15 bg-white/[0.06] p-4"
+            className="rounded-2xl border border-cyan-300/20 bg-white/[0.07] p-4 ring-1 ring-white/[0.03]"
             id="admin-create-media"
             onSubmit={submitMedia}
           >
             <div className="mb-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
               <div>
-                <h3 className="text-xl font-black">เพิ่มการ์ดสื่อใหม่</h3>
+                <h3 className="text-xl font-black">
+                  {editingMediaId ? 'แก้ไขการ์ดสื่อ' : 'เพิ่มการ์ดสื่อใหม่'}
+                </h3>
                 <p className="mt-1 text-sm font-semibold text-slate-400">
                   แปะลิงก์ Drive, Sheet, YouTube หรือเว็บภายนอก โดยไม่ต้องแก้โค้ด
                 </p>
               </div>
-              <span className="rounded-xl bg-cyan-300/10 px-3 py-1 text-sm font-bold text-cyan-200">
-                บันทึกลง Neon
-              </span>
+              <div className="flex flex-wrap gap-2">
+                {editingMediaId && (
+                  <button
+                    className="min-h-10 rounded-xl bg-white/10 px-4 text-sm font-black text-white"
+                    onClick={resetMediaForm}
+                    type="button"
+                  >
+                    ยกเลิกแก้ไข
+                  </button>
+                )}
+                <span className="inline-flex min-h-10 items-center rounded-xl bg-cyan-300/10 px-3 py-1 text-sm font-bold text-cyan-200">
+                  {editingMediaId ? `ID ${editingMediaId}` : 'บันทึกลง Neon'}
+                </span>
+              </div>
             </div>
 
             <div className="grid gap-4 md:grid-cols-2">
@@ -2570,12 +2634,12 @@ function AdminPanel({
               disabled={saving}
               type="submit"
             >
-              {saving ? <Loader2 className="animate-spin" size={20} /> : <Plus size={20} />}
-              {saving ? 'กำลังบันทึก...' : 'บันทึกสื่อใหม่'}
+              {saving ? <Loader2 className="animate-spin" size={20} /> : editingMediaId ? <Pencil size={20} /> : <Plus size={20} />}
+              {saving ? 'กำลังบันทึก...' : editingMediaId ? 'บันทึกการแก้ไข' : 'บันทึกสื่อใหม่'}
             </button>
           </form>
 
-          <section className="rounded-3xl border border-white/10 bg-white/[0.06] p-4">
+          <section className="rounded-2xl border border-white/10 bg-white/[0.07] p-4 ring-1 ring-white/[0.03]">
             <div className="mb-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
               <h3 className="text-xl font-black">รายการสื่อล่าสุด</h3>
               <span className="rounded-xl bg-cyan-300/10 px-3 py-1 text-sm font-bold text-cyan-200">
@@ -2605,9 +2669,24 @@ function AdminPanel({
                       <td className="px-4 py-4">{item.status}</td>
                       <td className="px-4 py-4">{item.downloads}</td>
                       <td className="px-4 py-4">
-                        <button className="rounded-xl bg-cyan-300/10 px-3 py-2 text-sm font-black text-cyan-200">
-                          แก้ไข
-                        </button>
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-cyan-300/10 px-3 text-sm font-black text-cyan-200"
+                            onClick={() => startEditMedia(item)}
+                            type="button"
+                          >
+                            <Pencil size={15} />
+                            แก้ไข
+                          </button>
+                          <button
+                            className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-red-400/10 px-3 text-sm font-black text-red-200"
+                            onClick={() => deleteMedia(item)}
+                            type="button"
+                          >
+                            <Trash2 size={15} />
+                            ลบ
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -2622,9 +2701,22 @@ function AdminPanel({
                   <p className="mt-1 text-sm text-slate-400">
                     {item.topic} · {item.access} · {item.status}
                   </p>
-                  <button className="mt-3 min-h-11 rounded-xl bg-cyan-300 px-4 font-black text-slate-950">
-                    แก้ไข
-                  </button>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                    <button
+                      className="min-h-11 rounded-xl bg-cyan-300 px-4 font-black text-slate-950"
+                      onClick={() => startEditMedia(item)}
+                      type="button"
+                    >
+                      แก้ไข
+                    </button>
+                    <button
+                      className="min-h-11 rounded-xl bg-red-400/15 px-4 font-black text-red-100"
+                      onClick={() => deleteMedia(item)}
+                      type="button"
+                    >
+                      ลบ
+                    </button>
+                  </div>
                 </article>
               ))}
             </div>
