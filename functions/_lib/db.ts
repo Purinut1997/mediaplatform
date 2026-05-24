@@ -127,6 +127,13 @@ export async function ensureSchema(env: Env) {
     )
   `
 
+  await sql`alter table media drop constraint if exists media_access_level_check`
+  await sql`alter table media drop constraint if exists media_status_check`
+  await sql`alter table users drop constraint if exists users_access_level_check`
+  await sql`alter table users drop constraint if exists users_role_check`
+  await sql`alter table users drop constraint if exists users_status_check`
+  await sql`alter table vip_requests drop constraint if exists vip_requests_status_check`
+
   await sql`
     create index if not exists media_status_topic_idx on media(status, topic)
   `
