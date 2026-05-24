@@ -185,6 +185,7 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
       {
         ok: false,
         error: 'บันทึกข้อมูลไม่สำเร็จ',
+        detail: error instanceof Error ? error.message : 'unknown error',
       },
       { status: 500 },
     )
