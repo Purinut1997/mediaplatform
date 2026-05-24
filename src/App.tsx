@@ -167,6 +167,11 @@ function App() {
     const saved = window.localStorage.getItem('currentUser')
     return saved ? (JSON.parse(saved) as CurrentUser) : null
   })
+  const [mediaRecords, setMediaRecords] = useState<MediaItem[]>(mediaItems)
+  const [topicOptions, setTopicOptions] = useState(topics)
+  const [dataStatus, setDataStatus] = useState<'loading' | 'ready' | 'fallback'>(
+    'loading',
+  )
   const [view, setView] = useState<View>('home')
   const [selected, setSelected] = useState<MediaItem>(mediaItems[0])
   const [query, setQuery] = useState('')
@@ -201,20 +206,66 @@ function App() {
     return () => window.clearTimeout(timer)
   }, [toast])
 
+  useEffect(() => {
+    let active = true
+
+    async function loadData() {
+      try {
+        const [mediaResponse, categoriesResponse] = await Promise.all([
+          fetch('/api/media'),
+          fetch('/api/categories'),
+        ])
+
+        if (!mediaResponse.ok || !categoriesResponse.ok) {
+          throw new Error('API response was not ok')
+        }
+
+        const mediaJson = (await mediaResponse.json()) as {
+          media?: MediaItem[]
+        }
+        const categoriesJson = (await categoriesResponse.json()) as {
+          categories?: Array<{ name: string }>
+        }
+
+        if (!active) return
+
+        const nextMedia = mediaJson.media?.length ? mediaJson.media : mediaItems
+        setMediaRecords(nextMedia)
+        setSelected(nextMedia[0] ?? mediaItems[0])
+        setTopicOptions([
+          'ทั้งหมด',
+          ...(categoriesJson.categories?.map((item) => item.name) ?? topics.slice(1)),
+        ])
+        setDataStatus('ready')
+      } catch {
+        if (!active) return
+        setMediaRecords(mediaItems)
+        setTopicOptions(topics)
+        setDataStatus('fallback')
+      }
+    }
+
+    void loadData()
+
+    return () => {
+      active = false
+    }
+  }, [])
+
   const filteredMedia = useMemo(
     () =>
-      mediaItems.filter((item) => {
+      mediaRecords.filter((item) => {
         const text = `${item.title} ${item.description}`.toLowerCase()
         const matchQuery = text.includes(query.toLowerCase())
         const matchTopic = topic === 'ทั้งหมด' || item.topic === topic
         return matchQuery && matchTopic && canViewMedia(currentUser, item)
       }),
-    [currentUser, query, topic],
+    [currentUser, mediaRecords, query, topic],
   )
 
   const lockedPreviewMedia = useMemo(
-    () => mediaItems.filter((item) => !canViewMedia(currentUser, item)),
-    [currentUser],
+    () => mediaRecords.filter((item) => !canViewMedia(currentUser, item)),
+    [currentUser, mediaRecords],
   )
 
   const openDetail = (item: MediaItem) => {
@@ -258,6 +309,7 @@ function App() {
               <PortalTiles setView={setView} />
               <MediaSection
                 currentUser={currentUser}
+                dataStatus={dataStatus}
                 filteredMedia={filteredMedia}
                 lockedPreviewMedia={lockedPreviewMedia}
                 openDetail={openDetail}
@@ -265,12 +317,14 @@ function App() {
                 setQuery={setQuery}
                 setTopic={setTopic}
                 topic={topic}
+                topics={topicOptions}
               />
             </>
           )}
           {view === 'media' && (
             <MediaSection
               currentUser={currentUser}
+              dataStatus={dataStatus}
               expanded
               filteredMedia={filteredMedia}
               lockedPreviewMedia={lockedPreviewMedia}
@@ -279,6 +333,7 @@ function App() {
               setQuery={setQuery}
               setTopic={setTopic}
               topic={topic}
+              topics={topicOptions}
             />
           )}
           {view === 'detail' && (
@@ -295,6 +350,7 @@ function App() {
           )}
           {view === 'admin' && currentUser?.role === 'superadmin' && (
             <AdminPanel
+              mediaItems={mediaRecords}
               onSuccess={() => notifySuccess('บันทึกการตั้งค่าตัวอย่างแล้ว')}
             />
           )}
@@ -615,22 +671,26 @@ function PortalTiles({ setView }: { setView: (view: View) => void }) {
 
 function MediaSection({
   currentUser,
+  dataStatus,
   filteredMedia,
   lockedPreviewMedia,
   query,
   setQuery,
   setTopic,
   topic,
+  topics,
   openDetail,
   expanded,
 }: {
   currentUser: CurrentUser | null
+  dataStatus: 'loading' | 'ready' | 'fallback'
   filteredMedia: MediaItem[]
   lockedPreviewMedia: MediaItem[]
   query: string
   setQuery: (value: string) => void
   setTopic: (value: string) => void
   topic: string
+  topics: string[]
   openDetail: (item: MediaItem) => void
   expanded?: boolean
 }) {
@@ -645,6 +705,13 @@ function MediaSection({
           <h2 className="text-3xl font-black text-slate-950 dark:text-white">
             หมวดหมู่หลายชั้น สำหรับค้นหาไวบนมือถือและ PC
           </h2>
+          <p className="mt-2 text-sm font-bold text-slate-500 dark:text-slate-400">
+            {dataStatus === 'ready'
+              ? 'ข้อมูลนี้ดึงจาก Neon ผ่าน Cloudflare Functions'
+              : dataStatus === 'fallback'
+                ? 'กำลังใช้ข้อมูลสำรองในหน้าเว็บ เพราะ API ยังไม่พร้อม'
+                : 'กำลังโหลดข้อมูลจาก Neon...'}
+          </p>
         </div>
         <div className="grid gap-3 sm:grid-cols-[minmax(220px,1fr)_auto]">
           <label className="relative">
@@ -1058,7 +1125,13 @@ function LoginPanel() {
   )
 }
 
-function AdminPanel({ onSuccess }: { onSuccess: () => void }) {
+function AdminPanel({
+  mediaItems,
+  onSuccess,
+}: {
+  mediaItems: MediaItem[]
+  onSuccess: () => void
+}) {
   return (
     <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
       <div className="overflow-hidden rounded-[2rem] border border-cyan-300/10 bg-[#080d18] p-4 text-white shadow-2xl shadow-slate-950/30 sm:p-6">

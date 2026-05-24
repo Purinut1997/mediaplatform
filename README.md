@@ -61,3 +61,16 @@ After adding `DATABASE_URL` in Cloudflare, open:
 ```
 
 It should return JSON with `ok: true` and a timestamp from Neon.
+
+## Media API
+
+The first request to `/api/media` initializes the core Neon tables if they do
+not already exist, seeds starter media, and returns published media records.
+
+```text
+GET /api/media
+GET /api/categories
+POST /api/media
+```
+
+Reference SQL is kept in `database/schema.sql`.
