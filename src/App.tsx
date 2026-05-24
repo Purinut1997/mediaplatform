@@ -11,6 +11,7 @@ import {
   Download,
   ExternalLink,
   Eye,
+  EyeOff,
   FileText,
   Gauge,
   GraduationCap,
@@ -20,6 +21,7 @@ import {
   ListFilter,
   Loader2,
   LockKeyhole,
+  Mail,
   Menu,
   Moon,
   PlayCircle,
@@ -1171,6 +1173,8 @@ function LoginPanel({ onLogin }: { onLogin: (user: CurrentUser) => void }) {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
+  const [remember, setRemember] = useState(true)
 
   const submitLogin = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -1202,60 +1206,83 @@ function LoginPanel({ onLogin }: { onLogin: (user: CurrentUser) => void }) {
   }
 
   return (
-    <section className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
-      <div className="grid overflow-hidden rounded-[2rem] border border-white/70 bg-white/78 shadow-2xl shadow-slate-950/10 backdrop-blur-xl lg:grid-cols-[.9fr_1.1fr] dark:border-white/10 dark:bg-white/[0.06]">
-        <div className="bg-slate-950 p-8 text-white sm:p-10">
-          <img
-            alt="MIKPURINUT"
-            className="mb-6 h-16 w-16 rounded-2xl object-cover shadow-2xl"
-            src={LOGO_URL}
-          />
-          <p className="mb-3 inline-flex rounded-2xl bg-cyan-300 px-3 py-1 text-sm font-black text-slate-950">
-            Secure Access
-          </p>
-          <h2 className="text-3xl font-black">เข้าสู่ระบบผู้ดูแล</h2>
-          <p className="mt-4 leading-8 text-slate-300">
-            หลังบ้าน Super Admin จะไม่แสดงต่อผู้ใช้ทั่วไป ต้องเข้าสู่ระบบด้วยบัญชีที่ได้รับสิทธิ์ก่อน
-          </p>
-          <p className="mt-8 rounded-2xl border border-white/10 bg-white/10 p-4 text-sm leading-7 text-slate-300">
-            ระบบนี้เชื่อม session กับ Neon แล้ว ผู้ดูแลต้องมีบัญชีในฐานข้อมูล
-            และ Cloudflare ต้องตั้งค่า bootstrap admin ก่อนใช้งานครั้งแรก
+    <section className="mx-auto grid min-h-[calc(100vh-88px)] max-w-6xl place-items-center px-4 py-10 sm:px-6">
+      <form
+        className="relative w-full max-w-[560px] overflow-hidden rounded-[1.75rem] border border-white/80 bg-white/92 px-5 py-8 shadow-2xl shadow-slate-950/14 backdrop-blur-2xl sm:rounded-[2rem] sm:px-10 dark:border-white/10 dark:bg-slate-950/90"
+        onSubmit={submitLogin}
+      >
+        <div className="pointer-events-none absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-cyan-400 to-transparent" />
+        <img
+          alt="MIKPURINUT"
+          className="mx-auto h-20 w-20 rounded-full border-4 border-white object-cover shadow-xl shadow-blue-900/20"
+          src={LOGO_URL}
+        />
+        <div className="mt-5 text-center">
+          <h2 className="text-3xl font-black text-slate-950 dark:text-white">
+            ลงชื่อเข้าใช้
+          </h2>
+          <p className="mt-2 text-sm font-bold text-slate-500 dark:text-slate-400">
+            กรอกข้อมูลเพื่อเข้าสู่ระบบบัญชีของคุณ
           </p>
         </div>
 
-        <form className="p-6 sm:p-10" onSubmit={submitLogin}>
-          <h3 className="text-2xl font-black text-slate-950 dark:text-white">
-            Login
-          </h3>
-          <p className="mt-2 text-sm font-semibold text-slate-500 dark:text-slate-400">
-            ใช้บัญชี superadmin เพื่อเข้าสู่แผงควบคุม
-          </p>
-
-          <label className="mt-6 block">
-            <span className="text-sm font-black text-slate-700 dark:text-slate-200">
-              ชื่อผู้ใช้
+        <label className="mt-8 block">
+          <span className="text-sm font-black text-slate-600 dark:text-slate-300">
+            อีเมล
+          </span>
+          <span className="mt-2 grid min-h-14 grid-cols-[58px_1fr] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-within:border-blue-500 transition-within:ring-4 transition-within:ring-blue-500/10 dark:border-white/10 dark:bg-white/10">
+            <span className="grid place-items-center border-r border-slate-100 bg-slate-50 text-blue-600 dark:border-white/10 dark:bg-white/5 dark:text-cyan-300">
+              <Mail size={21} />
             </span>
             <input
-              className="mt-2 min-h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-base outline-none transition focus:border-cyan-500 focus:ring-4 focus:ring-cyan-500/10 dark:border-white/10 dark:bg-white/10"
+              className="min-w-0 bg-transparent px-4 text-base font-semibold text-slate-800 outline-none placeholder:text-slate-400 dark:text-white"
               onChange={(event) => setEmail(event.target.value)}
-              placeholder="admin@example.com"
+              placeholder="name@example.com"
               type="email"
               value={email}
             />
-          </label>
+          </span>
+        </label>
 
-          <label className="mt-4 block">
-            <span className="text-sm font-black text-slate-700 dark:text-slate-200">
-              รหัสผ่าน
+        <label className="mt-5 block">
+          <span className="text-sm font-black text-slate-600 dark:text-slate-300">
+            รหัสผ่าน
+          </span>
+          <span className="mt-2 grid min-h-14 grid-cols-[58px_1fr_52px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-within:border-blue-500 transition-within:ring-4 transition-within:ring-blue-500/10 dark:border-white/10 dark:bg-white/10">
+            <span className="grid place-items-center border-r border-slate-100 bg-slate-50 text-blue-600 dark:border-white/10 dark:bg-white/5 dark:text-cyan-300">
+              <LockKeyhole size={21} />
             </span>
             <input
-              className="mt-2 min-h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-base outline-none transition focus:border-cyan-500 focus:ring-4 focus:ring-cyan-500/10 dark:border-white/10 dark:bg-white/10"
+              className="min-w-0 bg-transparent px-4 text-base font-semibold text-slate-800 outline-none placeholder:text-slate-400 dark:text-white"
               onChange={(event) => setPassword(event.target.value)}
               placeholder="••••••••"
-              type="password"
+              type={showPassword ? 'text' : 'password'}
               value={password}
             />
+            <button
+              className="grid place-items-center text-slate-500 hover:text-blue-600 dark:text-slate-300"
+              onClick={() => setShowPassword((value) => !value)}
+              type="button"
+            >
+              {showPassword ? <Eye size={21} /> : <EyeOff size={21} />}
+            </button>
+          </span>
+        </label>
+
+        <div className="mt-5 flex items-center justify-between gap-3 text-sm font-bold">
+          <label className="flex min-h-10 items-center gap-2 text-slate-500 dark:text-slate-300">
+            <input
+              checked={remember}
+              className="h-4 w-4 rounded border-slate-300 text-blue-600"
+              onChange={(event) => setRemember(event.target.checked)}
+              type="checkbox"
+            />
+            จำฉันไว้ในระบบ
           </label>
+          <button className="text-blue-600 hover:text-blue-700" type="button">
+            ลืมรหัสผ่าน?
+          </button>
+        </div>
 
           {error && (
             <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 p-3 text-sm font-bold text-red-700 dark:border-red-400/20 dark:bg-red-400/10 dark:text-red-200">
@@ -1264,15 +1291,47 @@ function LoginPanel({ onLogin }: { onLogin: (user: CurrentUser) => void }) {
           )}
 
           <button
-            className="mt-6 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-slate-950 px-5 font-black text-cyan-200 shadow-lg shadow-slate-900/10 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-cyan-300 dark:text-slate-950"
+            className="mt-6 inline-flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-blue-500 to-violet-600 px-5 text-lg font-black text-white shadow-xl shadow-blue-600/25 transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
             disabled={submitting}
             type="submit"
           >
             {submitting && <Loader2 className="animate-spin" size={20} />}
-            {submitting ? 'กำลังตรวจสอบ...' : 'เข้าสู่ระบบ Super Admin'}
+            {submitting ? 'กำลังตรวจสอบ...' : 'เข้าสู่ระบบ'}
+            {!submitting && <ChevronRight size={21} />}
           </button>
-        </form>
-      </div>
+
+        <div className="my-8 flex items-center gap-3 text-xs font-black text-slate-400">
+          <span className="h-px flex-1 bg-slate-200 dark:bg-white/10" />
+          หรือเข้าสู่ระบบด้วย
+          <span className="h-px flex-1 bg-slate-200 dark:bg-white/10" />
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <button
+            className="inline-flex min-h-13 items-center justify-center gap-2 rounded-2xl bg-red-500 px-4 font-black text-white shadow-lg shadow-red-500/20"
+            onClick={() => setError('Google Login จะเชื่อมต่อในขั้นตอน OAuth ถัดไป')}
+            type="button"
+          >
+            <span className="text-xl">G</span>
+            Google
+          </button>
+          <button
+            className="inline-flex min-h-13 items-center justify-center gap-2 rounded-2xl bg-blue-700 px-4 font-black text-white shadow-lg shadow-blue-700/20"
+            onClick={() => setError('Facebook Login เป็นตัวเลือกสำรองในอนาคต')}
+            type="button"
+          >
+            <span className="text-xl">f</span>
+            Facebook
+          </button>
+        </div>
+
+        <div className="mt-6 rounded-2xl border border-dashed border-blue-200 bg-blue-50/60 p-4 text-center text-sm font-bold text-slate-500 dark:border-cyan-300/20 dark:bg-cyan-300/10 dark:text-slate-300">
+          ยังไม่มีบัญชีสมาชิก?{' '}
+          <button className="font-black text-blue-600 dark:text-cyan-200" type="button">
+            สมัครฟรี!
+          </button>
+        </div>
+      </form>
     </section>
   )
 }
