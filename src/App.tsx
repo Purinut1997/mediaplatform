@@ -1275,27 +1275,67 @@ function LoginPanel({
   }
 
   return (
-    <section className="mx-auto grid min-h-[calc(100vh-88px)] max-w-6xl place-items-center px-4 py-10 sm:px-6">
+    <section className="mx-auto grid min-h-[calc(100vh-88px)] max-w-7xl place-items-center px-4 py-10 sm:px-6">
       <form
-        className="relative w-full max-w-[560px] overflow-hidden rounded-[1.75rem] border border-white/80 bg-white/92 px-5 py-8 shadow-2xl shadow-slate-950/14 backdrop-blur-2xl sm:rounded-[2rem] sm:px-10 dark:border-white/10 dark:bg-slate-950/90"
+        className="relative grid w-full max-w-5xl overflow-hidden rounded-[2rem] border border-white/80 bg-white/86 shadow-2xl shadow-sky-900/12 backdrop-blur-2xl lg:grid-cols-[0.9fr_1.1fr] dark:border-white/10 dark:bg-slate-950/88"
         onSubmit={submitLogin}
       >
-        <div className="pointer-events-none absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-cyan-400 to-transparent" />
-        <img
-          alt="MIKPURINUT"
-          className="mx-auto h-20 w-20 rounded-full border-4 border-white object-cover shadow-xl shadow-blue-900/20"
-          src={LOGO_URL}
-        />
-        <div className="mt-5 text-center">
-          <h2 className="text-3xl font-black text-slate-950 dark:text-white">
-            ลงชื่อเข้าใช้
-          </h2>
-          <p className="mt-2 text-sm font-bold text-slate-500 dark:text-slate-400">
-            กรอกข้อมูลเพื่อเข้าสู่ระบบบัญชีของคุณ
-          </p>
+        <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-cyan-400 via-blue-500 to-fuchsia-500" />
+        <div className="relative overflow-hidden bg-slate-950 p-6 text-white sm:p-8 lg:p-10">
+          <div className="absolute inset-0 opacity-40 [background-image:radial-gradient(circle_at_20%_20%,rgba(34,211,238,.38),transparent_32%),radial-gradient(circle_at_82%_16%,rgba(168,85,247,.34),transparent_28%),linear-gradient(135deg,rgba(255,255,255,.08)_1px,transparent_1px)] [background-size:auto,auto,28px_28px]" />
+          <div className="relative flex min-h-full flex-col justify-between gap-10">
+            <div>
+              <div className="flex items-center gap-3">
+                <img
+                  alt="MIKPURINUT"
+                  className="h-14 w-14 rounded-2xl border border-cyan-300/30 object-cover shadow-xl shadow-cyan-500/20"
+                  src={LOGO_URL}
+                />
+                <div>
+                  <p className="text-sm font-black text-cyan-200">MIKPURINUT Nexus</p>
+                  <p className="text-xs font-bold text-slate-400">Member Access Console</p>
+                </div>
+              </div>
+              <h2 className="mt-10 text-4xl font-black leading-tight">
+                เข้าสู่พื้นที่คลังสื่ออัจฉริยะ
+              </h2>
+              <p className="mt-4 leading-8 text-slate-300">
+                ใช้บัญชีเดียวเพื่อเปิดสิทธิ์ดาวน์โหลด ติดตามสื่อที่บันทึกไว้ และเข้าสู่หลังบ้านเมื่อคุณเป็นผู้ดูแล
+              </p>
+            </div>
+
+            <div className="grid gap-3">
+              {[
+                ['Public', 'ดูสื่อเปิดเผยได้ทันที'],
+                ['Member', 'ปลดล็อกไฟล์สมาชิก'],
+                ['VIP', 'เข้าถึงชุดสื่อขั้นสูง'],
+              ].map(([label, detail]) => (
+                <div
+                  className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/8 px-4 py-3"
+                  key={label}
+                >
+                  <span className="font-black text-white">{label}</span>
+                  <span className="text-sm font-bold text-slate-400">{detail}</span>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
 
-        <label className="mt-8 block">
+        <div className="p-5 sm:p-8 lg:p-10">
+          <div className="mb-7">
+            <p className="inline-flex rounded-full bg-cyan-100 px-3 py-1 text-xs font-black text-cyan-800 dark:bg-cyan-300/10 dark:text-cyan-200">
+              Secure Login
+            </p>
+            <h2 className="mt-3 text-3xl font-black text-slate-950 dark:text-white">
+              ลงชื่อเข้าใช้
+            </h2>
+            <p className="mt-2 text-sm font-bold text-slate-500 dark:text-slate-400">
+              กรอกอีเมลและรหัสผ่านเพื่อเข้าสู่ระบบบัญชีของคุณ
+            </p>
+          </div>
+
+        <label className="block">
           <span className="text-sm font-black text-slate-600 dark:text-slate-300">
             อีเมล
           </span>
@@ -1404,6 +1444,7 @@ function LoginPanel({
             สมัครฟรี!
           </button>
         </div>
+        </div>
       </form>
     </section>
   )
@@ -1484,39 +1525,56 @@ function RegisterPanel({
   const vipSelected = form.membership === 'vip'
 
   return (
-    <section className="mx-auto grid min-h-[calc(100vh-88px)] max-w-7xl overflow-hidden rounded-none bg-white shadow-2xl shadow-slate-950/10 lg:grid-cols-[0.78fr_1.22fr] dark:bg-slate-950">
-      <div className="relative grid min-h-[360px] place-items-center overflow-hidden bg-gradient-to-br from-blue-700 via-indigo-600 to-blue-500 p-8 text-white lg:min-h-full">
-        <div className="absolute inset-0 opacity-20 [background-image:linear-gradient(30deg,rgba(255,255,255,.3)_12%,transparent_12.5%,transparent_87%,rgba(255,255,255,.3)_87.5%,rgba(255,255,255,.3)),linear-gradient(150deg,rgba(255,255,255,.3)_12%,transparent_12.5%,transparent_87%,rgba(255,255,255,.3)_87.5%,rgba(255,255,255,.3)),linear-gradient(30deg,rgba(255,255,255,.3)_12%,transparent_12.5%,transparent_87%,rgba(255,255,255,.3)_87.5%,rgba(255,255,255,.3)),linear-gradient(150deg,rgba(255,255,255,.3)_12%,transparent_12.5%,transparent_87%,rgba(255,255,255,.3)_87.5%,rgba(255,255,255,.3))] [background-position:0_0,0_0,24px_42px,24px_42px] [background-size:48px_84px]" />
-        <div className="relative max-w-md text-center">
-          <img
-            alt="MIKPURINUT"
-            className="mx-auto mb-8 h-24 w-24 rounded-full border-4 border-white/30 object-cover shadow-2xl"
-            src={LOGO_URL}
-          />
-          <h2 className="text-4xl font-black">มาร่วมเป็นส่วนหนึ่งกับเรา</h2>
-          <p className="mt-5 text-lg font-bold text-blue-100">
-            เข้าถึงซอฟต์แวร์คุณภาพเพื่อยกระดับองค์กรของคุณ
-          </p>
-          <div className="mx-auto mt-8 grid max-w-xs gap-3 text-left text-blue-50">
-            {['ดาวน์โหลดโปรแกรมฟรีทันที', 'อัปเดตเวอร์ชันใหม่ตลอด', 'ทีมงานดูแลตลอดการใช้งาน'].map((item) => (
-              <p className="flex items-center gap-3 font-bold" key={item}>
-                <CheckCircle2 className="shrink-0 text-blue-100" size={19} />
-                {item}
-              </p>
+    <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
+      <div className="relative overflow-hidden rounded-[2rem] border border-white/70 bg-slate-950 p-5 text-white shadow-2xl shadow-sky-900/15 sm:p-8">
+        <div className="absolute inset-0 opacity-70 [background-image:radial-gradient(circle_at_12%_18%,rgba(34,211,238,.36),transparent_28%),radial-gradient(circle_at_82%_12%,rgba(244,114,182,.26),transparent_30%),linear-gradient(90deg,rgba(255,255,255,.08)_1px,transparent_1px),linear-gradient(rgba(255,255,255,.06)_1px,transparent_1px)] [background-size:auto,auto,42px_42px,42px_42px]" />
+        <div className="relative grid gap-6 lg:grid-cols-[1.05fr_0.95fr] lg:items-end">
+          <div>
+            <button
+              className="mb-6 inline-flex min-h-11 items-center gap-2 rounded-2xl border border-white/15 bg-white/10 px-4 font-black text-cyan-100"
+              onClick={() => setView('login')}
+              type="button"
+            >
+              <ArrowLeft size={18} />
+              กลับไปหน้าเข้าสู่ระบบ
+            </button>
+            <div className="flex items-center gap-4">
+              <img
+                alt="MIKPURINUT"
+                className="h-16 w-16 rounded-2xl border border-cyan-300/30 object-cover shadow-xl shadow-cyan-500/20"
+                src={LOGO_URL}
+              />
+              <div>
+                <p className="text-sm font-black text-cyan-200">MIKPURINUT Membership</p>
+                <h2 className="text-3xl font-black sm:text-4xl">
+                  เลือกสิทธิ์ แล้วเริ่มใช้งานคลังสื่อ
+                </h2>
+              </div>
+            </div>
+            <p className="mt-5 max-w-3xl leading-8 text-slate-300">
+              สมัครครั้งเดียวเพื่อเก็บประวัติ ดาวน์โหลดสื่อสมาชิก และส่งคำขอ VIP ได้ในหน้าเดียว
+              โดยผู้ดูแลสามารถเปิดปิดแพ็กเกจ VIP และเปลี่ยน QR Code จากหลังบ้าน
+            </p>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
+            {['บัญชีสมาชิก', 'เลือกสิทธิ์', 'ยืนยันและใช้งาน'].map((item, index) => (
+              <div
+                className="rounded-2xl border border-white/10 bg-white/10 p-4"
+                key={item}
+              >
+                <p className="text-xs font-black text-cyan-200">STEP {index + 1}</p>
+                <p className="mt-1 font-black">{item}</p>
+              </div>
             ))}
           </div>
         </div>
       </div>
 
-      <form className="px-5 py-8 sm:px-10 lg:px-14" onSubmit={submitRegister}>
-        <div className="mb-6 flex items-center gap-4">
-          <button
-            className="grid h-12 w-16 place-items-center rounded-full border border-slate-300 text-slate-700 transition hover:border-blue-500 hover:text-blue-600 dark:border-white/10 dark:text-white"
-            onClick={() => setView('login')}
-            type="button"
-          >
-            <ArrowLeft size={22} />
-          </button>
+      <form
+        className="mt-6 rounded-[2rem] border border-white/70 bg-white/86 p-5 shadow-2xl shadow-slate-950/8 backdrop-blur-xl sm:p-8 lg:p-10 dark:border-white/10 dark:bg-white/[0.06]"
+        onSubmit={submitRegister}
+      >
+        <div className="mb-6 flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
           <div>
             <h2 className="text-3xl font-black text-slate-950 dark:text-white">
               สมัครสมาชิกใหม่
