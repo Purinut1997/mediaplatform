@@ -139,7 +139,11 @@ export async function ensureSchema(env: Env) {
 
   await seedInitialData(env)
   await seedSettings(env)
-  await seedBootstrapAdmin(env)
+  try {
+    await seedBootstrapAdmin(env)
+  } catch (error) {
+    console.error('Bootstrap admin failed', error)
+  }
 }
 
 export async function hashPassword(password: string, salt = randomHex(16)) {
@@ -235,6 +239,14 @@ async function seedSettings(env: Env) {
       'site',
       ${JSON.stringify({
         vipRegistrationEnabled: false,
+        heroEyebrow: 'AI / Cyber / School Operations',
+        heroTitle: 'ศูนย์กลางสื่อการเรียนรู้ที่สดใส ล้ำสมัย และใช้งานง่าย',
+        heroDescription:
+          'ออกแบบเป็น portal โรงเรียนยุคใหม่ มีคลังสื่อแบบ dashboard, แยกสิทธิ์ Public / Member / VIP และเชื่อมสื่อจาก Drive, Sheet, YouTube ได้ในที่เดียว',
+        heroImageUrl:
+          'https://raw.githubusercontent.com/Purinut1997/web-images/c70597729a1ba58a7b7b672d2bcace2f673a5a49/bdbeb65d-b4f5-4f65-a388-e95d950eac84%20%281%29.png',
+        heroPrimaryLabel: 'เปิดคลังสื่อ',
+        heroSecondaryLabel: 'ดูสิทธิ์ VIP',
         vipPrice: 0,
         vipQrUrl: '',
         vipBankName: 'พร้อมเพย์ (PromptPay)',
@@ -256,6 +268,14 @@ async function seedSettings(env: Env) {
       value = value
         || ${JSON.stringify({
           vipRegistrationEnabled: false,
+          heroEyebrow: 'AI / Cyber / School Operations',
+          heroTitle: 'ศูนย์กลางสื่อการเรียนรู้ที่สดใส ล้ำสมัย และใช้งานง่าย',
+          heroDescription:
+            'ออกแบบเป็น portal โรงเรียนยุคใหม่ มีคลังสื่อแบบ dashboard, แยกสิทธิ์ Public / Member / VIP และเชื่อมสื่อจาก Drive, Sheet, YouTube ได้ในที่เดียว',
+          heroImageUrl:
+            'https://raw.githubusercontent.com/Purinut1997/web-images/c70597729a1ba58a7b7b672d2bcace2f673a5a49/bdbeb65d-b4f5-4f65-a388-e95d950eac84%20%281%29.png',
+          heroPrimaryLabel: 'เปิดคลังสื่อ',
+          heroSecondaryLabel: 'ดูสิทธิ์ VIP',
           vipPrice: 0,
           vipPaymentTitle: 'ข้อมูลการชำระเงิน VIP',
           vipPaymentSubtitle: 'กรุณาโอนเงินและแนบสลิปเพื่อยืนยันสิทธิ์',

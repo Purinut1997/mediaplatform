@@ -2,6 +2,12 @@ import { getCurrentUser } from '../_lib/auth'
 import { ensureSchema, getSql, type Env } from '../_lib/db'
 
 type SiteSettings = {
+  heroEyebrow: string
+  heroTitle: string
+  heroDescription: string
+  heroImageUrl: string
+  heroPrimaryLabel: string
+  heroSecondaryLabel: string
   vipRegistrationEnabled: boolean
   vipPrice: number
   vipQrUrl: string
@@ -16,6 +22,14 @@ type SiteSettings = {
 }
 
 const defaultSettings: SiteSettings = {
+  heroEyebrow: 'AI / Cyber / School Operations',
+  heroTitle: 'ศูนย์กลางสื่อการเรียนรู้ที่สดใส ล้ำสมัย และใช้งานง่าย',
+  heroDescription:
+    'ออกแบบเป็น portal โรงเรียนยุคใหม่ มีคลังสื่อแบบ dashboard, แยกสิทธิ์ Public / Member / VIP และเชื่อมสื่อจาก Drive, Sheet, YouTube ได้ในที่เดียว',
+  heroImageUrl:
+    'https://raw.githubusercontent.com/Purinut1997/web-images/c70597729a1ba58a7b7b672d2bcace2f673a5a49/bdbeb65d-b4f5-4f65-a388-e95d950eac84%20%281%29.png',
+  heroPrimaryLabel: 'เปิดคลังสื่อ',
+  heroSecondaryLabel: 'ดูสิทธิ์ VIP',
   vipRegistrationEnabled: false,
   vipPrice: 0,
   vipQrUrl: '',
@@ -59,6 +73,12 @@ export const onRequestPut = async ({ env, request }: { env: Env; request: Reques
 
   const body = (await request.json().catch(() => ({}))) as Partial<SiteSettings>
   const settings: SiteSettings = normalizeSettings({
+    heroEyebrow: String(body.heroEyebrow ?? defaultSettings.heroEyebrow),
+    heroTitle: String(body.heroTitle ?? defaultSettings.heroTitle),
+    heroDescription: String(body.heroDescription ?? defaultSettings.heroDescription),
+    heroImageUrl: String(body.heroImageUrl ?? defaultSettings.heroImageUrl),
+    heroPrimaryLabel: String(body.heroPrimaryLabel ?? defaultSettings.heroPrimaryLabel),
+    heroSecondaryLabel: String(body.heroSecondaryLabel ?? defaultSettings.heroSecondaryLabel),
     vipRegistrationEnabled: Boolean(body.vipRegistrationEnabled),
     vipPrice: Number(body.vipPrice ?? defaultSettings.vipPrice),
     vipQrUrl: String(body.vipQrUrl ?? ''),

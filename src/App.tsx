@@ -91,6 +91,12 @@ type MediaFormState = {
 }
 
 type SiteSettings = {
+  heroEyebrow: string
+  heroTitle: string
+  heroDescription: string
+  heroImageUrl: string
+  heroPrimaryLabel: string
+  heroSecondaryLabel: string
   vipRegistrationEnabled: boolean
   vipPrice: number
   vipQrUrl: string
@@ -181,6 +187,13 @@ const sourceOptions: MediaItem['source'][] = [
   'External Link',
 ]
 const defaultSiteSettings: SiteSettings = {
+  heroEyebrow: 'AI / Cyber / School Operations',
+  heroTitle: 'ศูนย์กลางสื่อการเรียนรู้ที่สดใส ล้ำสมัย และใช้งานง่าย',
+  heroDescription:
+    'ออกแบบเป็น portal โรงเรียนยุคใหม่ มีคลังสื่อแบบ dashboard, แยกสิทธิ์ Public / Member / VIP และเชื่อมสื่อจาก Drive, Sheet, YouTube ได้ในที่เดียว',
+  heroImageUrl: BRAND_HERO_URL,
+  heroPrimaryLabel: 'เปิดคลังสื่อ',
+  heroSecondaryLabel: 'ดูสิทธิ์ VIP',
   vipRegistrationEnabled: false,
   vipPrice: 0,
   vipQrUrl: '',
@@ -252,6 +265,19 @@ function getPreviewUrl(item: MediaItem) {
   }
 
   return link
+}
+
+async function readJson<T>(response: Response): Promise<T> {
+  const text = await response.text()
+  try {
+    return JSON.parse(text) as T
+  } catch {
+    throw new Error(
+      response.ok
+        ? 'API ส่งข้อมูลกลับมาไม่ถูกต้อง'
+        : 'API ยังไม่พร้อมใช้งาน กรุณาลองใหม่อีกครั้ง',
+    )
+  }
 }
 
 function App() {
@@ -440,7 +466,7 @@ function App() {
         <main>
           {view === 'home' && (
             <>
-              <Hero setView={setView} />
+              <Hero settings={siteSettings} setView={setView} />
               <PortalTiles setView={setView} />
               <MediaSection
                 currentUser={currentUser}
@@ -750,21 +776,26 @@ function Header({
   )
 }
 
-function Hero({ setView }: { setView: (view: View) => void }) {
+function Hero({
+  setView,
+  settings,
+}: {
+  setView: (view: View) => void
+  settings: SiteSettings
+}) {
   return (
     <section className="mx-auto max-w-7xl px-4 pb-8 pt-8 sm:px-6 lg:pt-12">
       <div className="grid overflow-hidden rounded-[2rem] border border-white/80 bg-white/80 shadow-2xl shadow-sky-900/10 backdrop-blur-2xl lg:grid-cols-[0.9fr_1.1fr] dark:border-white/10 dark:bg-white/[0.06]">
         <div className="p-6 sm:p-9 lg:p-12">
           <div className="mb-6 inline-flex items-center gap-2 rounded-2xl border border-cyan-500/20 bg-cyan-50 px-4 py-2 text-sm font-black text-cyan-900 dark:bg-cyan-400/10 dark:text-cyan-200">
             <BrainCircuit size={18} />
-            AI / Cyber / School Operations
+            {settings.heroEyebrow}
           </div>
           <h1 className="max-w-3xl text-4xl font-black leading-tight text-slate-950 sm:text-5xl dark:text-white">
-            ศูนย์กลางสื่อการเรียนรู้ที่สดใส ล้ำสมัย และใช้งานง่าย
+            {settings.heroTitle}
           </h1>
           <p className="mt-5 max-w-2xl text-base leading-8 text-slate-600 sm:text-lg dark:text-slate-300">
-            ออกแบบเป็น portal โรงเรียนยุคใหม่ มีคลังสื่อแบบ dashboard, แยกสิทธิ์
-            Public / Member / VIP และเชื่อมสื่อจาก Drive, Sheet, YouTube ได้ในที่เดียว
+            {settings.heroDescription}
           </p>
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
             <button
@@ -773,7 +804,7 @@ function Hero({ setView }: { setView: (view: View) => void }) {
               type="button"
             >
               <BookOpen size={20} />
-              เปิดคลังสื่อ
+              {settings.heroPrimaryLabel}
             </button>
             <button
               className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-slate-300 bg-white/70 px-6 font-black text-slate-800 transition hover:-translate-y-0.5 hover:border-cyan-400 dark:border-white/10 dark:bg-white/10 dark:text-white"
@@ -781,24 +812,24 @@ function Hero({ setView }: { setView: (view: View) => void }) {
               type="button"
             >
               <ShieldCheck size={20} />
-              ดูสิทธิ์ VIP
+              {settings.heroSecondaryLabel}
             </button>
           </div>
         </div>
 
-        <BrandShowcase />
+        <BrandShowcase imageUrl={settings.heroImageUrl} />
       </div>
     </section>
   )
 }
 
-function BrandShowcase() {
+function BrandShowcase({ imageUrl }: { imageUrl: string }) {
   return (
     <div className="relative min-h-[380px] overflow-hidden border-t border-sky-100 bg-sky-950 text-white lg:border-l lg:border-t-0">
       <img
         alt="MIX The Architect brand"
         className="absolute inset-0 h-full w-full object-cover"
-        src={BRAND_HERO_URL}
+        src={imageUrl || BRAND_HERO_URL}
       />
       <div className="absolute inset-0 bg-gradient-to-r from-sky-950/10 via-sky-950/0 to-sky-950/32" />
       <div className="brand-code-rain absolute inset-0" />
@@ -1276,10 +1307,10 @@ function LoginPanel({
           website: botTrap,
         }),
       })
-      const result = (await response.json()) as {
+      const result = await readJson<{
         user?: CurrentUser
         error?: string
-      }
+      }>(response)
 
       if (!response.ok || !result.user) {
         throw new Error(result.error ?? 'เข้าสู่ระบบไม่สำเร็จ')
@@ -1543,10 +1574,10 @@ function RegisterPanel({
           website: botTrap,
         }),
       })
-      const result = (await response.json()) as {
+      const result = await readJson<{
         user?: CurrentUser
         error?: string
-      }
+      }>(response)
 
       if (!response.ok || !result.user) {
         throw new Error(result.error ?? 'สมัครสมาชิกไม่สำเร็จ')
@@ -1947,12 +1978,12 @@ function AdminPanel({
         credentials: 'include',
         body: JSON.stringify(nextSettings),
       })
-      const result = (await response.json().catch(() => null)) as {
+      const result = await readJson<{
         settings?: SiteSettings
         error?: string
-      } | null
+      }>(response)
 
-      if (!response.ok || !result?.settings) {
+      if (!response.ok || !result.settings) {
         throw new Error(result?.error ?? 'บันทึกการตั้งค่าไม่สำเร็จ')
       }
 
@@ -2026,6 +2057,70 @@ function AdminPanel({
           </aside>
 
           <div className="grid gap-6">
+          <form
+            className="rounded-3xl border border-sky-300/20 bg-white/[0.06] p-4"
+            onSubmit={submitSettings}
+          >
+            <div className="mb-4">
+              <h3 className="text-xl font-black">ตั้งค่าหน้าแรกและหน้าปกเว็บไซต์</h3>
+              <p className="mt-1 text-sm font-semibold text-slate-400">
+                แก้ข้อความ hero และรูปหน้าปกหน้าแรกได้โดยไม่ต้องแก้โค้ด
+              </p>
+            </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              <AdminField
+                label="ป้ายหัวข้อเล็ก"
+                name="heroEyebrow"
+                onChange={updateSettings}
+                placeholder="AI / Cyber / School Operations"
+                value={settingsForm.heroEyebrow}
+              />
+              <AdminField
+                label="URL รูปหน้าปกเว็บไซต์"
+                name="heroImageUrl"
+                onChange={updateSettings}
+                placeholder="https://..."
+                value={settingsForm.heroImageUrl}
+              />
+              <AdminField
+                label="หัวข้อใหญ่หน้าแรก"
+                name="heroTitle"
+                onChange={updateSettings}
+                placeholder="ศูนย์กลางสื่อ..."
+                value={settingsForm.heroTitle}
+              />
+              <AdminField
+                label="คำอธิบายหน้าแรก"
+                name="heroDescription"
+                onChange={updateSettings}
+                placeholder="รายละเอียดแนะนำเว็บไซต์"
+                value={settingsForm.heroDescription}
+              />
+              <AdminField
+                label="ข้อความปุ่มหลัก"
+                name="heroPrimaryLabel"
+                onChange={updateSettings}
+                placeholder="เปิดคลังสื่อ"
+                value={settingsForm.heroPrimaryLabel}
+              />
+              <AdminField
+                label="ข้อความปุ่มรอง"
+                name="heroSecondaryLabel"
+                onChange={updateSettings}
+                placeholder="ดูสิทธิ์ VIP"
+                value={settingsForm.heroSecondaryLabel}
+              />
+            </div>
+            <button
+              className="mt-5 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-sky-300 px-5 font-black text-slate-950 shadow-lg shadow-sky-500/20 disabled:opacity-60 sm:w-auto"
+              disabled={savingSettings}
+              type="submit"
+            >
+              {savingSettings ? <Loader2 className="animate-spin" size={20} /> : <Settings size={20} />}
+              {savingSettings ? 'กำลังบันทึก...' : 'บันทึกหน้าแรก'}
+            </button>
+          </form>
+
           <form
             className="rounded-3xl border border-pink-300/20 bg-white/[0.06] p-4"
             onSubmit={submitSettings}
