@@ -1397,7 +1397,7 @@ function LoginPanel({
               className="min-w-0 bg-transparent px-4 text-base font-semibold text-slate-800 outline-none placeholder:text-slate-400 dark:text-white"
               onChange={(event) => setEmail(event.target.value)}
               inputMode="email"
-              placeholder="admin หรือ name@example.com"
+              placeholder="กรอกอีเมลหรือชื่อผู้ใช้"
               type="text"
               value={email}
             />
