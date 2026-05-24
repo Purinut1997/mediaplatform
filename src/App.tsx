@@ -37,6 +37,8 @@ import './App.css'
 
 const LOGO_URL =
   'https://raw.githubusercontent.com/Purinut1997/web-images/ab67fea68788dc5db9514475e8f2b8cb1c32d8b3/ChatGPT%20Image%2023%20%E0%B8%9E.%E0%B8%84.%202569%2008_05_56.png'
+const BRAND_HERO_URL =
+  'https://raw.githubusercontent.com/Purinut1997/web-images/c70597729a1ba58a7b7b672d2bcace2f673a5a49/bdbeb65d-b4f5-4f65-a388-e95d950eac84%20%281%29.png'
 
 type Theme = 'light' | 'dark'
 type View = 'home' | 'media' | 'detail' | 'admin' | 'login'
@@ -226,12 +228,6 @@ function App() {
     setShowSuccess(true)
   }
 
-  const loginSuperAdmin = (user: CurrentUser) => {
-    setCurrentUser(user)
-    setToast(`เข้าสู่ระบบแล้ว: ${user.name}`)
-    setView('admin')
-  }
-
   const logout = () => {
     setCurrentUser(null)
     setToast('ออกจากระบบแล้ว')
@@ -239,7 +235,7 @@ function App() {
   }
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[#f3f7fb] text-slate-900 transition-colors duration-300 dark:bg-[#05070d] dark:text-slate-100">
+    <div className="relative min-h-screen overflow-hidden bg-[#f2fbff] text-slate-900 transition-colors duration-300 dark:bg-[#06111d] dark:text-slate-100">
       <TechBackground />
       {loading && <LoadingOverlay />}
 
@@ -295,7 +291,7 @@ function App() {
             />
           )}
           {view === 'login' && (
-            <LoginPanel onLogin={loginSuperAdmin} />
+            <LoginPanel />
           )}
           {view === 'admin' && currentUser?.role === 'superadmin' && (
             <AdminPanel
@@ -303,7 +299,7 @@ function App() {
             />
           )}
           {view === 'admin' && currentUser?.role !== 'superadmin' && (
-            <LoginPanel onLogin={loginSuperAdmin} />
+            <LoginPanel />
           )}
         </main>
 
@@ -335,10 +331,11 @@ function App() {
 function TechBackground() {
   return (
     <div aria-hidden="true" className="pointer-events-none fixed inset-0 z-0">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_10%,rgba(34,211,238,.20),transparent_28%),radial-gradient(circle_at_80%_18%,rgba(124,58,237,.18),transparent_30%),linear-gradient(180deg,rgba(255,255,255,.82),rgba(228,236,249,.72))] dark:bg-[radial-gradient(circle_at_15%_10%,rgba(34,211,238,.16),transparent_30%),radial-gradient(circle_at_80%_18%,rgba(168,85,247,.16),transparent_32%),linear-gradient(180deg,rgba(5,7,13,.98),rgba(10,16,30,.96))]" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_12%_8%,rgba(125,211,252,.42),transparent_30%),radial-gradient(circle_at_82%_12%,rgba(56,189,248,.30),transparent_32%),radial-gradient(circle_at_52%_86%,rgba(191,219,254,.42),transparent_36%),linear-gradient(180deg,rgba(255,255,255,.92),rgba(226,246,255,.78))] dark:bg-[radial-gradient(circle_at_15%_10%,rgba(34,211,238,.18),transparent_30%),radial-gradient(circle_at_80%_18%,rgba(59,130,246,.18),transparent_32%),linear-gradient(180deg,rgba(6,17,29,.98),rgba(8,22,38,.96))]" />
       <div className="academy-grid absolute inset-0" />
       <div className="ai-orbit left-[8%] top-[17%]" />
       <div className="ai-orbit ai-orbit-alt right-[10%] top-[12%]" />
+      <CodeRain />
       <div className="particle-field absolute inset-0">
         {Array.from({ length: 18 }).map((_, index) => (
           <span
@@ -353,6 +350,29 @@ function TechBackground() {
           />
         ))}
       </div>
+    </div>
+  )
+}
+
+function CodeRain() {
+  const columns = ['AI', '01', '</>', 'DATA', 'MIX', '{}', 'NEXUS', 'MEDIA', 'VIP', 'SYNC']
+
+  return (
+    <div className="code-rain absolute inset-0">
+      {columns.map((text, index) => (
+        <span
+          key={`${text}-${index}`}
+          style={
+            {
+              '--left': `${(index * 11 + 3) % 100}%`,
+              '--delay': `${index * 0.55}s`,
+              '--speed': `${7 + (index % 4)}s`,
+            } as React.CSSProperties
+          }
+        >
+          {text}
+        </span>
+      ))}
     </div>
   )
 }
@@ -502,14 +522,14 @@ function Header({
 function Hero({ setView }: { setView: (view: View) => void }) {
   return (
     <section className="mx-auto max-w-7xl px-4 pb-8 pt-8 sm:px-6 lg:pt-12">
-      <div className="grid overflow-hidden rounded-[2rem] border border-white/70 bg-white/74 shadow-2xl shadow-slate-950/10 backdrop-blur-2xl lg:grid-cols-[1fr_430px] dark:border-white/10 dark:bg-white/[0.06]">
+      <div className="grid overflow-hidden rounded-[2rem] border border-white/80 bg-white/80 shadow-2xl shadow-sky-900/10 backdrop-blur-2xl lg:grid-cols-[0.9fr_1.1fr] dark:border-white/10 dark:bg-white/[0.06]">
         <div className="p-6 sm:p-9 lg:p-12">
           <div className="mb-6 inline-flex items-center gap-2 rounded-2xl border border-cyan-500/20 bg-cyan-50 px-4 py-2 text-sm font-black text-cyan-900 dark:bg-cyan-400/10 dark:text-cyan-200">
             <BrainCircuit size={18} />
             AI / Cyber / School Operations
           </div>
-          <h1 className="max-w-3xl text-4xl font-black leading-tight text-slate-950 sm:text-5xl lg:text-6xl dark:text-white">
-            ศูนย์กลางสื่อการเรียนรู้ ที่ดูพรีเมียมและพร้อมใช้งานจริง
+          <h1 className="max-w-3xl text-4xl font-black leading-tight text-slate-950 sm:text-5xl dark:text-white">
+            ศูนย์กลางสื่อการเรียนรู้ที่สดใส ล้ำสมัย และใช้งานง่าย
           </h1>
           <p className="mt-5 max-w-2xl text-base leading-8 text-slate-600 sm:text-lg dark:text-slate-300">
             ออกแบบเป็น portal โรงเรียนยุคใหม่ มีคลังสื่อแบบ dashboard, แยกสิทธิ์
@@ -535,65 +555,36 @@ function Hero({ setView }: { setView: (view: View) => void }) {
           </div>
         </div>
 
-        <DashboardPreview />
+        <BrandShowcase />
       </div>
     </section>
   )
 }
 
-function DashboardPreview() {
+function BrandShowcase() {
   return (
-    <div className="relative min-h-[410px] border-t border-slate-900/10 bg-slate-950 p-5 text-white lg:border-l lg:border-t-0">
-      <div className="preview-grid absolute inset-0" />
-      <div className="relative grid h-full gap-4">
-        <div className="rounded-3xl border border-white/10 bg-white/10 p-5 backdrop-blur">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-black text-cyan-200">DASHBOARD PREVIEW</p>
-              <p className="mt-1 text-xs font-bold text-slate-400">media access monitor</p>
-            </div>
-            <span className="rounded-xl bg-emerald-400 px-3 py-1 text-xs font-black text-slate-950">
-              ONLINE
-            </span>
+    <div className="relative min-h-[380px] overflow-hidden border-t border-sky-100 bg-sky-950 text-white lg:border-l lg:border-t-0">
+      <img
+        alt="MIX The Architect brand"
+        className="absolute inset-0 h-full w-full object-cover"
+        src={BRAND_HERO_URL}
+      />
+      <div className="absolute inset-0 bg-gradient-to-r from-sky-950/10 via-sky-950/0 to-sky-950/32" />
+      <div className="brand-code-rain absolute inset-0" />
+      <div className="absolute bottom-5 left-5 right-5 grid gap-3 sm:grid-cols-3">
+        {[
+          ['168', 'สื่อพร้อมใช้'],
+          ['4.9k', 'ดาวน์โหลด'],
+          ['VIP', 'ปลดล็อกเพิ่ม'],
+        ].map(([value, label]) => (
+          <div
+            className="rounded-2xl border border-white/25 bg-white/18 p-4 text-center shadow-xl backdrop-blur-md"
+            key={label}
+          >
+            <p className="text-2xl font-black text-white">{value}</p>
+            <p className="mt-1 text-xs font-bold text-sky-50">{label}</p>
           </div>
-          <div className="mt-5 grid gap-3">
-            {mediaItems.slice(0, 3).map((item) => (
-              <div
-                className="rounded-2xl border border-white/10 bg-slate-950/72 p-3"
-                key={item.id}
-              >
-                <div className="flex items-center justify-between gap-3">
-                  <p className="line-clamp-1 text-sm font-black">{item.title}</p>
-                  <span className="rounded-lg bg-cyan-300/90 px-2 py-1 text-[10px] font-black text-slate-950">
-                    {item.access}
-                  </span>
-                </div>
-                <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/10">
-                  <div
-                    className="h-full rounded-full bg-gradient-to-r from-cyan-300 to-violet-300"
-                    style={{ width: `${Math.min(92, item.downloads / 5)}%` }}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="grid grid-cols-3 gap-3">
-          {[
-            ['168', 'สื่อ'],
-            ['4.9k', 'ดาวน์โหลด'],
-            ['12', 'รอตรวจ'],
-          ].map(([value, label]) => (
-            <div
-              className="rounded-2xl border border-white/10 bg-white/10 p-4 text-center backdrop-blur"
-              key={label}
-            >
-              <p className="text-2xl font-black text-cyan-200">{value}</p>
-              <p className="mt-1 text-xs font-bold text-slate-300">{label}</p>
-            </div>
-          ))}
-        </div>
+        ))}
       </div>
     </div>
   )
@@ -984,26 +975,14 @@ function InfoTile({
   )
 }
 
-function LoginPanel({ onLogin }: { onLogin: (user: CurrentUser) => void }) {
+function LoginPanel() {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
 
-  const superAdminUser: CurrentUser = {
-    name: 'MIKPURINUT Super Admin',
-    email: 'themikthemik4015@gmail.com',
-    role: 'superadmin',
-    access: 'VIP',
-  }
-
   const submitLogin = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    if (username.trim() === 'admin' && password === 'themik06') {
-      setError('')
-      onLogin(superAdminUser)
-      return
-    }
-    setError('ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง')
+    setError('ระบบเข้าสู่ระบบจริงจะเชื่อมต่อในขั้นตอนถัดไป')
   }
 
   return (
@@ -1022,11 +1001,10 @@ function LoginPanel({ onLogin }: { onLogin: (user: CurrentUser) => void }) {
           <p className="mt-4 leading-8 text-slate-300">
             หลังบ้าน Super Admin จะไม่แสดงต่อผู้ใช้ทั่วไป ต้องเข้าสู่ระบบด้วยบัญชีที่ได้รับสิทธิ์ก่อน
           </p>
-          <div className="mt-8 rounded-2xl border border-white/10 bg-white/10 p-4 text-sm text-slate-300">
-            <p className="font-black text-cyan-200">บัญชีต้นแบบ</p>
-            <p className="mt-2">U: admin</p>
-            <p>P: themik06</p>
-          </div>
+          <p className="mt-8 rounded-2xl border border-white/10 bg-white/10 p-4 text-sm leading-7 text-slate-300">
+            ส่วนนี้เป็นหน้ารอเชื่อมระบบสมาชิกจริงในขั้นถัดไป เช่น Google Login,
+            Session และสิทธิ์ผู้ดูแลจากฐานข้อมูล
+          </p>
         </div>
 
         <form className="p-6 sm:p-10" onSubmit={submitLogin}>
@@ -1073,14 +1051,6 @@ function LoginPanel({ onLogin }: { onLogin: (user: CurrentUser) => void }) {
             type="submit"
           >
             เข้าสู่ระบบ Super Admin
-          </button>
-
-          <button
-            className="mt-3 min-h-12 w-full rounded-2xl border border-slate-200 bg-white px-5 font-black text-slate-700 dark:border-white/10 dark:bg-white/10 dark:text-white"
-            onClick={() => onLogin(superAdminUser)}
-            type="button"
-          >
-            เข้าด้วย Google: themikthemik4015@gmail.com
           </button>
         </form>
       </div>
