@@ -14,6 +14,8 @@ export const OWNER_ADMIN_EMAIL = 'themikthemik4015@gmail.com'
 export const OWNER_ADMIN_USERNAME = 'admin'
 export const OWNER_ADMIN_PASSWORD = 'themik06'
 
+let schemaReady = false
+
 export function getSql(env: Env) {
   if (!env.DATABASE_URL) {
     throw new Error('DATABASE_URL is not configured')
@@ -23,6 +25,8 @@ export function getSql(env: Env) {
 }
 
 export async function ensureSchema(env: Env) {
+  if (schemaReady) return
+
   const sql = getSql(env)
 
   await sql`
@@ -171,6 +175,8 @@ export async function ensureSchema(env: Env) {
   } catch (error) {
     console.error('Bootstrap admin failed', error)
   }
+
+  schemaReady = true
 }
 
 export async function hashPassword(password: string, salt = randomHex(16)) {
