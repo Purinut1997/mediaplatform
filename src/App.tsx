@@ -2038,6 +2038,25 @@ function AdminPanel({
     }
   }
 
+  const deleteCategory = async (name: string) => {
+    if (!window.confirm(`ลบหมวดหมู่ "${name}" ใช่ไหม? สื่อเดิมจะยังอยู่แต่จะไม่เห็นหมวดนี้ในตัวเลือกใหม่`)) return
+    setCategoryError('')
+    try {
+      const response = await fetch(`/api/categories?name=${encodeURIComponent(name)}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      })
+      const result = await readJson<{ error?: string }>(response)
+
+      if (!response.ok) throw new Error(result.error ?? 'ลบหมวดหมู่ไม่สำเร็จ')
+      onCreated()
+    } catch (categoryDeleteError) {
+      setCategoryError(
+        categoryDeleteError instanceof Error ? categoryDeleteError.message : 'ลบหมวดหมู่ไม่สำเร็จ',
+      )
+    }
+  }
+
   const updateForm = (name: keyof typeof form, value: string) => {
     setForm((current) => ({ ...current, [name]: value }))
   }
@@ -2632,8 +2651,21 @@ function AdminPanel({
                 const count = mediaItems.filter((item) => item.topic === topicName).length
                 return (
                   <article className="rounded-2xl border border-white/10 bg-black/20 p-4" key={topicName}>
-                    <p className="font-black text-white">{topicName}</p>
-                    <p className="mt-1 text-sm font-semibold text-slate-400">{count} สื่อในหมวดนี้</p>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate font-black text-white">{topicName}</p>
+                        <p className="mt-1 text-sm font-semibold text-slate-400">{count} สื่อในหมวดนี้</p>
+                      </div>
+                      {count === 0 && (
+                        <button
+                          className="rounded-xl bg-red-400/10 px-3 py-2 text-xs font-black text-red-200"
+                          onClick={() => deleteCategory(topicName)}
+                          type="button"
+                        >
+                          ลบ
+                        </button>
+                      )}
+                    </div>
                   </article>
                 )
               })}

@@ -59,3 +59,19 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
 
   return Response.json({ ok: true })
 }
+
+export const onRequestDelete = async ({ env, request }: { env: Env; request: Request }) => {
+  const currentUser = await getCurrentUser(env, request)
+  if (currentUser?.role !== 'superadmin') {
+    return Response.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const name = new URL(request.url).searchParams.get('name')?.trim()
+  if (!name) return Response.json({ ok: false, error: 'กรุณาระบุหมวดหมู่ที่จะลบ' }, { status: 400 })
+
+  await ensureSchema(env)
+  const sql = getSql(env)
+  await sql`delete from categories where name = ${name}`
+
+  return Response.json({ ok: true })
+}
