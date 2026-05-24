@@ -33,7 +33,6 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
       {
         ok: false,
         error: 'ระบบเข้าสู่ระบบมีปัญหา กรุณาลองใหม่อีกครั้ง',
-        detail: error instanceof Error ? error.message : 'unknown error',
       },
       { status: 500 },
     )

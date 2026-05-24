@@ -1,5 +1,7 @@
 import { neon } from '@neondatabase/serverless'
 
+const PBKDF2_ITERATIONS = 100000
+
 export type Env = {
   DATABASE_URL?: string
   ADMIN_WRITE_TOKEN?: string
@@ -163,7 +165,7 @@ export async function hashPassword(password: string, salt = randomHex(16)) {
       name: 'PBKDF2',
       hash: 'SHA-256',
       salt: hexToBytes(salt),
-      iterations: 120000,
+      iterations: PBKDF2_ITERATIONS,
     },
     material,
     256,
