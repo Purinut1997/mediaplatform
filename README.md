@@ -51,6 +51,16 @@ the admin form:
 ADMIN_WRITE_TOKEN="choose-a-long-random-admin-token"
 ```
 
+For the first real Super Admin account, add:
+
+```text
+ADMIN_BOOTSTRAP_EMAIL="your-admin-email@example.com"
+ADMIN_BOOTSTRAP_PASSWORD="choose-a-strong-password"
+ADMIN_BOOTSTRAP_NAME="MIKPURINUT Super Admin"
+```
+
+The next API request will create or update that account in Neon.
+
 ## First API Check
 
 After deploying to Cloudflare Pages, open:
@@ -78,12 +88,15 @@ not already exist, seeds starter media, and returns published media records.
 GET /api/media
 GET /api/categories
 POST /api/media
+POST /api/auth/login
+GET /api/auth/me
+POST /api/auth/logout
 ```
 
 `POST /api/media` accepts title, topic, access, status, price, cover,
 description, source, resourceUrl, and previewUrl. The resource link is stored in
 `media_links` so Google Drive, Google Sheet, YouTube, or external files can be
 managed without editing code. Writes require `x-admin-token` to match
-`ADMIN_WRITE_TOKEN`.
+`ADMIN_WRITE_TOKEN` or a valid logged-in `superadmin` session.
 
 Reference SQL is kept in `database/schema.sql`.

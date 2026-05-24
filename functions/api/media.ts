@@ -1,3 +1,4 @@
+import { getCurrentUser } from '../_lib/auth'
 import { ensureSchema, getSql, type Env } from '../_lib/db'
 
 const DEFAULT_COVER_URL =
@@ -93,14 +94,13 @@ export const onRequestGet = async ({ env, request }: { env: Env; request: Reques
 }
 
 export const onRequestPost = async ({ env, request }: { env: Env; request: Request }) => {
-  if (!env.ADMIN_WRITE_TOKEN) {
-    return Response.json(
-      { ok: false, error: 'ADMIN_WRITE_TOKEN is not configured' },
-      { status: 501 },
-    )
-  }
+  const currentUser = await getCurrentUser(env, request)
+  const hasToken =
+    Boolean(env.ADMIN_WRITE_TOKEN) &&
+    request.headers.get('x-admin-token') === env.ADMIN_WRITE_TOKEN
+  const isSuperAdmin = currentUser?.role === 'superadmin'
 
-  if (request.headers.get('x-admin-token') !== env.ADMIN_WRITE_TOKEN) {
+  if (!isSuperAdmin && !hasToken) {
     return Response.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -174,7 +174,7 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
 
   await sql`
     insert into audit_logs (actor, action, target_type, target_id, detail)
-    values ('superadmin', 'create', 'media', ${String(row.id)}, ${JSON.stringify({ title })}::jsonb)
+    values (${currentUser?.email ?? 'token-superadmin'}, 'create', 'media', ${String(row.id)}, ${JSON.stringify({ title })}::jsonb)
   `
 
   return Response.json({ ok: true, media: toMedia(row) }, { status: 201 })

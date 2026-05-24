@@ -68,7 +68,7 @@ type MediaItem = {
 type CurrentUser = {
   name: string
   email: string
-  role: 'superadmin' | 'member'
+  role: 'superadmin' | 'admin' | 'member'
   access: 'VIP' | 'สมาชิก'
 }
 
@@ -262,6 +262,29 @@ function App() {
   }, [currentUser])
 
   useEffect(() => {
+    let active = true
+
+    async function loadCurrentUser() {
+      try {
+        const response = await fetch('/api/auth/me', { credentials: 'include' })
+        if (!response.ok) return
+        const result = (await response.json()) as { user?: CurrentUser | null }
+        if (!active) return
+        setCurrentUser(result.user ?? null)
+      } catch {
+        if (!active) return
+        setCurrentUser(null)
+      }
+    }
+
+    void loadCurrentUser()
+
+    return () => {
+      active = false
+    }
+  }, [])
+
+  useEffect(() => {
     const timer = window.setTimeout(() => setLoading(false), 760)
     return () => window.clearTimeout(timer)
   }, [refreshToken])
@@ -345,7 +368,14 @@ function App() {
     setShowSuccess(true)
   }
 
+  const handleLogin = (user: CurrentUser) => {
+    setCurrentUser(user)
+    setToast(`เข้าสู่ระบบแล้ว: ${user.name}`)
+    setView(user.role === 'superadmin' ? 'admin' : 'media')
+  }
+
   const logout = () => {
+    void fetch('/api/auth/logout', { method: 'POST', credentials: 'include' })
     setCurrentUser(null)
     setToast('ออกจากระบบแล้ว')
     setView('home')
@@ -412,7 +442,7 @@ function App() {
             />
           )}
           {view === 'login' && (
-            <LoginPanel />
+            <LoginPanel onLogin={handleLogin} />
           )}
           {view === 'admin' && currentUser?.role === 'superadmin' && (
             <AdminPanel
@@ -425,7 +455,7 @@ function App() {
             />
           )}
           {view === 'admin' && currentUser?.role !== 'superadmin' && (
-            <LoginPanel />
+            <LoginPanel onLogin={handleLogin} />
           )}
         </main>
 
@@ -1136,14 +1166,39 @@ function InfoTile({
   )
 }
 
-function LoginPanel() {
-  const [username, setUsername] = useState('')
+function LoginPanel({ onLogin }: { onLogin: (user: CurrentUser) => void }) {
+  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
+  const [submitting, setSubmitting] = useState(false)
 
-  const submitLogin = (event: FormEvent<HTMLFormElement>) => {
+  const submitLogin = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    setError('ระบบเข้าสู่ระบบจริงจะเชื่อมต่อในขั้นตอนถัดไป')
+    setError('')
+    setSubmitting(true)
+
+    try {
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ email, password }),
+      })
+      const result = (await response.json()) as {
+        user?: CurrentUser
+        error?: string
+      }
+
+      if (!response.ok || !result.user) {
+        throw new Error(result.error ?? 'เข้าสู่ระบบไม่สำเร็จ')
+      }
+
+      onLogin(result.user)
+    } catch (loginError) {
+      setError(loginError instanceof Error ? loginError.message : 'เข้าสู่ระบบไม่สำเร็จ')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -1163,8 +1218,8 @@ function LoginPanel() {
             หลังบ้าน Super Admin จะไม่แสดงต่อผู้ใช้ทั่วไป ต้องเข้าสู่ระบบด้วยบัญชีที่ได้รับสิทธิ์ก่อน
           </p>
           <p className="mt-8 rounded-2xl border border-white/10 bg-white/10 p-4 text-sm leading-7 text-slate-300">
-            ส่วนนี้เป็นหน้ารอเชื่อมระบบสมาชิกจริงในขั้นถัดไป เช่น Google Login,
-            Session และสิทธิ์ผู้ดูแลจากฐานข้อมูล
+            ระบบนี้เชื่อม session กับ Neon แล้ว ผู้ดูแลต้องมีบัญชีในฐานข้อมูล
+            และ Cloudflare ต้องตั้งค่า bootstrap admin ก่อนใช้งานครั้งแรก
           </p>
         </div>
 
@@ -1182,9 +1237,10 @@ function LoginPanel() {
             </span>
             <input
               className="mt-2 min-h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-base outline-none transition focus:border-cyan-500 focus:ring-4 focus:ring-cyan-500/10 dark:border-white/10 dark:bg-white/10"
-              onChange={(event) => setUsername(event.target.value)}
-              placeholder="admin"
-              value={username}
+              onChange={(event) => setEmail(event.target.value)}
+              placeholder="admin@example.com"
+              type="email"
+              value={email}
             />
           </label>
 
@@ -1208,10 +1264,12 @@ function LoginPanel() {
           )}
 
           <button
-            className="mt-6 min-h-12 w-full rounded-2xl bg-slate-950 px-5 font-black text-cyan-200 shadow-lg shadow-slate-900/10 dark:bg-cyan-300 dark:text-slate-950"
+            className="mt-6 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-slate-950 px-5 font-black text-cyan-200 shadow-lg shadow-slate-900/10 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-cyan-300 dark:text-slate-950"
+            disabled={submitting}
             type="submit"
           >
-            เข้าสู่ระบบ Super Admin
+            {submitting && <Loader2 className="animate-spin" size={20} />}
+            {submitting ? 'กำลังตรวจสอบ...' : 'เข้าสู่ระบบ Super Admin'}
           </button>
         </form>
       </div>
@@ -1251,6 +1309,7 @@ function AdminPanel({
           'Content-Type': 'application/json',
           'x-admin-token': adminToken,
         },
+        credentials: 'include',
         body: JSON.stringify({
           ...form,
           price: Number(form.price || 0),
@@ -1356,7 +1415,7 @@ function AdminPanel({
                 <input
                   className="mt-2 min-h-12 w-full rounded-2xl border border-cyan-300/20 bg-cyan-300/10 px-4 text-base text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-300 focus:ring-4 focus:ring-cyan-300/10"
                   onChange={(event) => setAdminToken(event.target.value)}
-                  placeholder="ตั้งค่า ADMIN_WRITE_TOKEN ใน Cloudflare แล้วนำมาใส่ตรงนี้"
+                  placeholder="เว้นว่างได้ถ้าเข้าสู่ระบบ superadmin แล้ว"
                   type="password"
                   value={adminToken}
                 />

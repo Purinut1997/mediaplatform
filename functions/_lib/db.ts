@@ -3,6 +3,9 @@ import { neon } from '@neondatabase/serverless'
 export type Env = {
   DATABASE_URL?: string
   ADMIN_WRITE_TOKEN?: string
+  ADMIN_BOOTSTRAP_EMAIL?: string
+  ADMIN_BOOTSTRAP_PASSWORD?: string
+  ADMIN_BOOTSTRAP_NAME?: string
 }
 
 export function getSql(env: Env) {
@@ -73,6 +76,30 @@ export async function ensureSchema(env: Env) {
   `
 
   await sql`
+    create table if not exists users (
+      id serial primary key,
+      name text not null,
+      email text not null unique,
+      password_hash text not null,
+      role text not null default 'member' check (role in ('superadmin', 'admin', 'member')),
+      access_level text not null default 'สมาชิก' check (access_level in ('สมาชิก', 'VIP')),
+      status text not null default 'active' check (status in ('active', 'disabled')),
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now()
+    )
+  `
+
+  await sql`
+    create table if not exists sessions (
+      id serial primary key,
+      user_id integer not null references users(id) on delete cascade,
+      token_hash text not null unique,
+      expires_at timestamptz not null,
+      created_at timestamptz not null default now()
+    )
+  `
+
+  await sql`
     create index if not exists media_status_topic_idx on media(status, topic)
   `
 
@@ -80,7 +107,96 @@ export async function ensureSchema(env: Env) {
     create index if not exists media_access_idx on media(access_level)
   `
 
+  await sql`
+    create index if not exists sessions_user_idx on sessions(user_id, expires_at)
+  `
+
   await seedInitialData(env)
+  await seedBootstrapAdmin(env)
+}
+
+export async function hashPassword(password: string, salt = randomHex(16)) {
+  const material = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(password),
+    'PBKDF2',
+    false,
+    ['deriveBits'],
+  )
+  const bits = await crypto.subtle.deriveBits(
+    {
+      name: 'PBKDF2',
+      hash: 'SHA-256',
+      salt: hexToBytes(salt),
+      iterations: 120000,
+    },
+    material,
+    256,
+  )
+
+  return `pbkdf2:${salt}:${bytesToHex(new Uint8Array(bits))}`
+}
+
+export async function verifyPassword(password: string, storedHash: string) {
+  const [method, salt, hash] = storedHash.split(':')
+  if (method !== 'pbkdf2' || !salt || !hash) return false
+  const nextHash = await hashPassword(password, salt)
+  return timingSafeEqual(nextHash, storedHash)
+}
+
+export async function sha256Hex(value: string) {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value))
+  return bytesToHex(new Uint8Array(digest))
+}
+
+export function randomHex(byteLength: number) {
+  const bytes = new Uint8Array(byteLength)
+  crypto.getRandomValues(bytes)
+  return bytesToHex(bytes)
+}
+
+function bytesToHex(bytes: Uint8Array) {
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('')
+}
+
+function hexToBytes(hex: string) {
+  const bytes = new Uint8Array(hex.length / 2)
+  for (let index = 0; index < bytes.length; index += 1) {
+    bytes[index] = Number.parseInt(hex.slice(index * 2, index * 2 + 2), 16)
+  }
+  return bytes
+}
+
+function timingSafeEqual(left: string, right: string) {
+  if (left.length !== right.length) return false
+  let diff = 0
+  for (let index = 0; index < left.length; index += 1) {
+    diff |= left.charCodeAt(index) ^ right.charCodeAt(index)
+  }
+  return diff === 0
+}
+
+async function seedBootstrapAdmin(env: Env) {
+  const email = env.ADMIN_BOOTSTRAP_EMAIL?.trim().toLowerCase()
+  const password = env.ADMIN_BOOTSTRAP_PASSWORD
+
+  if (!email || !password) return
+
+  const sql = getSql(env)
+  const passwordHash = await hashPassword(password)
+  const name = env.ADMIN_BOOTSTRAP_NAME?.trim() || 'MIKPURINUT Super Admin'
+
+  await sql`
+    insert into users (name, email, password_hash, role, access_level, status)
+    values (${name}, ${email}, ${passwordHash}, 'superadmin', 'VIP', 'active')
+    on conflict (email) do update set
+      name = excluded.name,
+      password_hash = excluded.password_hash,
+      role = 'superadmin',
+      access_level = 'VIP',
+      status = 'active',
+      updated_at = now()
+  `
 }
 
 async function seedInitialData(env: Env) {

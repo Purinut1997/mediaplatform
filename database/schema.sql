@@ -46,5 +46,26 @@ create table if not exists audit_logs (
   created_at timestamptz not null default now()
 );
 
+create table if not exists users (
+  id serial primary key,
+  name text not null,
+  email text not null unique,
+  password_hash text not null,
+  role text not null default 'member' check (role in ('superadmin', 'admin', 'member')),
+  access_level text not null default 'สมาชิก' check (access_level in ('สมาชิก', 'VIP')),
+  status text not null default 'active' check (status in ('active', 'disabled')),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists sessions (
+  id serial primary key,
+  user_id integer not null references users(id) on delete cascade,
+  token_hash text not null unique,
+  expires_at timestamptz not null,
+  created_at timestamptz not null default now()
+);
+
 create index if not exists media_status_topic_idx on media(status, topic);
 create index if not exists media_access_idx on media(access_level);
+create index if not exists sessions_user_idx on sessions(user_id, expires_at);
