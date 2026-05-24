@@ -18,28 +18,43 @@
   }
   to {
     background-position:
-      72px 36px,
-      -48px 64px,
+      64px 32px,
+      -42px 58px,
       120px 0;
   }
 }
 
-@keyframes lane-sweep {
-  from {
-    transform: translateX(-10%) rotate(var(--lane-angle, -7deg));
+@keyframes float-particle {
+  0%,
+  100% {
+    opacity: 0.28;
+    transform: translate3d(0, 0, 0) scale(0.86);
   }
-  to {
-    transform: translateX(10%) rotate(var(--lane-angle, -7deg));
+  50% {
+    opacity: 0.92;
+    transform: translate3d(18px, -28px, 0) scale(1.08);
+  }
+}
+
+@keyframes orbit-breathe {
+  0%,
+  100% {
+    opacity: 0.36;
+    transform: rotate(0deg) scale(0.96);
+  }
+  50% {
+    opacity: 0.72;
+    transform: rotate(18deg) scale(1.03);
   }
 }
 
 @keyframes pulse-line {
   0%,
   100% {
-    opacity: 0.35;
+    opacity: 0.28;
   }
   50% {
-    opacity: 0.9;
+    opacity: 0.78;
   }
 }
 
@@ -47,93 +62,94 @@ main > section {
   animation: gentle-in 0.42s ease both;
 }
 
-.circuit-grid {
+.academy-grid {
   background-image:
-    linear-gradient(rgba(15, 23, 42, 0.09) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(15, 23, 42, 0.08) 1px, transparent 1px),
-    linear-gradient(135deg, rgba(16, 185, 129, 0.12) 1px, transparent 1px);
+    linear-gradient(rgba(15, 23, 42, 0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(15, 23, 42, 0.06) 1px, transparent 1px),
+    linear-gradient(135deg, rgba(34, 211, 238, 0.12) 1px, transparent 1px);
   background-size:
-    42px 42px,
-    42px 42px,
-    168px 168px;
+    44px 44px,
+    44px 44px,
+    156px 156px;
   animation: grid-drift 18s linear infinite;
-  mask-image: linear-gradient(to bottom, transparent, black 12%, black 86%, transparent);
+  mask-image: linear-gradient(to bottom, transparent, black 10%, black 88%, transparent);
 }
 
-.dark .circuit-grid {
+.dark .academy-grid {
   background-image:
-    linear-gradient(rgba(190, 242, 100, 0.11) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(45, 212, 191, 0.1) 1px, transparent 1px),
+    linear-gradient(rgba(34, 211, 238, 0.11) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(168, 85, 247, 0.1) 1px, transparent 1px),
     linear-gradient(135deg, rgba(255, 255, 255, 0.08) 1px, transparent 1px);
 }
 
-.scan-lane {
-  --lane-angle: -7deg;
-  background:
-    linear-gradient(90deg, transparent, rgba(16, 185, 129, 0.18), transparent),
-    repeating-linear-gradient(
-      90deg,
-      transparent 0 28px,
-      rgba(15, 23, 42, 0.1) 28px 30px
-    );
-  border-block: 1px solid rgba(16, 185, 129, 0.14);
-  animation: lane-sweep 7s ease-in-out infinite alternate;
-}
-
-.scan-lane-slow {
-  --lane-angle: 5deg;
-  animation-duration: 11s;
-}
-
-.dark .scan-lane {
-  background:
-    linear-gradient(90deg, transparent, rgba(190, 242, 100, 0.13), transparent),
-    repeating-linear-gradient(
-      90deg,
-      transparent 0 28px,
-      rgba(255, 255, 255, 0.08) 28px 30px
-    );
-  border-block-color: rgba(190, 242, 100, 0.12);
-}
-
-.data-chip {
+.particle-field span {
   position: absolute;
-  border: 1px solid rgba(16, 185, 129, 0.22);
-  background: rgba(255, 255, 255, 0.72);
-  color: rgba(15, 23, 42, 0.55);
-  border-radius: 10px;
-  padding: 6px 10px;
-  font-size: 10px;
-  font-weight: 900;
-  letter-spacing: 0.14em;
-  box-shadow: 0 14px 40px rgba(15, 23, 42, 0.08);
+  left: var(--x);
+  top: var(--y);
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(14, 165, 233, 0.72);
+  box-shadow:
+    0 0 18px rgba(14, 165, 233, 0.72),
+    0 0 42px rgba(124, 58, 237, 0.28);
+  animation: float-particle 7s ease-in-out infinite;
+  animation-delay: var(--delay);
 }
 
-.dark .data-chip {
-  background: rgba(15, 23, 42, 0.62);
-  color: rgba(190, 242, 100, 0.7);
-  border-color: rgba(190, 242, 100, 0.18);
+.dark .particle-field span {
+  background: rgba(103, 232, 249, 0.78);
+  box-shadow:
+    0 0 18px rgba(103, 232, 249, 0.7),
+    0 0 42px rgba(168, 85, 247, 0.36);
 }
 
-.control-map {
+.ai-orbit {
+  position: absolute;
+  width: 220px;
+  height: 220px;
+  border-radius: 999px;
+  border: 1px solid rgba(14, 165, 233, 0.18);
+  background:
+    radial-gradient(circle at 50% 50%, rgba(14, 165, 233, 0.12), transparent 42%),
+    conic-gradient(
+      from 140deg,
+      transparent,
+      rgba(14, 165, 233, 0.32),
+      transparent,
+      rgba(124, 58, 237, 0.24),
+      transparent
+    );
+  filter: blur(0.2px);
+  animation: orbit-breathe 9s ease-in-out infinite;
+}
+
+.ai-orbit-alt {
+  width: 300px;
+  height: 300px;
+  animation-duration: 12s;
+  animation-delay: 1.2s;
+}
+
+.preview-grid {
   background-image:
-    linear-gradient(rgba(190, 242, 100, 0.12) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(45, 212, 191, 0.12) 1px, transparent 1px);
-  background-size: 28px 28px;
+    linear-gradient(rgba(103, 232, 249, 0.12) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(168, 85, 247, 0.11) 1px, transparent 1px);
+  background-size: 30px 30px;
 }
 
-.control-map::before,
-.control-map::after {
+.preview-grid::before,
+.preview-grid::after {
   content: '';
   position: absolute;
   inset: 14%;
-  border: 1px solid rgba(190, 242, 100, 0.22);
-  clip-path: polygon(0 0, 76% 0, 100% 24%, 100% 100%, 18% 100%, 0 82%);
+  border: 1px solid rgba(103, 232, 249, 0.22);
+  clip-path: polygon(0 0, 74% 0, 100% 26%, 100% 100%, 18% 100%, 0 82%);
   animation: pulse-line 3.4s ease-in-out infinite;
 }
 
-.control-map::after {
+.preview-grid::after {
   inset: 28% 18%;
-  border-color: rgba(45, 212, 191, 0.24);
-  animation-delay: 0.9s;
+  border-color: rgba(168, 85, 247, 0.28);
+  animation-delay: 0.85s;
 }

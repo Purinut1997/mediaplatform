@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   AlertCircle,
+  Archive,
   BarChart3,
   BookOpen,
+  BrainCircuit,
   CheckCircle2,
   ChevronRight,
   Database,
@@ -11,6 +13,7 @@ import {
   Eye,
   FileText,
   Gauge,
+  GraduationCap,
   Heart,
   Layers3,
   Link2,
@@ -24,7 +27,6 @@ import {
   Search,
   Settings,
   ShieldCheck,
-  Sparkles,
   Star,
   Sun,
   Tag,
@@ -44,7 +46,7 @@ type MediaStatus = 'เผยแพร่' | 'แบบร่าง' | 'ซ่�
 type MediaItem = {
   id: number
   title: string
-  category: string
+  topic: string
   access: AccessLevel
   status: MediaStatus
   price: number
@@ -60,7 +62,7 @@ const mediaItems: MediaItem[] = [
   {
     id: 1,
     title: 'ชุดเอกสารอบรม AI สำหรับครู',
-    category: 'เอกสารอบรม',
+    topic: 'AI',
     access: 'สาธารณะ',
     status: 'เผยแพร่',
     price: 0,
@@ -76,7 +78,7 @@ const mediaItems: MediaItem[] = [
   {
     id: 2,
     title: 'Google Sheet ระบบเช็กชื่อออนไลน์',
-    category: 'AppScript',
+    topic: 'AppScript',
     access: 'สมาชิก',
     status: 'เผยแพร่',
     price: 0,
@@ -92,7 +94,7 @@ const mediaItems: MediaItem[] = [
   {
     id: 3,
     title: 'วิดีโอสอนติดตั้งระบบคลังสื่อ',
-    category: 'วิดีโอสอน',
+    topic: 'อบรม',
     access: 'VIP',
     status: 'เผยแพร่',
     price: 0,
@@ -108,7 +110,7 @@ const mediaItems: MediaItem[] = [
   {
     id: 4,
     title: 'Prompt Pack สำหรับงานบริหารโรงเรียน',
-    category: 'Prompt',
+    topic: 'งานเอกสาร',
     access: 'ซื้อแยก',
     status: 'แบบร่าง',
     price: 499,
@@ -123,7 +125,21 @@ const mediaItems: MediaItem[] = [
   },
 ]
 
-const categories = ['ทั้งหมด', 'เอกสารอบรม', 'AppScript', 'วิดีโอสอน', 'Prompt']
+const topics = ['ทั้งหมด', 'AI', 'AppScript', 'โรงเรียน', 'งานเอกสาร', 'อบรม']
+const accessLevels: Array<'ทั้งหมด' | AccessLevel> = [
+  'ทั้งหมด',
+  'สาธารณะ',
+  'สมาชิก',
+  'VIP',
+  'ซื้อแยก',
+]
+
+const portalTiles = [
+  { label: 'คลังสื่อ', detail: 'ไฟล์ เอกสาร วิดีโอ', icon: Archive, view: 'media' as View },
+  { label: 'AI Lab', detail: 'Prompt และคู่มือ AI', icon: BrainCircuit, view: 'media' as View },
+  { label: 'ห้องอบรม', detail: 'บทเรียนและวิดีโอ', icon: GraduationCap, view: 'media' as View },
+  { label: 'หลังบ้าน', detail: 'Super Admin', icon: ShieldCheck, view: 'admin' as View },
+]
 
 const adminStats = [
   { label: 'สมาชิกทั้งหมด', value: '1,284', icon: Users },
@@ -140,7 +156,8 @@ function App() {
   const [view, setView] = useState<View>('home')
   const [selected, setSelected] = useState<MediaItem>(mediaItems[0])
   const [query, setQuery] = useState('')
-  const [category, setCategory] = useState('ทั้งหมด')
+  const [topic, setTopic] = useState('ทั้งหมด')
+  const [access, setAccess] = useState<'ทั้งหมด' | AccessLevel>('ทั้งหมด')
   const [toast, setToast] = useState('ระบบเชื่อมต่อ Cloudflare + Neon สำเร็จ')
   const [showSuccess, setShowSuccess] = useState(false)
   const [showError, setShowError] = useState(false)
@@ -153,7 +170,7 @@ function App() {
   }, [theme])
 
   useEffect(() => {
-    const timer = window.setTimeout(() => setLoading(false), 780)
+    const timer = window.setTimeout(() => setLoading(false), 760)
     return () => window.clearTimeout(timer)
   }, [])
 
@@ -168,10 +185,11 @@ function App() {
       mediaItems.filter((item) => {
         const text = `${item.title} ${item.description}`.toLowerCase()
         const matchQuery = text.includes(query.toLowerCase())
-        const matchCategory = category === 'ทั้งหมด' || item.category === category
-        return matchQuery && matchCategory
+        const matchTopic = topic === 'ทั้งหมด' || item.topic === topic
+        const matchAccess = access === 'ทั้งหมด' || item.access === access
+        return matchQuery && matchTopic && matchAccess
       }),
-    [category, query],
+    [access, query, topic],
   )
 
   const openDetail = (item: MediaItem) => {
@@ -186,7 +204,7 @@ function App() {
   }
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[#edf5f1] text-slate-900 transition-colors duration-300 dark:bg-[#07110f] dark:text-slate-100">
+    <div className="relative min-h-screen overflow-hidden bg-[#f3f7fb] text-slate-900 transition-colors duration-300 dark:bg-[#05070d] dark:text-slate-100">
       <TechBackground />
       {loading && <LoadingOverlay />}
 
@@ -204,25 +222,30 @@ function App() {
           {view === 'home' && (
             <>
               <Hero setView={setView} />
+              <PortalTiles setView={setView} />
               <MediaSection
-                category={category}
+                access={access}
                 filteredMedia={filteredMedia}
                 openDetail={openDetail}
                 query={query}
-                setCategory={setCategory}
+                setAccess={setAccess}
                 setQuery={setQuery}
+                setTopic={setTopic}
+                topic={topic}
               />
             </>
           )}
           {view === 'media' && (
             <MediaSection
-              category={category}
+              access={access}
               expanded
               filteredMedia={filteredMedia}
               openDetail={openDetail}
               query={query}
-              setCategory={setCategory}
+              setAccess={setAccess}
               setQuery={setQuery}
+              setTopic={setTopic}
+              topic={topic}
             />
           )}
           {view === 'detail' && (
@@ -268,13 +291,24 @@ function App() {
 function TechBackground() {
   return (
     <div aria-hidden="true" className="pointer-events-none fixed inset-0 z-0">
-      <div className="absolute inset-0 bg-[linear-gradient(120deg,rgba(20,184,166,.16),transparent_34%),linear-gradient(300deg,rgba(190,242,100,.18),transparent_30%),linear-gradient(180deg,rgba(255,255,255,.82),rgba(226,242,236,.76))] dark:bg-[linear-gradient(120deg,rgba(45,212,191,.14),transparent_36%),linear-gradient(300deg,rgba(190,242,100,.10),transparent_31%),linear-gradient(180deg,rgba(7,17,15,.98),rgba(10,25,22,.94))]" />
-      <div className="circuit-grid absolute inset-0 opacity-70 dark:opacity-45" />
-      <div className="scan-lane absolute left-[-12%] top-[18%] h-20 w-[124%] rotate-[-7deg]" />
-      <div className="scan-lane scan-lane-slow absolute left-[-18%] top-[72%] h-16 w-[132%] rotate-[5deg]" />
-      <div className="data-chip left-[6%] top-[18%]">MEDIA_SYNC</div>
-      <div className="data-chip right-[9%] top-[28%]">NEON_OK</div>
-      <div className="data-chip bottom-[18%] left-[18%]">VIP_GATE</div>
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_10%,rgba(34,211,238,.20),transparent_28%),radial-gradient(circle_at_80%_18%,rgba(124,58,237,.18),transparent_30%),linear-gradient(180deg,rgba(255,255,255,.82),rgba(228,236,249,.72))] dark:bg-[radial-gradient(circle_at_15%_10%,rgba(34,211,238,.16),transparent_30%),radial-gradient(circle_at_80%_18%,rgba(168,85,247,.16),transparent_32%),linear-gradient(180deg,rgba(5,7,13,.98),rgba(10,16,30,.96))]" />
+      <div className="academy-grid absolute inset-0" />
+      <div className="ai-orbit left-[8%] top-[17%]" />
+      <div className="ai-orbit ai-orbit-alt right-[10%] top-[12%]" />
+      <div className="particle-field absolute inset-0">
+        {Array.from({ length: 18 }).map((_, index) => (
+          <span
+            key={index}
+            style={
+              {
+                '--x': `${(index * 37) % 100}%`,
+                '--y': `${(index * 61) % 100}%`,
+                '--delay': `${index * 0.32}s`,
+              } as React.CSSProperties
+            }
+          />
+        ))}
+      </div>
     </div>
   )
 }
@@ -301,7 +335,7 @@ function Header({
   ]
 
   return (
-    <header className="sticky top-0 z-40 border-b border-emerald-900/10 bg-white/72 shadow-sm shadow-emerald-950/5 backdrop-blur-2xl dark:border-white/10 dark:bg-[#07110f]/78">
+    <header className="sticky top-0 z-40 border-b border-white/60 bg-white/72 shadow-sm shadow-slate-950/5 backdrop-blur-2xl dark:border-white/10 dark:bg-[#070b14]/80">
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
         <button
           className="flex min-h-12 items-center gap-3 text-left"
@@ -310,26 +344,26 @@ function Header({
         >
           <img
             alt="MIKPURINUT logo"
-            className="h-11 w-11 rounded-xl border border-white object-cover shadow-lg shadow-emerald-900/15"
+            className="h-11 w-11 rounded-2xl border border-white object-cover shadow-lg shadow-cyan-900/15"
             src={LOGO_URL}
           />
           <span>
             <span className="block text-base font-black tracking-wide text-slate-950 dark:text-white">
-              MIKPURINUT Grid
+              MIKPURINUT Nexus
             </span>
-            <span className="block text-xs font-semibold text-emerald-700 dark:text-emerald-300">
-              Media Operations Center
+            <span className="block text-xs font-semibold text-cyan-700 dark:text-cyan-300">
+              AI School Media Portal
             </span>
           </span>
         </button>
 
-        <nav className="hidden items-center rounded-2xl border border-slate-200/80 bg-white/70 p-1 shadow-sm dark:border-white/10 dark:bg-white/5 lg:flex">
+        <nav className="hidden items-center rounded-2xl border border-white/70 bg-white/70 p-1 shadow-sm dark:border-white/10 dark:bg-white/5 lg:flex">
           {nav.map((item) => (
             <button
               className={`min-h-10 rounded-xl px-4 text-sm font-black transition ${
                 view === item.value
-                  ? 'bg-emerald-500 text-slate-950 shadow-lg shadow-emerald-500/25'
-                  : 'text-slate-600 hover:bg-emerald-50 dark:text-slate-300 dark:hover:bg-white/10'
+                  ? 'bg-slate-950 text-cyan-200 shadow-lg shadow-cyan-500/10 dark:bg-cyan-300 dark:text-slate-950'
+                  : 'text-slate-600 hover:bg-cyan-50 dark:text-slate-300 dark:hover:bg-white/10'
               }`}
               key={item.value}
               onClick={() => setView(item.value)}
@@ -343,14 +377,14 @@ function Header({
         <div className="flex items-center gap-2">
           <button
             aria-label="สลับธีม"
-            className="grid h-11 w-11 place-items-center rounded-xl border border-slate-200 bg-white/80 text-slate-700 shadow-sm transition hover:-translate-y-0.5 dark:border-white/10 dark:bg-white/10 dark:text-white"
+            className="grid h-11 w-11 place-items-center rounded-xl border border-white/70 bg-white/80 text-slate-700 shadow-sm transition hover:-translate-y-0.5 dark:border-white/10 dark:bg-white/10 dark:text-white"
             onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
             type="button"
           >
             {theme === 'dark' ? <Sun size={19} /> : <Moon size={19} />}
           </button>
           <button
-            className="hidden min-h-11 rounded-xl bg-slate-950 px-5 text-sm font-black text-white shadow-lg shadow-slate-900/15 transition hover:-translate-y-0.5 dark:bg-lime-300 dark:text-slate-950 sm:inline-flex sm:items-center"
+            className="hidden min-h-11 rounded-xl bg-slate-950 px-5 text-sm font-black text-cyan-200 shadow-lg shadow-slate-900/15 transition hover:-translate-y-0.5 dark:bg-cyan-300 dark:text-slate-950 sm:inline-flex sm:items-center"
             onClick={() => setView('admin')}
             type="button"
           >
@@ -358,7 +392,7 @@ function Header({
           </button>
           <button
             aria-label="เปิดเมนู"
-            className="grid h-11 w-11 place-items-center rounded-xl border border-slate-200 bg-white/80 text-slate-700 lg:hidden dark:border-white/10 dark:bg-white/10 dark:text-white"
+            className="grid h-11 w-11 place-items-center rounded-xl border border-white/70 bg-white/80 text-slate-700 lg:hidden dark:border-white/10 dark:bg-white/10 dark:text-white"
             onClick={() => setMenuOpen(!menuOpen)}
             type="button"
           >
@@ -371,7 +405,7 @@ function Header({
         <div className="border-t border-slate-200 bg-white/95 px-4 py-3 lg:hidden dark:border-white/10 dark:bg-slate-950/95">
           {nav.map((item) => (
             <button
-              className="block min-h-12 w-full rounded-xl px-4 text-left text-sm font-bold text-slate-700 hover:bg-emerald-50 dark:text-slate-200 dark:hover:bg-white/10"
+              className="block min-h-12 w-full rounded-xl px-4 text-left text-sm font-bold text-slate-700 hover:bg-cyan-50 dark:text-slate-200 dark:hover:bg-white/10"
               key={item.value}
               onClick={() => {
                 setView(item.value)
@@ -390,23 +424,23 @@ function Header({
 
 function Hero({ setView }: { setView: (view: View) => void }) {
   return (
-    <section className="mx-auto max-w-7xl px-4 pb-10 pt-8 sm:px-6 lg:pb-14 lg:pt-12">
-      <div className="grid overflow-hidden rounded-[2rem] border border-slate-900/10 bg-white/72 shadow-2xl shadow-emerald-950/10 backdrop-blur-xl lg:grid-cols-[1fr_420px] dark:border-white/10 dark:bg-white/[0.06]">
+    <section className="mx-auto max-w-7xl px-4 pb-8 pt-8 sm:px-6 lg:pt-12">
+      <div className="grid overflow-hidden rounded-[2rem] border border-white/70 bg-white/74 shadow-2xl shadow-slate-950/10 backdrop-blur-2xl lg:grid-cols-[1fr_430px] dark:border-white/10 dark:bg-white/[0.06]">
         <div className="p-6 sm:p-9 lg:p-12">
-          <div className="mb-6 inline-flex items-center gap-2 rounded-xl border border-emerald-500/25 bg-emerald-50 px-4 py-2 text-sm font-black text-emerald-800 dark:bg-emerald-400/10 dark:text-emerald-200">
-            <Sparkles size={17} />
-            ศูนย์ควบคุมคลังสื่อสำหรับโรงเรียน
+          <div className="mb-6 inline-flex items-center gap-2 rounded-2xl border border-cyan-500/20 bg-cyan-50 px-4 py-2 text-sm font-black text-cyan-900 dark:bg-cyan-400/10 dark:text-cyan-200">
+            <BrainCircuit size={18} />
+            AI / Cyber / School Operations
           </div>
           <h1 className="max-w-3xl text-4xl font-black leading-tight text-slate-950 sm:text-5xl lg:text-6xl dark:text-white">
-            คลังสื่อที่ดูแลได้เหมือนแผงควบคุม ไม่ใช่เว็บขายไฟล์ธรรมดา
+            ศูนย์กลางสื่อการเรียนรู้ ที่ดูพรีเมียมและพร้อมใช้งานจริง
           </h1>
           <p className="mt-5 max-w-2xl text-base leading-8 text-slate-600 sm:text-lg dark:text-slate-300">
-            จัดการการ์ดสื่อ ลิงก์ Drive, Sheet, YouTube, สิทธิ์สมาชิก และ
-            VIP ผ่านหลังบ้าน โดยออกแบบให้มือถือใช้งานง่ายและขยายระบบต่อได้
+            ออกแบบเป็น portal โรงเรียนยุคใหม่ มีคลังสื่อแบบ dashboard, แยกสิทธิ์
+            Public / Member / VIP และเชื่อมสื่อจาก Drive, Sheet, YouTube ได้ในที่เดียว
           </p>
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
             <button
-              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-emerald-500 px-6 font-black text-slate-950 shadow-xl shadow-emerald-500/25 transition hover:-translate-y-0.5"
+              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-slate-950 px-6 font-black text-cyan-200 shadow-xl shadow-slate-900/15 transition hover:-translate-y-0.5 dark:bg-cyan-300 dark:text-slate-950"
               onClick={() => setView('media')}
               type="button"
             >
@@ -414,7 +448,7 @@ function Hero({ setView }: { setView: (view: View) => void }) {
               เปิดคลังสื่อ
             </button>
             <button
-              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-slate-300 bg-white/70 px-6 font-black text-slate-800 transition hover:-translate-y-0.5 hover:border-emerald-400 dark:border-white/10 dark:bg-white/10 dark:text-white"
+              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-slate-300 bg-white/70 px-6 font-black text-slate-800 transition hover:-translate-y-0.5 hover:border-cyan-400 dark:border-white/10 dark:bg-white/10 dark:text-white"
               onClick={() => setView('admin')}
               type="button"
             >
@@ -424,64 +458,111 @@ function Hero({ setView }: { setView: (view: View) => void }) {
           </div>
         </div>
 
-        <div className="relative min-h-[360px] border-t border-slate-900/10 bg-slate-950 p-5 text-white lg:border-l lg:border-t-0 dark:bg-black/50">
-          <div className="control-map absolute inset-0" />
-          <div className="relative grid h-full content-between gap-4">
-            <div className="rounded-3xl border border-white/10 bg-white/10 p-5 backdrop-blur">
-              <p className="text-sm font-black text-lime-200">LIVE SYSTEM MAP</p>
-              <div className="mt-5 grid gap-3">
-                {['Cloudflare Pages', 'Neon Database', 'Drive / Sheet / YouTube'].map(
-                  (label, index) => (
-                    <div
-                      className="flex items-center justify-between rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3"
-                      key={label}
-                    >
-                      <span className="font-bold">{label}</span>
-                      <span className="rounded-lg bg-lime-300 px-2 py-1 text-xs font-black text-slate-950">
-                        NODE {index + 1}
-                      </span>
-                    </div>
-                  ),
-                )}
-              </div>
-            </div>
+        <DashboardPreview />
+      </div>
+    </section>
+  )
+}
 
-            <div className="grid grid-cols-3 gap-3">
-              {[
-                ['168', 'สื่อ'],
-                ['4.9k', 'ดาวน์โหลด'],
-                ['12', 'รอตรวจ'],
-              ].map(([value, label]) => (
-                <div
-                  className="rounded-2xl border border-white/10 bg-white/10 p-4 text-center backdrop-blur"
-                  key={label}
-                >
-                  <p className="text-2xl font-black text-lime-200">{value}</p>
-                  <p className="mt-1 text-xs font-bold text-slate-300">{label}</p>
-                </div>
-              ))}
+function DashboardPreview() {
+  return (
+    <div className="relative min-h-[410px] border-t border-slate-900/10 bg-slate-950 p-5 text-white lg:border-l lg:border-t-0">
+      <div className="preview-grid absolute inset-0" />
+      <div className="relative grid h-full gap-4">
+        <div className="rounded-3xl border border-white/10 bg-white/10 p-5 backdrop-blur">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-black text-cyan-200">DASHBOARD PREVIEW</p>
+              <p className="mt-1 text-xs font-bold text-slate-400">media access monitor</p>
             </div>
+            <span className="rounded-xl bg-emerald-400 px-3 py-1 text-xs font-black text-slate-950">
+              ONLINE
+            </span>
+          </div>
+          <div className="mt-5 grid gap-3">
+            {mediaItems.slice(0, 3).map((item) => (
+              <div
+                className="rounded-2xl border border-white/10 bg-slate-950/72 p-3"
+                key={item.id}
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <p className="line-clamp-1 text-sm font-black">{item.title}</p>
+                  <span className="rounded-lg bg-cyan-300/90 px-2 py-1 text-[10px] font-black text-slate-950">
+                    {item.access}
+                  </span>
+                </div>
+                <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/10">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-cyan-300 to-violet-300"
+                    style={{ width: `${Math.min(92, item.downloads / 5)}%` }}
+                  />
+                </div>
+              </div>
+            ))}
           </div>
         </div>
+
+        <div className="grid grid-cols-3 gap-3">
+          {[
+            ['168', 'สื่อ'],
+            ['4.9k', 'ดาวน์โหลด'],
+            ['12', 'รอตรวจ'],
+          ].map(([value, label]) => (
+            <div
+              className="rounded-2xl border border-white/10 bg-white/10 p-4 text-center backdrop-blur"
+              key={label}
+            >
+              <p className="text-2xl font-black text-cyan-200">{value}</p>
+              <p className="mt-1 text-xs font-bold text-slate-300">{label}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function PortalTiles({ setView }: { setView: (view: View) => void }) {
+  return (
+    <section className="mx-auto max-w-7xl px-4 py-4 sm:px-6">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {portalTiles.map((tile) => (
+          <button
+            className="group min-h-28 rounded-3xl border border-white/70 bg-white/74 p-5 text-left shadow-lg shadow-slate-950/5 backdrop-blur-xl transition hover:-translate-y-1 hover:border-cyan-300 dark:border-white/10 dark:bg-white/[0.06]"
+            key={tile.label}
+            onClick={() => setView(tile.view)}
+            type="button"
+          >
+            <tile.icon className="mb-4 text-cyan-600 transition group-hover:scale-110 dark:text-cyan-300" />
+            <p className="text-lg font-black text-slate-950 dark:text-white">{tile.label}</p>
+            <p className="mt-1 text-sm font-semibold text-slate-500 dark:text-slate-400">
+              {tile.detail}
+            </p>
+          </button>
+        ))}
       </div>
     </section>
   )
 }
 
 function MediaSection({
-  category,
+  access,
   filteredMedia,
   query,
-  setCategory,
+  setAccess,
   setQuery,
+  setTopic,
+  topic,
   openDetail,
   expanded,
 }: {
-  category: string
+  access: 'ทั้งหมด' | AccessLevel
   filteredMedia: MediaItem[]
   query: string
-  setCategory: (value: string) => void
+  setAccess: (value: 'ทั้งหมด' | AccessLevel) => void
   setQuery: (value: string) => void
+  setTopic: (value: string) => void
+  topic: string
   openDetail: (item: MediaItem) => void
   expanded?: boolean
 }) {
@@ -489,12 +570,12 @@ function MediaSection({
     <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
       <div className="mb-6 grid gap-4 lg:grid-cols-[1fr_520px] lg:items-end">
         <div>
-          <p className="mb-2 inline-flex items-center gap-2 rounded-xl bg-lime-100 px-3 py-1 text-sm font-black text-lime-900 dark:bg-lime-300/10 dark:text-lime-200">
+          <p className="mb-2 inline-flex items-center gap-2 rounded-2xl bg-violet-50 px-3 py-1 text-sm font-black text-violet-800 dark:bg-violet-400/10 dark:text-violet-200">
             <Database size={16} />
-            {expanded ? 'คลังสื่อทั้งหมด' : 'รายการพร้อมใช้งาน'}
+            {expanded ? 'คลังสื่อทั้งหมด' : 'สื่อพร้อมใช้งาน'}
           </p>
           <h2 className="text-3xl font-black text-slate-950 dark:text-white">
-            เลือกสื่อจากแผงข้อมูลเดียว
+            หมวดหมู่หลายชั้น สำหรับค้นหาไวบนมือถือและ PC
           </h2>
         </div>
         <div className="grid gap-3 sm:grid-cols-[minmax(220px,1fr)_auto]">
@@ -504,46 +585,76 @@ function MediaSection({
               size={20}
             />
             <input
-              className="min-h-12 w-full rounded-2xl border border-slate-200 bg-white/80 pl-12 pr-4 text-base outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 dark:border-white/10 dark:bg-white/10"
+              className="min-h-12 w-full rounded-2xl border border-white/70 bg-white/78 pl-12 pr-4 text-base outline-none transition focus:border-cyan-500 focus:ring-4 focus:ring-cyan-500/10 dark:border-white/10 dark:bg-white/10"
               onChange={(event) => setQuery(event.target.value)}
               placeholder="ค้นหาชื่อสื่อหรือคำอธิบาย"
               value={query}
             />
           </label>
-          <button className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white/80 px-5 font-black text-slate-700 dark:border-white/10 dark:bg-white/10 dark:text-white">
+          <button className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-white/70 bg-white/78 px-5 font-black text-slate-700 dark:border-white/10 dark:bg-white/10 dark:text-white">
             <ListFilter size={18} />
             ตัวกรอง
           </button>
         </div>
       </div>
 
-      <div className="mb-6 flex gap-2 overflow-x-auto pb-2">
-        {categories.map((item) => (
-          <button
-            className={`min-h-11 shrink-0 rounded-2xl px-5 text-sm font-black transition ${
-              category === item
-                ? 'bg-slate-950 text-lime-200 dark:bg-lime-300 dark:text-slate-950'
-                : 'border border-slate-200 bg-white/70 text-slate-600 dark:border-white/10 dark:bg-white/10 dark:text-slate-200'
-            }`}
-            key={item}
-            onClick={() => setCategory(item)}
-            type="button"
-          >
-            {item}
-          </button>
-        ))}
-      </div>
+      <FilterRow
+        items={topics}
+        label="หัวข้อ"
+        selected={topic}
+        setSelected={setTopic}
+      />
+      <FilterRow
+        items={accessLevels}
+        label="สิทธิ์"
+        selected={access}
+        setSelected={setAccess}
+      />
 
       {filteredMedia.length === 0 ? (
         <EmptyState />
       ) : (
-        <div className="grid gap-4 lg:grid-cols-2">
+        <div className="mt-6 grid gap-4 lg:grid-cols-2">
           {filteredMedia.map((item) => (
             <MediaCard item={item} key={item.id} openDetail={openDetail} />
           ))}
         </div>
       )}
     </section>
+  )
+}
+
+function FilterRow<T extends string>({
+  items,
+  label,
+  selected,
+  setSelected,
+}: {
+  items: T[]
+  label: string
+  selected: T
+  setSelected: (value: T) => void
+}) {
+  return (
+    <div className="mb-3 flex gap-2 overflow-x-auto pb-2">
+      <span className="grid min-h-11 shrink-0 place-items-center rounded-2xl bg-slate-950 px-4 text-sm font-black text-cyan-200 dark:bg-cyan-300 dark:text-slate-950">
+        {label}
+      </span>
+      {items.map((item) => (
+        <button
+          className={`min-h-11 shrink-0 rounded-2xl px-5 text-sm font-black transition ${
+            selected === item
+              ? 'bg-cyan-500 text-slate-950 shadow-lg shadow-cyan-500/20'
+              : 'border border-white/70 bg-white/70 text-slate-600 dark:border-white/10 dark:bg-white/10 dark:text-slate-200'
+          }`}
+          key={item}
+          onClick={() => setSelected(item)}
+          type="button"
+        >
+          {item}
+        </button>
+      ))}
+    </div>
   )
 }
 
@@ -555,22 +666,22 @@ function MediaCard({
   openDetail: (item: MediaItem) => void
 }) {
   return (
-    <article className="group grid overflow-hidden rounded-3xl border border-slate-900/10 bg-white/76 shadow-lg shadow-emerald-950/5 backdrop-blur transition duration-300 hover:-translate-y-1 sm:grid-cols-[210px_1fr] dark:border-white/10 dark:bg-white/[0.06]">
+    <article className="group grid overflow-hidden rounded-3xl border border-white/70 bg-white/76 shadow-lg shadow-slate-950/5 backdrop-blur-xl transition duration-300 hover:-translate-y-1 sm:grid-cols-[210px_1fr] dark:border-white/10 dark:bg-white/[0.06]">
       <div className="relative min-h-52 overflow-hidden sm:min-h-full">
         <img
           alt={item.title}
           className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
           src={item.cover}
         />
-        <span className="absolute left-3 top-3 rounded-xl bg-slate-950/86 px-3 py-1 text-xs font-black text-lime-200 shadow">
+        <span className="absolute left-3 top-3 rounded-xl bg-slate-950/86 px-3 py-1 text-xs font-black text-cyan-200 shadow">
           {item.access}
         </span>
       </div>
       <div className="flex flex-col p-5">
         <div className="mb-3 flex flex-wrap items-center gap-2 text-sm font-bold">
-          <span className="inline-flex items-center gap-1 rounded-xl bg-emerald-50 px-3 py-1 text-emerald-800 dark:bg-emerald-400/10 dark:text-emerald-200">
+          <span className="inline-flex items-center gap-1 rounded-xl bg-cyan-50 px-3 py-1 text-cyan-800 dark:bg-cyan-400/10 dark:text-cyan-200">
             <Tag size={15} />
-            {item.category}
+            {item.topic}
           </span>
           <span className="rounded-xl bg-slate-100 px-3 py-1 text-slate-600 dark:bg-white/10 dark:text-slate-300">
             {item.source}
@@ -597,7 +708,7 @@ function MediaCard({
           </span>
         </div>
         <button
-          className="mt-5 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-slate-950 px-4 font-black text-lime-200 shadow-lg shadow-slate-900/10 transition hover:-translate-y-0.5 dark:bg-lime-300 dark:text-slate-950"
+          className="mt-5 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-slate-950 px-4 font-black text-cyan-200 shadow-lg shadow-slate-900/10 transition hover:-translate-y-0.5 dark:bg-cyan-300 dark:text-slate-950"
           onClick={() => openDetail(item)}
           type="button"
         >
@@ -623,14 +734,14 @@ function MediaDetail({
   return (
     <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
       <button
-        className="mb-5 inline-flex min-h-11 items-center gap-2 rounded-2xl border border-slate-200 bg-white/80 px-4 font-black text-slate-700 dark:border-white/10 dark:bg-white/10 dark:text-white"
+        className="mb-5 inline-flex min-h-11 items-center gap-2 rounded-2xl border border-white/70 bg-white/78 px-4 font-black text-slate-700 dark:border-white/10 dark:bg-white/10 dark:text-white"
         onClick={onBack}
         type="button"
       >
         กลับไปคลังสื่อ
       </button>
 
-      <div className="grid gap-6 overflow-hidden rounded-[2rem] border border-slate-900/10 bg-white/78 p-4 shadow-2xl shadow-emerald-950/10 backdrop-blur lg:grid-cols-[.95fr_1.05fr] dark:border-white/10 dark:bg-white/[0.06]">
+      <div className="grid gap-6 overflow-hidden rounded-[2rem] border border-white/70 bg-white/78 p-4 shadow-2xl shadow-slate-950/10 backdrop-blur-xl lg:grid-cols-[.95fr_1.05fr] dark:border-white/10 dark:bg-white/[0.06]">
         <div className="overflow-hidden rounded-3xl bg-slate-100 dark:bg-slate-800">
           <img
             alt={item.title}
@@ -640,10 +751,10 @@ function MediaDetail({
         </div>
         <div className="p-2 sm:p-4">
           <div className="mb-4 flex flex-wrap gap-2">
-            <span className="rounded-xl bg-emerald-50 px-3 py-1 text-sm font-black text-emerald-800 dark:bg-emerald-400/10 dark:text-emerald-200">
-              {item.category}
+            <span className="rounded-xl bg-cyan-50 px-3 py-1 text-sm font-black text-cyan-800 dark:bg-cyan-400/10 dark:text-cyan-200">
+              {item.topic}
             </span>
-            <span className="rounded-xl bg-lime-100 px-3 py-1 text-sm font-black text-lime-900 dark:bg-lime-300/10 dark:text-lime-200">
+            <span className="rounded-xl bg-violet-50 px-3 py-1 text-sm font-black text-violet-800 dark:bg-violet-400/10 dark:text-violet-200">
               {item.access}
             </span>
           </div>
@@ -663,7 +774,7 @@ function MediaDetail({
 
           <div className="mt-6 flex flex-col gap-3 sm:flex-row">
             <button
-              className="inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-2xl bg-emerald-500 px-5 font-black text-slate-950 shadow-lg shadow-emerald-500/20"
+              className="inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-2xl bg-cyan-400 px-5 font-black text-slate-950 shadow-lg shadow-cyan-500/20"
               onClick={item.access === 'สาธารณะ' ? onSuccess : onError}
               type="button"
             >
@@ -671,7 +782,7 @@ function MediaDetail({
               ดาวน์โหลด / เปิดลิงก์
             </button>
             <button
-              className="inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-2xl bg-slate-950 px-5 font-black text-lime-200 shadow-lg shadow-slate-900/10 dark:bg-lime-300 dark:text-slate-950"
+              className="inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-2xl bg-slate-950 px-5 font-black text-cyan-200 shadow-lg shadow-slate-900/10 dark:bg-cyan-300 dark:text-slate-950"
               onClick={onSuccess}
               type="button"
             >
@@ -683,9 +794,9 @@ function MediaDetail({
       </div>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_360px]">
-        <section className="rounded-3xl border border-slate-900/10 bg-white/76 p-6 shadow-sm backdrop-blur dark:border-white/10 dark:bg-white/[0.06]">
+        <section className="rounded-3xl border border-white/70 bg-white/76 p-6 shadow-sm backdrop-blur dark:border-white/10 dark:bg-white/[0.06]">
           <h3 className="mb-4 inline-flex items-center gap-2 text-xl font-black">
-            <FileText className="text-emerald-600" />
+            <FileText className="text-cyan-600" />
             รายละเอียดสื่อ
           </h3>
           <ul className="space-y-3 text-slate-600 dark:text-slate-300">
@@ -694,9 +805,9 @@ function MediaDetail({
             <li>ระบบจะเช็กสิทธิ์ก่อนแสดงปุ่มดาวน์โหลดจริงในขั้นตอน backend</li>
           </ul>
         </section>
-        <aside className="rounded-3xl border border-slate-900/10 bg-white/76 p-6 shadow-sm backdrop-blur dark:border-white/10 dark:bg-white/[0.06]">
+        <aside className="rounded-3xl border border-white/70 bg-white/76 p-6 shadow-sm backdrop-blur dark:border-white/10 dark:bg-white/[0.06]">
           <h3 className="mb-4 inline-flex items-center gap-2 text-xl font-black">
-            <PlayCircle className="text-lime-600" />
+            <PlayCircle className="text-violet-600" />
             Preview
           </h3>
           <div className="grid place-items-center rounded-2xl border border-dashed border-slate-300 p-8 text-center text-slate-500 dark:border-white/10">
@@ -719,8 +830,8 @@ function InfoTile({
   value: string
 }) {
   return (
-    <div className="rounded-2xl border border-slate-900/10 bg-white/70 p-4 dark:border-white/10 dark:bg-white/5">
-      <Icon className="mb-3 text-emerald-600 dark:text-emerald-300" size={24} />
+    <div className="rounded-2xl border border-white/70 bg-white/70 p-4 dark:border-white/10 dark:bg-white/5">
+      <Icon className="mb-3 text-cyan-600 dark:text-cyan-300" size={24} />
       <p className="text-sm font-bold text-slate-500 dark:text-slate-400">{label}</p>
       <p className="mt-1 text-lg font-black text-slate-950 dark:text-white">{value}</p>
     </div>
@@ -730,126 +841,119 @@ function InfoTile({
 function AdminPanel({ onSuccess }: { onSuccess: () => void }) {
   return (
     <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
-      <div className="mb-6 flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
-        <div>
-          <p className="mb-2 inline-flex items-center gap-2 rounded-xl bg-slate-950 px-3 py-1 text-sm font-black text-lime-200 dark:bg-lime-300 dark:text-slate-950">
-            <Gauge size={16} />
-            Super Admin Control Center
-          </p>
-          <h2 className="text-3xl font-black text-slate-950 dark:text-white">
-            หลังบ้านแบบแผงควบคุม แก้ข้อมูลได้โดยไม่ต้องแตะโค้ด
-          </h2>
-        </div>
-        <button
-          className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-emerald-500 px-5 font-black text-slate-950 shadow-lg shadow-emerald-500/20"
-          onClick={onSuccess}
-          type="button"
-        >
-          <Plus size={20} />
-          เพิ่มสื่อใหม่
-        </button>
-      </div>
-
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {adminStats.map((stat) => (
-          <article
-            className="rounded-3xl border border-slate-900/10 bg-white/76 p-5 shadow-sm backdrop-blur dark:border-white/10 dark:bg-white/[0.06]"
-            key={stat.label}
+      <div className="overflow-hidden rounded-[2rem] border border-cyan-300/10 bg-[#080d18] p-4 text-white shadow-2xl shadow-slate-950/30 sm:p-6">
+        <div className="mb-6 flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
+          <div>
+            <p className="mb-2 inline-flex items-center gap-2 rounded-xl bg-cyan-300 px-3 py-1 text-sm font-black text-slate-950">
+              <Gauge size={16} />
+              Super Admin Control Center
+            </p>
+            <h2 className="text-3xl font-black">
+              หลังบ้านดาร์กแบบ programmer dashboard
+            </h2>
+          </div>
+          <button
+            className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-cyan-300 px-5 font-black text-slate-950 shadow-lg shadow-cyan-500/20"
+            onClick={onSuccess}
+            type="button"
           >
-            <stat.icon className="mb-5 text-emerald-600 dark:text-emerald-300" size={28} />
-            <p className="text-sm font-bold text-slate-500 dark:text-slate-400">
-              {stat.label}
-            </p>
-            <p className="mt-1 text-3xl font-black text-slate-950 dark:text-white">
-              {stat.value}
-            </p>
-          </article>
-        ))}
-      </div>
+            <Plus size={20} />
+            เพิ่มสื่อใหม่
+          </button>
+        </div>
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-[270px_1fr]">
-        <aside className="rounded-3xl border border-slate-900/10 bg-slate-950 p-4 text-white shadow-xl shadow-emerald-950/10 dark:border-white/10">
-          {[
-            ['Dashboard', BarChart3],
-            ['จัดการสื่อ', Layers3],
-            ['สมาชิกและ VIP', Users],
-            ['หมวดหมู่และแท็ก', Tag],
-            ['ลิงก์ภายนอก', Link2],
-            ['ตั้งค่าเว็บ', Settings],
-          ].map(([label, Icon]) => {
-            const MenuIcon = Icon as typeof BarChart3
-            return (
-              <button
-                className="mb-2 flex min-h-12 w-full items-center gap-3 rounded-2xl px-4 text-left font-black text-slate-200 hover:bg-white/10"
-                key={label as string}
-                type="button"
-              >
-                <MenuIcon size={19} />
-                {label as string}
-              </button>
-            )
-          })}
-        </aside>
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {adminStats.map((stat) => (
+            <article
+              className="rounded-3xl border border-white/10 bg-white/[0.06] p-5 shadow-sm"
+              key={stat.label}
+            >
+              <stat.icon className="mb-5 text-cyan-300" size={28} />
+              <p className="text-sm font-bold text-slate-400">{stat.label}</p>
+              <p className="mt-1 text-3xl font-black text-white">{stat.value}</p>
+            </article>
+          ))}
+        </div>
 
-        <section className="rounded-3xl border border-slate-900/10 bg-white/76 p-4 shadow-sm backdrop-blur dark:border-white/10 dark:bg-white/[0.06]">
-          <div className="mb-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
-            <h3 className="text-xl font-black">รายการสื่อล่าสุด</h3>
-            <span className="rounded-xl bg-lime-100 px-3 py-1 text-sm font-bold text-lime-900 dark:bg-lime-300/10 dark:text-lime-200">
-              ตารางจะเปลี่ยนเป็น card บนมือถือ
-            </span>
-          </div>
-
-          <div className="hidden overflow-hidden rounded-2xl border border-slate-200 md:block dark:border-white/10">
-            <table className="w-full table-fixed text-left">
-              <thead className="bg-slate-950 text-sm text-lime-200">
-                <tr>
-                  <th className="w-[34%] px-4 py-3">สื่อ</th>
-                  <th className="px-4 py-3">สิทธิ์</th>
-                  <th className="px-4 py-3">สถานะ</th>
-                  <th className="px-4 py-3">ดาวน์โหลด</th>
-                  <th className="px-4 py-3">จัดการ</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-200 dark:divide-white/10">
-                {mediaItems.map((item) => (
-                  <tr key={item.id}>
-                    <td className="px-4 py-4">
-                      <p className="truncate font-black text-slate-950 dark:text-white">
-                        {item.title}
-                      </p>
-                      <p className="text-sm text-slate-500">{item.category}</p>
-                    </td>
-                    <td className="px-4 py-4">{item.access}</td>
-                    <td className="px-4 py-4">{item.status}</td>
-                    <td className="px-4 py-4">{item.downloads}</td>
-                    <td className="px-4 py-4">
-                      <button className="rounded-xl bg-emerald-50 px-3 py-2 text-sm font-black text-emerald-800 dark:bg-emerald-400/10 dark:text-emerald-200">
-                        แก้ไข
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          <div className="grid gap-3 md:hidden">
-            {mediaItems.map((item) => (
-              <article
-                className="rounded-2xl border border-slate-200 bg-white/70 p-4 dark:border-white/10 dark:bg-white/5"
-                key={item.id}
-              >
-                <p className="font-black text-slate-950 dark:text-white">{item.title}</p>
-                <p className="mt-1 text-sm text-slate-500">
-                  {item.category} · {item.access} · {item.status}
-                </p>
-                <button className="mt-3 min-h-11 rounded-xl bg-emerald-500 px-4 font-black text-slate-950">
-                  แก้ไข
+        <div className="mt-6 grid gap-6 lg:grid-cols-[270px_1fr]">
+          <aside className="rounded-3xl border border-white/10 bg-black/24 p-4">
+            {[
+              ['Dashboard', BarChart3],
+              ['จัดการสื่อ', Layers3],
+              ['สมาชิกและ VIP', Users],
+              ['หมวดหมู่และแท็ก', Tag],
+              ['ลิงก์ภายนอก', Link2],
+              ['ตั้งค่าเว็บ', Settings],
+            ].map(([label, Icon]) => {
+              const MenuIcon = Icon as typeof BarChart3
+              return (
+                <button
+                  className="mb-2 flex min-h-12 w-full items-center gap-3 rounded-2xl px-4 text-left font-black text-slate-200 hover:bg-cyan-300/10"
+                  key={label as string}
+                  type="button"
+                >
+                  <MenuIcon size={19} />
+                  {label as string}
                 </button>
-              </article>
-            ))}
-          </div>
-        </section>
+              )
+            })}
+          </aside>
+
+          <section className="rounded-3xl border border-white/10 bg-white/[0.06] p-4">
+            <div className="mb-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+              <h3 className="text-xl font-black">รายการสื่อล่าสุด</h3>
+              <span className="rounded-xl bg-cyan-300/10 px-3 py-1 text-sm font-bold text-cyan-200">
+                ตารางจะเปลี่ยนเป็น card บนมือถือ
+              </span>
+            </div>
+
+            <div className="hidden overflow-hidden rounded-2xl border border-white/10 md:block">
+              <table className="w-full table-fixed text-left">
+                <thead className="bg-black/32 text-sm text-cyan-200">
+                  <tr>
+                    <th className="w-[34%] px-4 py-3">สื่อ</th>
+                    <th className="px-4 py-3">สิทธิ์</th>
+                    <th className="px-4 py-3">สถานะ</th>
+                    <th className="px-4 py-3">ดาวน์โหลด</th>
+                    <th className="px-4 py-3">จัดการ</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/10">
+                  {mediaItems.map((item) => (
+                    <tr key={item.id}>
+                      <td className="px-4 py-4">
+                        <p className="truncate font-black text-white">{item.title}</p>
+                        <p className="text-sm text-slate-400">{item.topic}</p>
+                      </td>
+                      <td className="px-4 py-4">{item.access}</td>
+                      <td className="px-4 py-4">{item.status}</td>
+                      <td className="px-4 py-4">{item.downloads}</td>
+                      <td className="px-4 py-4">
+                        <button className="rounded-xl bg-cyan-300/10 px-3 py-2 text-sm font-black text-cyan-200">
+                          แก้ไข
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="grid gap-3 md:hidden">
+              {mediaItems.map((item) => (
+                <article className="rounded-2xl border border-white/10 bg-black/20 p-4" key={item.id}>
+                  <p className="font-black text-white">{item.title}</p>
+                  <p className="mt-1 text-sm text-slate-400">
+                    {item.topic} · {item.access} · {item.status}
+                  </p>
+                  <button className="mt-3 min-h-11 rounded-xl bg-cyan-300 px-4 font-black text-slate-950">
+                    แก้ไข
+                  </button>
+                </article>
+              ))}
+            </div>
+          </section>
+        </div>
       </div>
     </section>
   )
@@ -857,7 +961,7 @@ function AdminPanel({ onSuccess }: { onSuccess: () => void }) {
 
 function EmptyState() {
   return (
-    <div className="grid min-h-72 place-items-center rounded-3xl border border-dashed border-slate-300 bg-white/76 p-8 text-center backdrop-blur dark:border-white/10 dark:bg-white/[0.06]">
+    <div className="mt-6 grid min-h-72 place-items-center rounded-3xl border border-dashed border-slate-300 bg-white/76 p-8 text-center backdrop-blur dark:border-white/10 dark:bg-white/[0.06]">
       <div>
         <Search className="mx-auto mb-4 text-slate-400" size={42} />
         <h3 className="text-xl font-black text-slate-950 dark:text-white">
@@ -880,8 +984,8 @@ function LoadingOverlay() {
           className="mx-auto mb-5 h-20 w-20 rounded-2xl border border-white/20 object-cover shadow-2xl"
           src={LOGO_URL}
         />
-        <Loader2 className="mx-auto mb-4 animate-spin text-lime-300" size={34} />
-        <p className="text-xl font-black">กำลังเตรียมศูนย์ควบคุมคลังสื่อ</p>
+        <Loader2 className="mx-auto mb-4 animate-spin text-cyan-300" size={34} />
+        <p className="text-xl font-black">กำลังเตรียม AI School Media Portal</p>
         <p className="mt-2 text-sm text-slate-300">Created by MIKPURINUT</p>
       </div>
     </div>
@@ -890,9 +994,9 @@ function LoadingOverlay() {
 
 function Toast({ message }: { message: string }) {
   return (
-    <div className="fixed bottom-5 left-1/2 z-50 w-[calc(100%-24px)] max-w-md -translate-x-1/2 rounded-2xl border border-emerald-200 bg-white p-4 shadow-2xl dark:border-emerald-400/20 dark:bg-slate-900">
+    <div className="fixed bottom-5 left-1/2 z-50 w-[calc(100%-24px)] max-w-md -translate-x-1/2 rounded-2xl border border-cyan-200 bg-white p-4 shadow-2xl dark:border-cyan-400/20 dark:bg-slate-900">
       <div className="flex items-center gap-3">
-        <CheckCircle2 className="shrink-0 text-emerald-500" />
+        <CheckCircle2 className="shrink-0 text-cyan-500" />
         <p className="font-bold text-slate-700 dark:text-slate-100">{message}</p>
       </div>
     </div>
@@ -915,13 +1019,13 @@ function Popup({
     <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/50 p-4 backdrop-blur-sm">
       <div className="w-full max-w-md rounded-3xl bg-white p-6 text-center shadow-2xl dark:bg-slate-900">
         <Icon
-          className={`mx-auto mb-4 ${tone === 'success' ? 'text-emerald-500' : 'text-red-500'}`}
+          className={`mx-auto mb-4 ${tone === 'success' ? 'text-cyan-500' : 'text-red-500'}`}
           size={46}
         />
         <h3 className="text-2xl font-black text-slate-950 dark:text-white">{title}</h3>
         <p className="mt-3 leading-7 text-slate-600 dark:text-slate-300">{message}</p>
         <button
-          className="mt-6 min-h-12 w-full rounded-2xl bg-slate-950 px-5 font-black text-lime-200 dark:bg-lime-300 dark:text-slate-950"
+          className="mt-6 min-h-12 w-full rounded-2xl bg-slate-950 px-5 font-black text-cyan-200 dark:bg-cyan-300 dark:text-slate-950"
           onClick={onClose}
           type="button"
         >
@@ -943,7 +1047,7 @@ function Footer() {
               className="h-12 w-12 rounded-xl object-cover"
               src={LOGO_URL}
             />
-            <p className="font-black">MIKPURINUT Grid</p>
+            <p className="font-black">MIKPURINUT Nexus</p>
           </div>
           <p className="max-w-md leading-7 text-slate-300">
             ระบบคลังสื่อสมาชิกสำหรับโรงเรียนและผู้จัดอบรม รองรับลิงก์ Drive,
