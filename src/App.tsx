@@ -77,6 +77,27 @@ type CurrentUser = {
   access: 'VIP' | 'สมาชิก'
 }
 
+type AdminUser = {
+  id: number
+  name: string
+  email: string
+  role: CurrentUser['role']
+  access: CurrentUser['access']
+  status: 'active' | 'disabled'
+  createdAt: string
+}
+
+type VipRequest = {
+  id: number
+  userId: number | null
+  name: string
+  email: string
+  phone: string
+  slipName: string
+  status: 'pending' | 'approved' | 'rejected'
+  createdAt: string
+}
+
 type MediaFormState = {
   title: string
   topic: string
@@ -1915,8 +1936,63 @@ function AdminPanel({
   })
   const [saving, setSaving] = useState(false)
   const [savingSettings, setSavingSettings] = useState(false)
+  const [adminUsers, setAdminUsers] = useState<AdminUser[]>([])
+  const [vipRequests, setVipRequests] = useState<VipRequest[]>([])
+  const [loadingMembers, setLoadingMembers] = useState(false)
   const [error, setError] = useState('')
   const [settingsError, setSettingsError] = useState('')
+  const [memberError, setMemberError] = useState('')
+
+  const pendingVipRequests = vipRequests.filter((request) => request.status === 'pending')
+
+  const loadMembers = async () => {
+    setLoadingMembers(true)
+    setMemberError('')
+    try {
+      const response = await fetch('/api/admin/users', { credentials: 'include' })
+      const result = await readJson<{
+        users?: AdminUser[]
+        vipRequests?: VipRequest[]
+        error?: string
+      }>(response)
+
+      if (!response.ok) throw new Error(result.error ?? 'โหลดข้อมูลสมาชิกไม่สำเร็จ')
+      setAdminUsers(result.users ?? [])
+      setVipRequests(result.vipRequests ?? [])
+    } catch (loadError) {
+      setMemberError(
+        loadError instanceof Error ? loadError.message : 'โหลดข้อมูลสมาชิกไม่สำเร็จ',
+      )
+    } finally {
+      setLoadingMembers(false)
+    }
+  }
+
+  useEffect(() => {
+    queueMicrotask(() => void loadMembers())
+  }, [])
+
+  const submitMemberAction = async (payload: Record<string, unknown>) => {
+    setLoadingMembers(true)
+    setMemberError('')
+    try {
+      const response = await fetch('/api/admin/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(payload),
+      })
+      const result = await readJson<{ error?: string }>(response)
+
+      if (!response.ok) throw new Error(result.error ?? 'อัปเดตสมาชิกไม่สำเร็จ')
+      await loadMembers()
+    } catch (actionError) {
+      setMemberError(
+        actionError instanceof Error ? actionError.message : 'อัปเดตสมาชิกไม่สำเร็จ',
+      )
+      setLoadingMembers(false)
+    }
+  }
 
   const updateForm = (name: keyof typeof form, value: string) => {
     setForm((current) => ({ ...current, [name]: value }))
@@ -2058,6 +2134,150 @@ function AdminPanel({
           </aside>
 
           <div className="grid gap-6">
+          <section className="rounded-3xl border border-emerald-300/20 bg-white/[0.06] p-4">
+            <div className="mb-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+              <div>
+                <h3 className="flex items-center gap-2 text-xl font-black">
+                  <Users className="text-emerald-300" size={22} />
+                  สมาชิกและคำขอ VIP
+                </h3>
+                <p className="mt-1 text-sm font-semibold text-slate-400">
+                  ตรวจคำขอ VIP ปรับสิทธิ์ และเปิด/ปิดบัญชีสมาชิกได้จากหน้านี้
+                </p>
+              </div>
+              <button
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-emerald-300 px-4 font-black text-slate-950 disabled:opacity-60"
+                disabled={loadingMembers}
+                onClick={loadMembers}
+                type="button"
+              >
+                {loadingMembers ? <Loader2 className="animate-spin" size={18} /> : <Database size={18} />}
+                รีเฟรช
+              </button>
+            </div>
+
+            {memberError && (
+              <div className="mb-4 rounded-2xl border border-red-400/20 bg-red-400/10 p-3 text-sm font-bold text-red-200">
+                {memberError}
+              </div>
+            )}
+
+            <div className="grid gap-4 xl:grid-cols-[1fr_1.2fr]">
+              <div className="rounded-3xl border border-white/10 bg-black/20 p-4">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <p className="font-black text-white">คำขอ VIP รอตรวจ</p>
+                  <span className="rounded-full bg-amber-300 px-3 py-1 text-xs font-black text-slate-950">
+                    {pendingVipRequests.length}
+                  </span>
+                </div>
+                <div className="grid gap-3">
+                  {pendingVipRequests.length === 0 && (
+                    <div className="rounded-2xl border border-dashed border-white/15 p-5 text-sm font-bold text-slate-400">
+                      ยังไม่มีคำขอ VIP ที่รอตรวจ
+                    </div>
+                  )}
+                  {pendingVipRequests.map((request) => (
+                    <article className="rounded-2xl border border-white/10 bg-white/[0.05] p-4" key={request.id}>
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="font-black text-white">{request.name}</p>
+                          <p className="text-sm font-semibold text-slate-400">{request.email}</p>
+                          {request.phone && (
+                            <p className="text-sm font-semibold text-slate-400">{request.phone}</p>
+                          )}
+                          {request.slipName && (
+                            <p className="mt-1 text-xs font-bold text-cyan-200">สลิป: {request.slipName}</p>
+                          )}
+                        </div>
+                        <Crown className="shrink-0 text-amber-300" size={22} />
+                      </div>
+                      <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                        <button
+                          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-emerald-300 px-3 font-black text-slate-950 disabled:opacity-60"
+                          disabled={loadingMembers}
+                          onClick={() => submitMemberAction({ action: 'approve-vip', requestId: request.id })}
+                          type="button"
+                        >
+                          <CheckCircle2 size={18} />
+                          อนุมัติ
+                        </button>
+                        <button
+                          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-white/10 px-3 font-black text-white disabled:opacity-60"
+                          disabled={loadingMembers}
+                          onClick={() => submitMemberAction({ action: 'reject-vip', requestId: request.id })}
+                          type="button"
+                        >
+                          <X size={18} />
+                          ปฏิเสธ
+                        </button>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              </div>
+
+              <div className="rounded-3xl border border-white/10 bg-black/20 p-4">
+                <p className="mb-3 font-black text-white">สมาชิกทั้งหมด</p>
+                <div className="grid max-h-[520px] gap-3 overflow-y-auto pr-1">
+                  {adminUsers.length === 0 && (
+                    <div className="rounded-2xl border border-dashed border-white/15 p-5 text-sm font-bold text-slate-400">
+                      ยังไม่มีข้อมูลสมาชิก
+                    </div>
+                  )}
+                  {adminUsers.map((user) => {
+                    const isSuperAdmin = user.role === 'superadmin'
+                    return (
+                      <article className="rounded-2xl border border-white/10 bg-white/[0.05] p-4" key={user.id}>
+                        <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
+                          <div className="min-w-0">
+                            <p className="truncate font-black text-white">{user.name}</p>
+                            <p className="truncate text-sm font-semibold text-slate-400">{user.email}</p>
+                            <div className="mt-2 flex flex-wrap gap-2 text-xs font-black">
+                              <span className="rounded-full bg-cyan-300/10 px-3 py-1 text-cyan-200">{user.role}</span>
+                              <span className="rounded-full bg-amber-300/10 px-3 py-1 text-amber-200">{user.access}</span>
+                              <span className="rounded-full bg-white/10 px-3 py-1 text-slate-200">{user.status}</span>
+                            </div>
+                          </div>
+                          <ShieldCheck className={isSuperAdmin ? 'text-cyan-300' : 'text-slate-500'} size={22} />
+                        </div>
+                        <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                          <button
+                            className="min-h-10 rounded-xl bg-cyan-300/10 px-3 text-sm font-black text-cyan-200 disabled:cursor-not-allowed disabled:opacity-40"
+                            disabled={loadingMembers || isSuperAdmin}
+                            onClick={() =>
+                              submitMemberAction({
+                                action: 'set-access',
+                                userId: user.id,
+                                access: user.access === 'VIP' ? 'สมาชิก' : 'VIP',
+                              })
+                            }
+                            type="button"
+                          >
+                            {user.access === 'VIP' ? 'ลดเป็นสมาชิก' : 'ให้สิทธิ์ VIP'}
+                          </button>
+                          <button
+                            className="min-h-10 rounded-xl bg-white/10 px-3 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-40"
+                            disabled={loadingMembers || isSuperAdmin}
+                            onClick={() =>
+                              submitMemberAction({
+                                action: 'set-status',
+                                userId: user.id,
+                                status: user.status === 'active' ? 'disabled' : 'active',
+                              })
+                            }
+                            type="button"
+                          >
+                            {user.status === 'active' ? 'ปิดบัญชี' : 'เปิดบัญชี'}
+                          </button>
+                        </div>
+                      </article>
+                    )
+                  })}
+                </div>
+              </div>
+            </div>
+          </section>
+
           <form
             className="rounded-3xl border border-sky-300/20 bg-white/[0.06] p-4"
             onSubmit={submitSettings}
