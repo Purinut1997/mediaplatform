@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { type FormEvent, useEffect, useMemo, useState } from 'react'
 import {
   AlertCircle,
   Archive,
@@ -39,7 +39,7 @@ const LOGO_URL =
   'https://raw.githubusercontent.com/Purinut1997/web-images/ab67fea68788dc5db9514475e8f2b8cb1c32d8b3/ChatGPT%20Image%2023%20%E0%B8%9E.%E0%B8%84.%202569%2008_05_56.png'
 
 type Theme = 'light' | 'dark'
-type View = 'home' | 'media' | 'detail' | 'admin'
+type View = 'home' | 'media' | 'detail' | 'admin' | 'login'
 type AccessLevel = 'สาธารณะ' | 'สมาชิก' | 'VIP' | 'ซื้อแยก'
 type MediaStatus = 'เผยแพร่' | 'แบบร่าง' | 'ซ่อน'
 
@@ -56,6 +56,13 @@ type MediaItem = {
   cover: string
   source: 'Google Drive' | 'Google Sheet' | 'YouTube' | 'External Link'
   description: string
+}
+
+type CurrentUser = {
+  name: string
+  email: string
+  role: 'superadmin' | 'member'
+  access: 'VIP' | 'สมาชิก'
 }
 
 const mediaItems: MediaItem[] = [
@@ -126,19 +133,11 @@ const mediaItems: MediaItem[] = [
 ]
 
 const topics = ['ทั้งหมด', 'AI', 'AppScript', 'โรงเรียน', 'งานเอกสาร', 'อบรม']
-const accessLevels: Array<'ทั้งหมด' | AccessLevel> = [
-  'ทั้งหมด',
-  'สาธารณะ',
-  'สมาชิก',
-  'VIP',
-  'ซื้อแยก',
-]
-
 const portalTiles = [
   { label: 'คลังสื่อ', detail: 'ไฟล์ เอกสาร วิดีโอ', icon: Archive, view: 'media' as View },
   { label: 'AI Lab', detail: 'Prompt และคู่มือ AI', icon: BrainCircuit, view: 'media' as View },
   { label: 'ห้องอบรม', detail: 'บทเรียนและวิดีโอ', icon: GraduationCap, view: 'media' as View },
-  { label: 'หลังบ้าน', detail: 'Super Admin', icon: ShieldCheck, view: 'admin' as View },
+  { label: 'VIP Preview', detail: 'ดูสิ่งที่จะปลดล็อก', icon: ShieldCheck, view: 'media' as View },
 ]
 
 const adminStats = [
@@ -148,16 +147,28 @@ const adminStats = [
   { label: 'คำขอรอตรวจ', value: '12', icon: AlertCircle },
 ]
 
+function canViewMedia(user: CurrentUser | null, item: MediaItem) {
+  if (user?.role === 'superadmin') return true
+  if (item.access === 'สาธารณะ') return true
+  if (user?.access === 'VIP') return item.access !== 'ซื้อแยก'
+  if (user?.access === 'สมาชิก') return item.access === 'สมาชิก'
+  return false
+}
+
 function App() {
   const [theme, setTheme] = useState<Theme>(() => {
     if (typeof window === 'undefined') return 'light'
     return (window.localStorage.getItem('theme') as Theme | null) ?? 'light'
   })
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(() => {
+    if (typeof window === 'undefined') return null
+    const saved = window.localStorage.getItem('currentUser')
+    return saved ? (JSON.parse(saved) as CurrentUser) : null
+  })
   const [view, setView] = useState<View>('home')
   const [selected, setSelected] = useState<MediaItem>(mediaItems[0])
   const [query, setQuery] = useState('')
   const [topic, setTopic] = useState('ทั้งหมด')
-  const [access, setAccess] = useState<'ทั้งหมด' | AccessLevel>('ทั้งหมด')
   const [toast, setToast] = useState('ระบบเชื่อมต่อ Cloudflare + Neon สำเร็จ')
   const [showSuccess, setShowSuccess] = useState(false)
   const [showError, setShowError] = useState(false)
@@ -168,6 +179,14 @@ function App() {
     document.documentElement.classList.toggle('dark', theme === 'dark')
     window.localStorage.setItem('theme', theme)
   }, [theme])
+
+  useEffect(() => {
+    if (currentUser) {
+      window.localStorage.setItem('currentUser', JSON.stringify(currentUser))
+    } else {
+      window.localStorage.removeItem('currentUser')
+    }
+  }, [currentUser])
 
   useEffect(() => {
     const timer = window.setTimeout(() => setLoading(false), 760)
@@ -186,10 +205,14 @@ function App() {
         const text = `${item.title} ${item.description}`.toLowerCase()
         const matchQuery = text.includes(query.toLowerCase())
         const matchTopic = topic === 'ทั้งหมด' || item.topic === topic
-        const matchAccess = access === 'ทั้งหมด' || item.access === access
-        return matchQuery && matchTopic && matchAccess
+        return matchQuery && matchTopic && canViewMedia(currentUser, item)
       }),
-    [access, query, topic],
+    [currentUser, query, topic],
+  )
+
+  const lockedPreviewMedia = useMemo(
+    () => mediaItems.filter((item) => !canViewMedia(currentUser, item)),
+    [currentUser],
   )
 
   const openDetail = (item: MediaItem) => {
@@ -203,6 +226,18 @@ function App() {
     setShowSuccess(true)
   }
 
+  const loginSuperAdmin = (user: CurrentUser) => {
+    setCurrentUser(user)
+    setToast(`เข้าสู่ระบบแล้ว: ${user.name}`)
+    setView('admin')
+  }
+
+  const logout = () => {
+    setCurrentUser(null)
+    setToast('ออกจากระบบแล้ว')
+    setView('home')
+  }
+
   return (
     <div className="relative min-h-screen overflow-hidden bg-[#f3f7fb] text-slate-900 transition-colors duration-300 dark:bg-[#05070d] dark:text-slate-100">
       <TechBackground />
@@ -210,7 +245,9 @@ function App() {
 
       <div className="relative z-10">
         <Header
+          currentUser={currentUser}
           menuOpen={menuOpen}
+          onLogout={logout}
           setMenuOpen={setMenuOpen}
           setTheme={setTheme}
           setView={setView}
@@ -224,11 +261,11 @@ function App() {
               <Hero setView={setView} />
               <PortalTiles setView={setView} />
               <MediaSection
-                access={access}
+                currentUser={currentUser}
                 filteredMedia={filteredMedia}
+                lockedPreviewMedia={lockedPreviewMedia}
                 openDetail={openDetail}
                 query={query}
-                setAccess={setAccess}
                 setQuery={setQuery}
                 setTopic={setTopic}
                 topic={topic}
@@ -237,12 +274,12 @@ function App() {
           )}
           {view === 'media' && (
             <MediaSection
-              access={access}
+              currentUser={currentUser}
               expanded
               filteredMedia={filteredMedia}
+              lockedPreviewMedia={lockedPreviewMedia}
               openDetail={openDetail}
               query={query}
-              setAccess={setAccess}
               setQuery={setQuery}
               setTopic={setTopic}
               topic={topic}
@@ -251,15 +288,22 @@ function App() {
           {view === 'detail' && (
             <MediaDetail
               item={selected}
+              canDownload={canViewMedia(currentUser, selected)}
               onBack={() => setView('media')}
               onError={() => setShowError(true)}
               onSuccess={() => notifySuccess('บันทึกรายการโปรดแล้ว')}
             />
           )}
-          {view === 'admin' && (
+          {view === 'login' && (
+            <LoginPanel onLogin={loginSuperAdmin} />
+          )}
+          {view === 'admin' && currentUser?.role === 'superadmin' && (
             <AdminPanel
               onSuccess={() => notifySuccess('บันทึกการตั้งค่าตัวอย่างแล้ว')}
             />
+          )}
+          {view === 'admin' && currentUser?.role !== 'superadmin' && (
+            <LoginPanel onLogin={loginSuperAdmin} />
           )}
         </main>
 
@@ -314,16 +358,20 @@ function TechBackground() {
 }
 
 function Header({
+  currentUser,
   theme,
   view,
   menuOpen,
+  onLogout,
   setMenuOpen,
   setTheme,
   setView,
 }: {
+  currentUser: CurrentUser | null
   theme: Theme
   view: View
   menuOpen: boolean
+  onLogout: () => void
   setMenuOpen: (value: boolean) => void
   setTheme: (theme: Theme) => void
   setView: (view: View) => void
@@ -331,8 +379,11 @@ function Header({
   const nav = [
     { label: 'หน้าหลัก', value: 'home' as View },
     { label: 'คลังสื่อ', value: 'media' as View },
-    { label: 'Super Admin', value: 'admin' as View },
   ]
+  const visibleNav =
+    currentUser?.role === 'superadmin'
+      ? [...nav, { label: 'หลังบ้าน', value: 'admin' as View }]
+      : nav
 
   return (
     <header className="sticky top-0 z-40 border-b border-white/60 bg-white/72 shadow-sm shadow-slate-950/5 backdrop-blur-2xl dark:border-white/10 dark:bg-[#070b14]/80">
@@ -358,7 +409,7 @@ function Header({
         </button>
 
         <nav className="hidden items-center rounded-2xl border border-white/70 bg-white/70 p-1 shadow-sm dark:border-white/10 dark:bg-white/5 lg:flex">
-          {nav.map((item) => (
+          {visibleNav.map((item) => (
             <button
               className={`min-h-10 rounded-xl px-4 text-sm font-black transition ${
                 view === item.value
@@ -383,13 +434,25 @@ function Header({
           >
             {theme === 'dark' ? <Sun size={19} /> : <Moon size={19} />}
           </button>
-          <button
-            className="hidden min-h-11 rounded-xl bg-slate-950 px-5 text-sm font-black text-cyan-200 shadow-lg shadow-slate-900/15 transition hover:-translate-y-0.5 dark:bg-cyan-300 dark:text-slate-950 sm:inline-flex sm:items-center"
-            onClick={() => setView('admin')}
-            type="button"
-          >
-            เข้าหลังบ้าน
-          </button>
+          {currentUser ? (
+            <button
+              className="hidden min-h-11 rounded-xl bg-slate-950 px-5 text-sm font-black text-cyan-200 shadow-lg shadow-slate-900/15 transition hover:-translate-y-0.5 dark:bg-cyan-300 dark:text-slate-950 sm:inline-flex sm:items-center"
+              onClick={() =>
+                currentUser.role === 'superadmin' ? setView('admin') : onLogout()
+              }
+              type="button"
+            >
+              {currentUser.role === 'superadmin' ? 'หลังบ้าน' : 'ออกจากระบบ'}
+            </button>
+          ) : (
+            <button
+              className="hidden min-h-11 rounded-xl bg-slate-950 px-5 text-sm font-black text-cyan-200 shadow-lg shadow-slate-900/15 transition hover:-translate-y-0.5 dark:bg-cyan-300 dark:text-slate-950 sm:inline-flex sm:items-center"
+              onClick={() => setView('login')}
+              type="button"
+            >
+              เข้าสู่ระบบ
+            </button>
+          )}
           <button
             aria-label="เปิดเมนู"
             className="grid h-11 w-11 place-items-center rounded-xl border border-white/70 bg-white/80 text-slate-700 lg:hidden dark:border-white/10 dark:bg-white/10 dark:text-white"
@@ -403,7 +466,7 @@ function Header({
 
       {menuOpen && (
         <div className="border-t border-slate-200 bg-white/95 px-4 py-3 lg:hidden dark:border-white/10 dark:bg-slate-950/95">
-          {nav.map((item) => (
+          {visibleNav.map((item) => (
             <button
               className="block min-h-12 w-full rounded-xl px-4 text-left text-sm font-bold text-slate-700 hover:bg-cyan-50 dark:text-slate-200 dark:hover:bg-white/10"
               key={item.value}
@@ -416,6 +479,20 @@ function Header({
               {item.label}
             </button>
           ))}
+          <button
+            className="block min-h-12 w-full rounded-xl px-4 text-left text-sm font-bold text-slate-700 hover:bg-cyan-50 dark:text-slate-200 dark:hover:bg-white/10"
+            onClick={() => {
+              if (currentUser) {
+                onLogout()
+              } else {
+                setView('login')
+              }
+              setMenuOpen(false)
+            }}
+            type="button"
+          >
+            {currentUser ? 'ออกจากระบบ' : 'เข้าสู่ระบบ'}
+          </button>
         </div>
       )}
     </header>
@@ -449,11 +526,11 @@ function Hero({ setView }: { setView: (view: View) => void }) {
             </button>
             <button
               className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-slate-300 bg-white/70 px-6 font-black text-slate-800 transition hover:-translate-y-0.5 hover:border-cyan-400 dark:border-white/10 dark:bg-white/10 dark:text-white"
-              onClick={() => setView('admin')}
+              onClick={() => setView('media')}
               type="button"
             >
               <ShieldCheck size={20} />
-              ดู Super Admin
+              ดูสิทธิ์ VIP
             </button>
           </div>
         </div>
@@ -546,20 +623,20 @@ function PortalTiles({ setView }: { setView: (view: View) => void }) {
 }
 
 function MediaSection({
-  access,
+  currentUser,
   filteredMedia,
+  lockedPreviewMedia,
   query,
-  setAccess,
   setQuery,
   setTopic,
   topic,
   openDetail,
   expanded,
 }: {
-  access: 'ทั้งหมด' | AccessLevel
+  currentUser: CurrentUser | null
   filteredMedia: MediaItem[]
+  lockedPreviewMedia: MediaItem[]
   query: string
-  setAccess: (value: 'ทั้งหมด' | AccessLevel) => void
   setQuery: (value: string) => void
   setTopic: (value: string) => void
   topic: string
@@ -604,12 +681,7 @@ function MediaSection({
         selected={topic}
         setSelected={setTopic}
       />
-      <FilterRow
-        items={accessLevels}
-        label="สิทธิ์"
-        selected={access}
-        setSelected={setAccess}
-      />
+      <AccessNotice currentUser={currentUser} />
 
       {filteredMedia.length === 0 ? (
         <EmptyState />
@@ -620,6 +692,78 @@ function MediaSection({
           ))}
         </div>
       )}
+      {lockedPreviewMedia.length > 0 && (
+        <VipPreview lockedMedia={lockedPreviewMedia} />
+      )}
+    </section>
+  )
+}
+
+function AccessNotice({ currentUser }: { currentUser: CurrentUser | null }) {
+  const text =
+    currentUser?.role === 'superadmin'
+      ? 'คุณเข้าสู่ระบบเป็น Super Admin จึงเห็นสื่อทุกระดับ'
+      : currentUser?.access === 'VIP'
+        ? 'บัญชี VIP เห็นสื่อสมาชิกและ VIP ที่ดาวน์โหลดได้'
+        : currentUser?.access === 'สมาชิก'
+          ? 'บัญชีสมาชิกเห็นสื่อสาธารณะและสื่อสำหรับสมาชิก'
+          : 'ผู้เยี่ยมชมเห็นเฉพาะสื่อสาธารณะ ส่วน VIP แสดงเป็นตัวอย่างด้านล่าง'
+
+  return (
+    <div className="mt-3 rounded-3xl border border-cyan-200/70 bg-cyan-50/80 p-4 text-sm font-bold text-cyan-950 shadow-sm backdrop-blur dark:border-cyan-300/10 dark:bg-cyan-300/10 dark:text-cyan-100">
+      <div className="flex items-start gap-3">
+        <LockKeyhole className="mt-0.5 shrink-0" size={18} />
+        <p>{text}</p>
+      </div>
+    </div>
+  )
+}
+
+function VipPreview({ lockedMedia }: { lockedMedia: MediaItem[] }) {
+  return (
+    <section className="mt-8 rounded-[2rem] border border-violet-200/70 bg-white/70 p-4 shadow-xl shadow-slate-950/5 backdrop-blur-xl dark:border-violet-300/10 dark:bg-white/[0.06] sm:p-6">
+      <div className="mb-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
+        <div>
+          <p className="mb-2 inline-flex items-center gap-2 rounded-2xl bg-violet-50 px-3 py-1 text-sm font-black text-violet-800 dark:bg-violet-400/10 dark:text-violet-200">
+            <ShieldCheck size={16} />
+            VIP Preview
+          </p>
+          <h3 className="text-2xl font-black text-slate-950 dark:text-white">
+            ถ้าเป็น VIP จะปลดล็อกอะไรได้บ้าง
+          </h3>
+        </div>
+        <p className="text-sm font-bold text-slate-500 dark:text-slate-400">
+          แสดงเป็นตัวอย่างเท่านั้น ยังไม่เปิดลิงก์ดาวน์โหลด
+        </p>
+      </div>
+      <div className="grid gap-3 md:grid-cols-2">
+        {lockedMedia.map((item) => (
+          <article
+            className="grid gap-3 rounded-2xl border border-slate-200 bg-white/80 p-3 dark:border-white/10 dark:bg-black/20 sm:grid-cols-[96px_1fr]"
+            key={item.id}
+          >
+            <img
+              alt={item.title}
+              className="h-28 w-full rounded-xl object-cover sm:h-full"
+              src={item.cover}
+            />
+            <div>
+              <div className="mb-2 flex flex-wrap gap-2">
+                <span className="rounded-xl bg-slate-950 px-2 py-1 text-xs font-black text-cyan-200">
+                  {item.access}
+                </span>
+                <span className="rounded-xl bg-violet-50 px-2 py-1 text-xs font-black text-violet-800 dark:bg-violet-400/10 dark:text-violet-200">
+                  ล็อกอยู่
+                </span>
+              </div>
+              <p className="font-black text-slate-950 dark:text-white">{item.title}</p>
+              <p className="mt-1 line-clamp-2 text-sm text-slate-500 dark:text-slate-400">
+                {item.description}
+              </p>
+            </div>
+          </article>
+        ))}
+      </div>
     </section>
   )
 }
@@ -721,11 +865,13 @@ function MediaCard({
 }
 
 function MediaDetail({
+  canDownload,
   item,
   onBack,
   onError,
   onSuccess,
 }: {
+  canDownload: boolean
   item: MediaItem
   onBack: () => void
   onError: () => void
@@ -775,7 +921,7 @@ function MediaDetail({
           <div className="mt-6 flex flex-col gap-3 sm:flex-row">
             <button
               className="inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-2xl bg-cyan-400 px-5 font-black text-slate-950 shadow-lg shadow-cyan-500/20"
-              onClick={item.access === 'สาธารณะ' ? onSuccess : onError}
+              onClick={canDownload ? onSuccess : onError}
               type="button"
             >
               <Download size={20} />
@@ -835,6 +981,110 @@ function InfoTile({
       <p className="text-sm font-bold text-slate-500 dark:text-slate-400">{label}</p>
       <p className="mt-1 text-lg font-black text-slate-950 dark:text-white">{value}</p>
     </div>
+  )
+}
+
+function LoginPanel({ onLogin }: { onLogin: (user: CurrentUser) => void }) {
+  const [username, setUsername] = useState('')
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState('')
+
+  const superAdminUser: CurrentUser = {
+    name: 'MIKPURINUT Super Admin',
+    email: 'themikthemik4015@gmail.com',
+    role: 'superadmin',
+    access: 'VIP',
+  }
+
+  const submitLogin = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (username.trim() === 'admin' && password === 'themik06') {
+      setError('')
+      onLogin(superAdminUser)
+      return
+    }
+    setError('ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง')
+  }
+
+  return (
+    <section className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
+      <div className="grid overflow-hidden rounded-[2rem] border border-white/70 bg-white/78 shadow-2xl shadow-slate-950/10 backdrop-blur-xl lg:grid-cols-[.9fr_1.1fr] dark:border-white/10 dark:bg-white/[0.06]">
+        <div className="bg-slate-950 p-8 text-white sm:p-10">
+          <img
+            alt="MIKPURINUT"
+            className="mb-6 h-16 w-16 rounded-2xl object-cover shadow-2xl"
+            src={LOGO_URL}
+          />
+          <p className="mb-3 inline-flex rounded-2xl bg-cyan-300 px-3 py-1 text-sm font-black text-slate-950">
+            Secure Access
+          </p>
+          <h2 className="text-3xl font-black">เข้าสู่ระบบผู้ดูแล</h2>
+          <p className="mt-4 leading-8 text-slate-300">
+            หลังบ้าน Super Admin จะไม่แสดงต่อผู้ใช้ทั่วไป ต้องเข้าสู่ระบบด้วยบัญชีที่ได้รับสิทธิ์ก่อน
+          </p>
+          <div className="mt-8 rounded-2xl border border-white/10 bg-white/10 p-4 text-sm text-slate-300">
+            <p className="font-black text-cyan-200">บัญชีต้นแบบ</p>
+            <p className="mt-2">U: admin</p>
+            <p>P: themik06</p>
+          </div>
+        </div>
+
+        <form className="p-6 sm:p-10" onSubmit={submitLogin}>
+          <h3 className="text-2xl font-black text-slate-950 dark:text-white">
+            Login
+          </h3>
+          <p className="mt-2 text-sm font-semibold text-slate-500 dark:text-slate-400">
+            ใช้บัญชี superadmin เพื่อเข้าสู่แผงควบคุม
+          </p>
+
+          <label className="mt-6 block">
+            <span className="text-sm font-black text-slate-700 dark:text-slate-200">
+              ชื่อผู้ใช้
+            </span>
+            <input
+              className="mt-2 min-h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-base outline-none transition focus:border-cyan-500 focus:ring-4 focus:ring-cyan-500/10 dark:border-white/10 dark:bg-white/10"
+              onChange={(event) => setUsername(event.target.value)}
+              placeholder="admin"
+              value={username}
+            />
+          </label>
+
+          <label className="mt-4 block">
+            <span className="text-sm font-black text-slate-700 dark:text-slate-200">
+              รหัสผ่าน
+            </span>
+            <input
+              className="mt-2 min-h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-base outline-none transition focus:border-cyan-500 focus:ring-4 focus:ring-cyan-500/10 dark:border-white/10 dark:bg-white/10"
+              onChange={(event) => setPassword(event.target.value)}
+              placeholder="••••••••"
+              type="password"
+              value={password}
+            />
+          </label>
+
+          {error && (
+            <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 p-3 text-sm font-bold text-red-700 dark:border-red-400/20 dark:bg-red-400/10 dark:text-red-200">
+              {error}
+            </div>
+          )}
+
+          <button
+            className="mt-6 min-h-12 w-full rounded-2xl bg-slate-950 px-5 font-black text-cyan-200 shadow-lg shadow-slate-900/10 dark:bg-cyan-300 dark:text-slate-950"
+            type="submit"
+          >
+            เข้าสู่ระบบ Super Admin
+          </button>
+
+          <button
+            className="mt-3 min-h-12 w-full rounded-2xl border border-slate-200 bg-white px-5 font-black text-slate-700 dark:border-white/10 dark:bg-white/10 dark:text-white"
+            onClick={() => onLogin(superAdminUser)}
+            type="button"
+          >
+            เข้าด้วย Google: themikthemik4015@gmail.com
+          </button>
+        </form>
+      </div>
+    </section>
   )
 }
 
@@ -1051,12 +1301,12 @@ function Footer() {
           </div>
           <p className="max-w-md leading-7 text-slate-300">
             ระบบคลังสื่อสมาชิกสำหรับโรงเรียนและผู้จัดอบรม รองรับลิงก์ Drive,
-            Sheet, YouTube และ Super Admin
+            Sheet, YouTube และหลังบ้านผู้ดูแล
           </p>
         </div>
         <div>
           <p className="mb-3 font-black">ระบบ</p>
-          <p className="text-slate-300">Public · Member · VIP · Admin · Super Admin</p>
+          <p className="text-slate-300">Public · Member · VIP · Admin</p>
         </div>
         <div>
           <p className="mb-3 font-black">เครดิต</p>
