@@ -1,7 +1,7 @@
 @keyframes gentle-in {
   from {
     opacity: 0;
-    transform: translateY(10px);
+    transform: translateY(12px);
   }
   to {
     opacity: 1;
@@ -9,6 +9,131 @@
   }
 }
 
+@keyframes grid-drift {
+  from {
+    background-position:
+      0 0,
+      0 0,
+      0 0;
+  }
+  to {
+    background-position:
+      72px 36px,
+      -48px 64px,
+      120px 0;
+  }
+}
+
+@keyframes lane-sweep {
+  from {
+    transform: translateX(-10%) rotate(var(--lane-angle, -7deg));
+  }
+  to {
+    transform: translateX(10%) rotate(var(--lane-angle, -7deg));
+  }
+}
+
+@keyframes pulse-line {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 0.9;
+  }
+}
+
 main > section {
   animation: gentle-in 0.42s ease both;
+}
+
+.circuit-grid {
+  background-image:
+    linear-gradient(rgba(15, 23, 42, 0.09) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(15, 23, 42, 0.08) 1px, transparent 1px),
+    linear-gradient(135deg, rgba(16, 185, 129, 0.12) 1px, transparent 1px);
+  background-size:
+    42px 42px,
+    42px 42px,
+    168px 168px;
+  animation: grid-drift 18s linear infinite;
+  mask-image: linear-gradient(to bottom, transparent, black 12%, black 86%, transparent);
+}
+
+.dark .circuit-grid {
+  background-image:
+    linear-gradient(rgba(190, 242, 100, 0.11) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(45, 212, 191, 0.1) 1px, transparent 1px),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.08) 1px, transparent 1px);
+}
+
+.scan-lane {
+  --lane-angle: -7deg;
+  background:
+    linear-gradient(90deg, transparent, rgba(16, 185, 129, 0.18), transparent),
+    repeating-linear-gradient(
+      90deg,
+      transparent 0 28px,
+      rgba(15, 23, 42, 0.1) 28px 30px
+    );
+  border-block: 1px solid rgba(16, 185, 129, 0.14);
+  animation: lane-sweep 7s ease-in-out infinite alternate;
+}
+
+.scan-lane-slow {
+  --lane-angle: 5deg;
+  animation-duration: 11s;
+}
+
+.dark .scan-lane {
+  background:
+    linear-gradient(90deg, transparent, rgba(190, 242, 100, 0.13), transparent),
+    repeating-linear-gradient(
+      90deg,
+      transparent 0 28px,
+      rgba(255, 255, 255, 0.08) 28px 30px
+    );
+  border-block-color: rgba(190, 242, 100, 0.12);
+}
+
+.data-chip {
+  position: absolute;
+  border: 1px solid rgba(16, 185, 129, 0.22);
+  background: rgba(255, 255, 255, 0.72);
+  color: rgba(15, 23, 42, 0.55);
+  border-radius: 10px;
+  padding: 6px 10px;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  box-shadow: 0 14px 40px rgba(15, 23, 42, 0.08);
+}
+
+.dark .data-chip {
+  background: rgba(15, 23, 42, 0.62);
+  color: rgba(190, 242, 100, 0.7);
+  border-color: rgba(190, 242, 100, 0.18);
+}
+
+.control-map {
+  background-image:
+    linear-gradient(rgba(190, 242, 100, 0.12) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(45, 212, 191, 0.12) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+.control-map::before,
+.control-map::after {
+  content: '';
+  position: absolute;
+  inset: 14%;
+  border: 1px solid rgba(190, 242, 100, 0.22);
+  clip-path: polygon(0 0, 76% 0, 100% 24%, 100% 100%, 18% 100%, 0 82%);
+  animation: pulse-line 3.4s ease-in-out infinite;
+}
+
+.control-map::after {
+  inset: 28% 18%;
+  border-color: rgba(45, 212, 191, 0.24);
+  animation-delay: 0.9s;
 }

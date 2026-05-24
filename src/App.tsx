@@ -71,7 +71,7 @@ const mediaItems: MediaItem[] = [
     cover:
       'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=1200&q=80',
     description:
-      'ไฟล์ PDF สำหรับใช้ประกอบการอบรม พร้อมตัวอย่างกิจกรรมในห้องเรียน',
+      'ไฟล์ PDF สำหรับใช้ประกอบการอบรม พร้อมตัวอย่างกิจกรรมและเอกสารแจกในห้องเรียน',
   },
   {
     id: 2,
@@ -126,10 +126,10 @@ const mediaItems: MediaItem[] = [
 const categories = ['ทั้งหมด', 'เอกสารอบรม', 'AppScript', 'วิดีโอสอน', 'Prompt']
 
 const adminStats = [
-  { label: 'สมาชิกทั้งหมด', value: '1,284', icon: Users, tone: 'blue' },
-  { label: 'สื่อเผยแพร่', value: '168', icon: Layers3, tone: 'emerald' },
-  { label: 'ดาวน์โหลดเดือนนี้', value: '4,920', icon: Download, tone: 'cyan' },
-  { label: 'คำขอรอตรวจ', value: '12', icon: AlertCircle, tone: 'amber' },
+  { label: 'สมาชิกทั้งหมด', value: '1,284', icon: Users },
+  { label: 'สื่อเผยแพร่', value: '168', icon: Layers3 },
+  { label: 'ดาวน์โหลดเดือนนี้', value: '4,920', icon: Download },
+  { label: 'คำขอรอตรวจ', value: '12', icon: AlertCircle },
 ]
 
 function App() {
@@ -141,7 +141,7 @@ function App() {
   const [selected, setSelected] = useState<MediaItem>(mediaItems[0])
   const [query, setQuery] = useState('')
   const [category, setCategory] = useState('ทั้งหมด')
-  const [toast, setToast] = useState('เชื่อมต่อ Cloudflare + Neon สำเร็จ')
+  const [toast, setToast] = useState('ระบบเชื่อมต่อ Cloudflare + Neon สำเร็จ')
   const [showSuccess, setShowSuccess] = useState(false)
   const [showError, setShowError] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -153,7 +153,7 @@ function App() {
   }, [theme])
 
   useEffect(() => {
-    const timer = window.setTimeout(() => setLoading(false), 800)
+    const timer = window.setTimeout(() => setLoading(false), 780)
     return () => window.clearTimeout(timer)
   }, [])
 
@@ -166,9 +166,8 @@ function App() {
   const filteredMedia = useMemo(
     () =>
       mediaItems.filter((item) => {
-        const matchQuery =
-          item.title.toLowerCase().includes(query.toLowerCase()) ||
-          item.description.toLowerCase().includes(query.toLowerCase())
+        const text = `${item.title} ${item.description}`.toLowerCase()
+        const matchQuery = text.includes(query.toLowerCase())
         const matchCategory = category === 'ทั้งหมด' || item.category === category
         return matchQuery && matchCategory
       }),
@@ -181,82 +180,101 @@ function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
-  const handleDemoAction = (message: string) => {
+  const notifySuccess = (message: string) => {
     setToast(message)
     setShowSuccess(true)
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 transition-colors duration-300 dark:bg-slate-950 dark:text-slate-100">
+    <div className="relative min-h-screen overflow-hidden bg-[#edf5f1] text-slate-900 transition-colors duration-300 dark:bg-[#07110f] dark:text-slate-100">
+      <TechBackground />
       {loading && <LoadingOverlay />}
-      <Header
-        theme={theme}
-        view={view}
-        menuOpen={menuOpen}
-        setMenuOpen={setMenuOpen}
-        setTheme={setTheme}
-        setView={setView}
-      />
 
-      <main>
-        {view === 'home' && (
-          <>
-            <Hero setView={setView} />
+      <div className="relative z-10">
+        <Header
+          menuOpen={menuOpen}
+          setMenuOpen={setMenuOpen}
+          setTheme={setTheme}
+          setView={setView}
+          theme={theme}
+          view={view}
+        />
+
+        <main>
+          {view === 'home' && (
+            <>
+              <Hero setView={setView} />
+              <MediaSection
+                category={category}
+                filteredMedia={filteredMedia}
+                openDetail={openDetail}
+                query={query}
+                setCategory={setCategory}
+                setQuery={setQuery}
+              />
+            </>
+          )}
+          {view === 'media' && (
             <MediaSection
               category={category}
+              expanded
               filteredMedia={filteredMedia}
+              openDetail={openDetail}
               query={query}
               setCategory={setCategory}
               setQuery={setQuery}
-              openDetail={openDetail}
             />
-          </>
-        )}
-        {view === 'media' && (
-          <MediaSection
-            category={category}
-            filteredMedia={filteredMedia}
-            query={query}
-            setCategory={setCategory}
-            setQuery={setQuery}
-            openDetail={openDetail}
-            expanded
-          />
-        )}
-        {view === 'detail' && (
-          <MediaDetail
-            item={selected}
-            onBack={() => setView('media')}
-            onError={() => setShowError(true)}
-            onSuccess={() => handleDemoAction('บันทึกรายการโปรดแล้ว')}
-          />
-        )}
-        {view === 'admin' && (
-          <AdminPanel
-            onSuccess={() => handleDemoAction('บันทึกการตั้งค่าตัวอย่างแล้ว')}
-          />
-        )}
-      </main>
+          )}
+          {view === 'detail' && (
+            <MediaDetail
+              item={selected}
+              onBack={() => setView('media')}
+              onError={() => setShowError(true)}
+              onSuccess={() => notifySuccess('บันทึกรายการโปรดแล้ว')}
+            />
+          )}
+          {view === 'admin' && (
+            <AdminPanel
+              onSuccess={() => notifySuccess('บันทึกการตั้งค่าตัวอย่างแล้ว')}
+            />
+          )}
+        </main>
 
-      <Footer />
+        <Footer />
+      </div>
+
       <CreditBadge />
       {toast && <Toast message={toast} />}
       {showSuccess && (
         <Popup
-          title="ดำเนินการสำเร็จ"
           message="ระบบบันทึกข้อมูลตัวอย่างเรียบร้อย พร้อมต่อยอดกับฐานข้อมูลจริง"
-          tone="success"
           onClose={() => setShowSuccess(false)}
+          title="ดำเนินการสำเร็จ"
+          tone="success"
         />
       )}
       {showError && (
         <Popup
-          title="ยังไม่มีสิทธิ์ดาวน์โหลด"
           message="สื่อนี้ต้องใช้สิทธิ์สมาชิกหรือ VIP ก่อนจึงจะเปิดลิงก์จริงได้"
-          tone="error"
           onClose={() => setShowError(false)}
+          title="ยังไม่มีสิทธิ์ดาวน์โหลด"
+          tone="error"
         />
       )}
+    </div>
+  )
+}
+
+function TechBackground() {
+  return (
+    <div aria-hidden="true" className="pointer-events-none fixed inset-0 z-0">
+      <div className="absolute inset-0 bg-[linear-gradient(120deg,rgba(20,184,166,.16),transparent_34%),linear-gradient(300deg,rgba(190,242,100,.18),transparent_30%),linear-gradient(180deg,rgba(255,255,255,.82),rgba(226,242,236,.76))] dark:bg-[linear-gradient(120deg,rgba(45,212,191,.14),transparent_36%),linear-gradient(300deg,rgba(190,242,100,.10),transparent_31%),linear-gradient(180deg,rgba(7,17,15,.98),rgba(10,25,22,.94))]" />
+      <div className="circuit-grid absolute inset-0 opacity-70 dark:opacity-45" />
+      <div className="scan-lane absolute left-[-12%] top-[18%] h-20 w-[124%] rotate-[-7deg]" />
+      <div className="scan-lane scan-lane-slow absolute left-[-18%] top-[72%] h-16 w-[132%] rotate-[5deg]" />
+      <div className="data-chip left-[6%] top-[18%]">MEDIA_SYNC</div>
+      <div className="data-chip right-[9%] top-[28%]">NEON_OK</div>
+      <div className="data-chip bottom-[18%] left-[18%]">VIP_GATE</div>
     </div>
   )
 }
@@ -283,7 +301,7 @@ function Header({
   ]
 
   return (
-    <header className="sticky top-0 z-40 border-b border-slate-200/70 bg-white/88 backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/78">
+    <header className="sticky top-0 z-40 border-b border-emerald-900/10 bg-white/72 shadow-sm shadow-emerald-950/5 backdrop-blur-2xl dark:border-white/10 dark:bg-[#07110f]/78">
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
         <button
           className="flex min-h-12 items-center gap-3 text-left"
@@ -292,26 +310,26 @@ function Header({
         >
           <img
             alt="MIKPURINUT logo"
-            className="h-11 w-11 rounded-full border border-white object-cover shadow-lg"
+            className="h-11 w-11 rounded-xl border border-white object-cover shadow-lg shadow-emerald-900/15"
             src={LOGO_URL}
           />
           <span>
-            <span className="block text-base font-black text-slate-950 dark:text-white">
-              MIKPURINUT Media
+            <span className="block text-base font-black tracking-wide text-slate-950 dark:text-white">
+              MIKPURINUT Grid
             </span>
-            <span className="block text-xs font-semibold text-slate-500 dark:text-slate-400">
-              ระบบคลังสื่อสมาชิก
+            <span className="block text-xs font-semibold text-emerald-700 dark:text-emerald-300">
+              Media Operations Center
             </span>
           </span>
         </button>
 
-        <nav className="hidden items-center gap-1 lg:flex">
+        <nav className="hidden items-center rounded-2xl border border-slate-200/80 bg-white/70 p-1 shadow-sm dark:border-white/10 dark:bg-white/5 lg:flex">
           {nav.map((item) => (
             <button
-              className={`rounded-full px-4 py-2 text-sm font-bold transition ${
+              className={`min-h-10 rounded-xl px-4 text-sm font-black transition ${
                 view === item.value
-                  ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20'
-                  : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-white/10'
+                  ? 'bg-emerald-500 text-slate-950 shadow-lg shadow-emerald-500/25'
+                  : 'text-slate-600 hover:bg-emerald-50 dark:text-slate-300 dark:hover:bg-white/10'
               }`}
               key={item.value}
               onClick={() => setView(item.value)}
@@ -325,14 +343,14 @@ function Header({
         <div className="flex items-center gap-2">
           <button
             aria-label="สลับธีม"
-            className="grid h-11 w-11 place-items-center rounded-full border border-slate-200 bg-white text-slate-700 shadow-sm transition hover:-translate-y-0.5 dark:border-white/10 dark:bg-white/10 dark:text-white"
+            className="grid h-11 w-11 place-items-center rounded-xl border border-slate-200 bg-white/80 text-slate-700 shadow-sm transition hover:-translate-y-0.5 dark:border-white/10 dark:bg-white/10 dark:text-white"
             onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
             type="button"
           >
             {theme === 'dark' ? <Sun size={19} /> : <Moon size={19} />}
           </button>
           <button
-            className="hidden min-h-11 rounded-full bg-slate-950 px-5 text-sm font-black text-white shadow-lg shadow-slate-900/15 transition hover:-translate-y-0.5 dark:bg-white dark:text-slate-950 sm:inline-flex sm:items-center"
+            className="hidden min-h-11 rounded-xl bg-slate-950 px-5 text-sm font-black text-white shadow-lg shadow-slate-900/15 transition hover:-translate-y-0.5 dark:bg-lime-300 dark:text-slate-950 sm:inline-flex sm:items-center"
             onClick={() => setView('admin')}
             type="button"
           >
@@ -340,7 +358,7 @@ function Header({
           </button>
           <button
             aria-label="เปิดเมนู"
-            className="grid h-11 w-11 place-items-center rounded-full border border-slate-200 bg-white text-slate-700 lg:hidden dark:border-white/10 dark:bg-white/10 dark:text-white"
+            className="grid h-11 w-11 place-items-center rounded-xl border border-slate-200 bg-white/80 text-slate-700 lg:hidden dark:border-white/10 dark:bg-white/10 dark:text-white"
             onClick={() => setMenuOpen(!menuOpen)}
             type="button"
           >
@@ -350,10 +368,10 @@ function Header({
       </div>
 
       {menuOpen && (
-        <div className="border-t border-slate-200 bg-white px-4 py-3 lg:hidden dark:border-white/10 dark:bg-slate-950">
+        <div className="border-t border-slate-200 bg-white/95 px-4 py-3 lg:hidden dark:border-white/10 dark:bg-slate-950/95">
           {nav.map((item) => (
             <button
-              className="block min-h-12 w-full rounded-xl px-4 text-left text-sm font-bold text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/10"
+              className="block min-h-12 w-full rounded-xl px-4 text-left text-sm font-bold text-slate-700 hover:bg-emerald-50 dark:text-slate-200 dark:hover:bg-white/10"
               key={item.value}
               onClick={() => {
                 setView(item.value)
@@ -372,24 +390,23 @@ function Header({
 
 function Hero({ setView }: { setView: (view: View) => void }) {
   return (
-    <section className="relative overflow-hidden bg-slate-950 text-white">
-      <div className="absolute inset-0 opacity-30 [background-image:linear-gradient(90deg,rgba(59,130,246,.25)_1px,transparent_1px),linear-gradient(rgba(20,184,166,.18)_1px,transparent_1px)] [background-size:56px_56px]" />
-      <div className="relative mx-auto grid max-w-7xl gap-8 px-4 py-14 sm:px-6 lg:grid-cols-[1.05fr_.95fr] lg:py-20">
-        <div>
-          <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-cyan-300/20 bg-white/10 px-4 py-2 text-sm font-bold text-cyan-100">
+    <section className="mx-auto max-w-7xl px-4 pb-10 pt-8 sm:px-6 lg:pb-14 lg:pt-12">
+      <div className="grid overflow-hidden rounded-[2rem] border border-slate-900/10 bg-white/72 shadow-2xl shadow-emerald-950/10 backdrop-blur-xl lg:grid-cols-[1fr_420px] dark:border-white/10 dark:bg-white/[0.06]">
+        <div className="p-6 sm:p-9 lg:p-12">
+          <div className="mb-6 inline-flex items-center gap-2 rounded-xl border border-emerald-500/25 bg-emerald-50 px-4 py-2 text-sm font-black text-emerald-800 dark:bg-emerald-400/10 dark:text-emerald-200">
             <Sparkles size={17} />
-            ระบบคลังสื่อสำหรับโรงเรียนและสมาชิก VIP
+            ศูนย์ควบคุมคลังสื่อสำหรับโรงเรียน
           </div>
-          <h1 className="max-w-3xl text-4xl font-black leading-tight sm:text-5xl lg:text-6xl">
-            จัดการสื่อ ลิงก์ Drive, Sheet, YouTube และสิทธิ์สมาชิกในที่เดียว
+          <h1 className="max-w-3xl text-4xl font-black leading-tight text-slate-950 sm:text-5xl lg:text-6xl dark:text-white">
+            คลังสื่อที่ดูแลได้เหมือนแผงควบคุม ไม่ใช่เว็บขายไฟล์ธรรมดา
           </h1>
-          <p className="mt-5 max-w-2xl text-base leading-8 text-slate-300 sm:text-lg">
-            ต้นแบบระบบที่ออกแบบให้ขยายต่อได้จริง มีหน้า public, หน้าสมาชิก,
-            และศูนย์ควบคุม Super Admin โดยคงเครดิต MIKPURINUT ตามเงื่อนไข
+          <p className="mt-5 max-w-2xl text-base leading-8 text-slate-600 sm:text-lg dark:text-slate-300">
+            จัดการการ์ดสื่อ ลิงก์ Drive, Sheet, YouTube, สิทธิ์สมาชิก และ
+            VIP ผ่านหลังบ้าน โดยออกแบบให้มือถือใช้งานง่ายและขยายระบบต่อได้
           </p>
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
             <button
-              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-blue-500 px-6 font-black text-white shadow-xl shadow-blue-500/30 transition hover:-translate-y-0.5"
+              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-emerald-500 px-6 font-black text-slate-950 shadow-xl shadow-emerald-500/25 transition hover:-translate-y-0.5"
               onClick={() => setView('media')}
               type="button"
             >
@@ -397,7 +414,7 @@ function Hero({ setView }: { setView: (view: View) => void }) {
               เปิดคลังสื่อ
             </button>
             <button
-              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-white/20 bg-white/10 px-6 font-black text-white transition hover:-translate-y-0.5 hover:bg-white/15"
+              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-slate-300 bg-white/70 px-6 font-black text-slate-800 transition hover:-translate-y-0.5 hover:border-emerald-400 dark:border-white/10 dark:bg-white/10 dark:text-white"
               onClick={() => setView('admin')}
               type="button"
             >
@@ -407,30 +424,42 @@ function Hero({ setView }: { setView: (view: View) => void }) {
           </div>
         </div>
 
-        <div className="rounded-2xl border border-white/10 bg-white/10 p-4 shadow-2xl backdrop-blur">
-          <div className="rounded-xl bg-slate-950/90 p-4">
-            <div className="mb-4 flex items-center gap-2 text-xs text-slate-400">
-              <span className="h-3 w-3 rounded-full bg-red-400" />
-              <span className="h-3 w-3 rounded-full bg-amber-400" />
-              <span className="h-3 w-3 rounded-full bg-emerald-400" />
-              <span className="ml-2">deploy pipeline</span>
+        <div className="relative min-h-[360px] border-t border-slate-900/10 bg-slate-950 p-5 text-white lg:border-l lg:border-t-0 dark:bg-black/50">
+          <div className="control-map absolute inset-0" />
+          <div className="relative grid h-full content-between gap-4">
+            <div className="rounded-3xl border border-white/10 bg-white/10 p-5 backdrop-blur">
+              <p className="text-sm font-black text-lime-200">LIVE SYSTEM MAP</p>
+              <div className="mt-5 grid gap-3">
+                {['Cloudflare Pages', 'Neon Database', 'Drive / Sheet / YouTube'].map(
+                  (label, index) => (
+                    <div
+                      className="flex items-center justify-between rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3"
+                      key={label}
+                    >
+                      <span className="font-bold">{label}</span>
+                      <span className="rounded-lg bg-lime-300 px-2 py-1 text-xs font-black text-slate-950">
+                        NODE {index + 1}
+                      </span>
+                    </div>
+                  ),
+                )}
+              </div>
             </div>
-            <div className="space-y-3 font-mono text-sm text-slate-300">
-              <p>
-                <span className="text-cyan-300">Cloudflare</span> deploy --
-                production
-              </p>
-              <p>
-                <span className="text-emerald-300">Neon</span> database check
-                ok
-              </p>
-              <p>
-                access.role = <span className="text-amber-300">VIP</span> |
-                Admin | Public
-              </p>
-              <p>
-                media.links = Drive + Sheet + YouTube + External
-              </p>
+
+            <div className="grid grid-cols-3 gap-3">
+              {[
+                ['168', 'สื่อ'],
+                ['4.9k', 'ดาวน์โหลด'],
+                ['12', 'รอตรวจ'],
+              ].map(([value, label]) => (
+                <div
+                  className="rounded-2xl border border-white/10 bg-white/10 p-4 text-center backdrop-blur"
+                  key={label}
+                >
+                  <p className="text-2xl font-black text-lime-200">{value}</p>
+                  <p className="mt-1 text-xs font-bold text-slate-300">{label}</p>
+                </div>
+              ))}
             </div>
           </div>
         </div>
@@ -457,31 +486,31 @@ function MediaSection({
   expanded?: boolean
 }) {
   return (
-    <section className="mx-auto max-w-7xl px-4 py-10 sm:px-6">
-      <div className="mb-7 flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
+    <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
+      <div className="mb-6 grid gap-4 lg:grid-cols-[1fr_520px] lg:items-end">
         <div>
-          <p className="mb-2 inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1 text-sm font-black text-blue-700 dark:bg-blue-500/10 dark:text-blue-200">
+          <p className="mb-2 inline-flex items-center gap-2 rounded-xl bg-lime-100 px-3 py-1 text-sm font-black text-lime-900 dark:bg-lime-300/10 dark:text-lime-200">
             <Database size={16} />
-            {expanded ? 'คลังสื่อทั้งหมด' : 'สื่อแนะนำ'}
+            {expanded ? 'คลังสื่อทั้งหมด' : 'รายการพร้อมใช้งาน'}
           </p>
           <h2 className="text-3xl font-black text-slate-950 dark:text-white">
-            ค้นหาและจัดการสื่อได้จากหน้าเว็บ
+            เลือกสื่อจากแผงข้อมูลเดียว
           </h2>
         </div>
-        <div className="grid gap-3 sm:grid-cols-[minmax(220px,360px)_auto]">
+        <div className="grid gap-3 sm:grid-cols-[minmax(220px,1fr)_auto]">
           <label className="relative">
             <Search
               className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
               size={20}
             />
             <input
-              className="min-h-12 w-full rounded-xl border border-slate-200 bg-white pl-12 pr-4 text-base outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 dark:border-white/10 dark:bg-white/10"
+              className="min-h-12 w-full rounded-2xl border border-slate-200 bg-white/80 pl-12 pr-4 text-base outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 dark:border-white/10 dark:bg-white/10"
               onChange={(event) => setQuery(event.target.value)}
               placeholder="ค้นหาชื่อสื่อหรือคำอธิบาย"
               value={query}
             />
           </label>
-          <button className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-5 font-black text-slate-700 dark:border-white/10 dark:bg-white/10 dark:text-white">
+          <button className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white/80 px-5 font-black text-slate-700 dark:border-white/10 dark:bg-white/10 dark:text-white">
             <ListFilter size={18} />
             ตัวกรอง
           </button>
@@ -491,10 +520,10 @@ function MediaSection({
       <div className="mb-6 flex gap-2 overflow-x-auto pb-2">
         {categories.map((item) => (
           <button
-            className={`min-h-11 shrink-0 rounded-full px-5 text-sm font-black transition ${
+            className={`min-h-11 shrink-0 rounded-2xl px-5 text-sm font-black transition ${
               category === item
-                ? 'bg-slate-950 text-white dark:bg-white dark:text-slate-950'
-                : 'border border-slate-200 bg-white text-slate-600 dark:border-white/10 dark:bg-white/10 dark:text-slate-200'
+                ? 'bg-slate-950 text-lime-200 dark:bg-lime-300 dark:text-slate-950'
+                : 'border border-slate-200 bg-white/70 text-slate-600 dark:border-white/10 dark:bg-white/10 dark:text-slate-200'
             }`}
             key={item}
             onClick={() => setCategory(item)}
@@ -508,7 +537,7 @@ function MediaSection({
       {filteredMedia.length === 0 ? (
         <EmptyState />
       ) : (
-        <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-4 lg:grid-cols-2">
           {filteredMedia.map((item) => (
             <MediaCard item={item} key={item.id} openDetail={openDetail} />
           ))}
@@ -526,32 +555,41 @@ function MediaCard({
   openDetail: (item: MediaItem) => void
 }) {
   return (
-    <article className="group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-lg shadow-slate-200/70 transition duration-300 hover:-translate-y-1 dark:border-white/10 dark:bg-slate-900 dark:shadow-black/20">
-      <div className="relative aspect-[16/10] overflow-hidden">
+    <article className="group grid overflow-hidden rounded-3xl border border-slate-900/10 bg-white/76 shadow-lg shadow-emerald-950/5 backdrop-blur transition duration-300 hover:-translate-y-1 sm:grid-cols-[210px_1fr] dark:border-white/10 dark:bg-white/[0.06]">
+      <div className="relative min-h-52 overflow-hidden sm:min-h-full">
         <img
           alt={item.title}
           className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
           src={item.cover}
         />
-        <span className="absolute left-3 top-3 rounded-full bg-white/92 px-3 py-1 text-xs font-black text-slate-900 shadow">
+        <span className="absolute left-3 top-3 rounded-xl bg-slate-950/86 px-3 py-1 text-xs font-black text-lime-200 shadow">
           {item.access}
         </span>
-        <span className="absolute right-3 top-3 rounded-full bg-blue-600 px-3 py-1 text-xs font-black text-white shadow">
-          {item.source}
-        </span>
       </div>
-      <div className="p-5">
-        <div className="mb-3 flex items-center gap-2 text-sm font-bold text-slate-500 dark:text-slate-400">
-          <Tag size={16} />
-          {item.category}
+      <div className="flex flex-col p-5">
+        <div className="mb-3 flex flex-wrap items-center gap-2 text-sm font-bold">
+          <span className="inline-flex items-center gap-1 rounded-xl bg-emerald-50 px-3 py-1 text-emerald-800 dark:bg-emerald-400/10 dark:text-emerald-200">
+            <Tag size={15} />
+            {item.category}
+          </span>
+          <span className="rounded-xl bg-slate-100 px-3 py-1 text-slate-600 dark:bg-white/10 dark:text-slate-300">
+            {item.source}
+          </span>
         </div>
-        <h3 className="line-clamp-2 min-h-14 text-lg font-black text-slate-950 dark:text-white">
+        <h3 className="line-clamp-2 text-xl font-black leading-snug text-slate-950 dark:text-white">
           {item.title}
         </h3>
-        <div className="mt-4 flex items-center justify-between text-sm text-slate-500 dark:text-slate-400">
+        <p className="mt-3 line-clamp-2 text-sm leading-6 text-slate-600 dark:text-slate-300">
+          {item.description}
+        </p>
+        <div className="mt-5 flex items-center gap-4 text-sm font-bold text-slate-500 dark:text-slate-400">
           <span className="inline-flex items-center gap-1">
             <Download size={16} />
             {item.downloads}
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <Eye size={16} />
+            {item.views}
           </span>
           <span className="inline-flex items-center gap-1">
             <Star className="fill-amber-400 text-amber-400" size={16} />
@@ -559,11 +597,11 @@ function MediaCard({
           </span>
         </div>
         <button
-          className="mt-5 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 font-black text-white shadow-lg shadow-blue-500/20 transition hover:-translate-y-0.5"
+          className="mt-5 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-slate-950 px-4 font-black text-lime-200 shadow-lg shadow-slate-900/10 transition hover:-translate-y-0.5 dark:bg-lime-300 dark:text-slate-950"
           onClick={() => openDetail(item)}
           type="button"
         >
-          รายละเอียด
+          เปิดแฟ้มสื่อ
           <ChevronRight size={19} />
         </button>
       </div>
@@ -585,23 +623,27 @@ function MediaDetail({
   return (
     <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
       <button
-        className="mb-5 inline-flex min-h-11 items-center gap-2 rounded-full border border-slate-200 bg-white px-4 font-black text-slate-700 dark:border-white/10 dark:bg-white/10 dark:text-white"
+        className="mb-5 inline-flex min-h-11 items-center gap-2 rounded-2xl border border-slate-200 bg-white/80 px-4 font-black text-slate-700 dark:border-white/10 dark:bg-white/10 dark:text-white"
         onClick={onBack}
         type="button"
       >
         กลับไปคลังสื่อ
       </button>
 
-      <div className="grid gap-6 rounded-3xl border border-blue-200 bg-white p-4 shadow-xl shadow-blue-100/70 lg:grid-cols-[1fr_.9fr] dark:border-blue-500/30 dark:bg-slate-900 dark:shadow-black/20">
-        <div className="overflow-hidden rounded-2xl bg-slate-100 dark:bg-slate-800">
-          <img alt={item.title} className="h-full min-h-80 w-full object-cover" src={item.cover} />
+      <div className="grid gap-6 overflow-hidden rounded-[2rem] border border-slate-900/10 bg-white/78 p-4 shadow-2xl shadow-emerald-950/10 backdrop-blur lg:grid-cols-[.95fr_1.05fr] dark:border-white/10 dark:bg-white/[0.06]">
+        <div className="overflow-hidden rounded-3xl bg-slate-100 dark:bg-slate-800">
+          <img
+            alt={item.title}
+            className="h-full min-h-80 w-full object-cover"
+            src={item.cover}
+          />
         </div>
         <div className="p-2 sm:p-4">
           <div className="mb-4 flex flex-wrap gap-2">
-            <span className="rounded-full bg-blue-50 px-3 py-1 text-sm font-black text-blue-700 dark:bg-blue-500/10 dark:text-blue-200">
+            <span className="rounded-xl bg-emerald-50 px-3 py-1 text-sm font-black text-emerald-800 dark:bg-emerald-400/10 dark:text-emerald-200">
               {item.category}
             </span>
-            <span className="rounded-full bg-emerald-50 px-3 py-1 text-sm font-black text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-200">
+            <span className="rounded-xl bg-lime-100 px-3 py-1 text-sm font-black text-lime-900 dark:bg-lime-300/10 dark:text-lime-200">
               {item.access}
             </span>
           </div>
@@ -616,16 +658,12 @@ function MediaDetail({
             <InfoTile icon={Eye} label="เข้าชม" value={`${item.views} ครั้ง`} />
             <InfoTile icon={Download} label="ดาวน์โหลด" value={`${item.downloads} ครั้ง`} />
             <InfoTile icon={FileText} label="แหล่งไฟล์" value={item.source} />
-            <InfoTile
-              icon={LockKeyhole}
-              label="ระดับสิทธิ์"
-              value={item.access}
-            />
+            <InfoTile icon={LockKeyhole} label="ระดับสิทธิ์" value={item.access} />
           </div>
 
           <div className="mt-6 flex flex-col gap-3 sm:flex-row">
             <button
-              className="inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 font-black text-white shadow-lg shadow-emerald-500/20"
+              className="inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-2xl bg-emerald-500 px-5 font-black text-slate-950 shadow-lg shadow-emerald-500/20"
               onClick={item.access === 'สาธารณะ' ? onSuccess : onError}
               type="button"
             >
@@ -633,7 +671,7 @@ function MediaDetail({
               ดาวน์โหลด / เปิดลิงก์
             </button>
             <button
-              className="inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-xl bg-violet-600 px-5 font-black text-white shadow-lg shadow-violet-500/20"
+              className="inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-2xl bg-slate-950 px-5 font-black text-lime-200 shadow-lg shadow-slate-900/10 dark:bg-lime-300 dark:text-slate-950"
               onClick={onSuccess}
               type="button"
             >
@@ -645,9 +683,9 @@ function MediaDetail({
       </div>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_360px]">
-        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-slate-900">
+        <section className="rounded-3xl border border-slate-900/10 bg-white/76 p-6 shadow-sm backdrop-blur dark:border-white/10 dark:bg-white/[0.06]">
           <h3 className="mb-4 inline-flex items-center gap-2 text-xl font-black">
-            <FileText className="text-blue-600" />
+            <FileText className="text-emerald-600" />
             รายละเอียดสื่อ
           </h3>
           <ul className="space-y-3 text-slate-600 dark:text-slate-300">
@@ -656,12 +694,12 @@ function MediaDetail({
             <li>ระบบจะเช็กสิทธิ์ก่อนแสดงปุ่มดาวน์โหลดจริงในขั้นตอน backend</li>
           </ul>
         </section>
-        <aside className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-slate-900">
+        <aside className="rounded-3xl border border-slate-900/10 bg-white/76 p-6 shadow-sm backdrop-blur dark:border-white/10 dark:bg-white/[0.06]">
           <h3 className="mb-4 inline-flex items-center gap-2 text-xl font-black">
-            <PlayCircle className="text-violet-600" />
+            <PlayCircle className="text-lime-600" />
             Preview
           </h3>
-          <div className="grid place-items-center rounded-xl border border-dashed border-slate-300 p-8 text-center text-slate-500 dark:border-white/10">
+          <div className="grid place-items-center rounded-2xl border border-dashed border-slate-300 p-8 text-center text-slate-500 dark:border-white/10">
             <ExternalLink className="mb-3" />
             Google Drive / YouTube embed จะอยู่ตรงนี้
           </div>
@@ -681,8 +719,8 @@ function InfoTile({
   value: string
 }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-white/10 dark:bg-white/5">
-      <Icon className="mb-3 text-blue-600 dark:text-blue-300" size={24} />
+    <div className="rounded-2xl border border-slate-900/10 bg-white/70 p-4 dark:border-white/10 dark:bg-white/5">
+      <Icon className="mb-3 text-emerald-600 dark:text-emerald-300" size={24} />
       <p className="text-sm font-bold text-slate-500 dark:text-slate-400">{label}</p>
       <p className="mt-1 text-lg font-black text-slate-950 dark:text-white">{value}</p>
     </div>
@@ -694,16 +732,16 @@ function AdminPanel({ onSuccess }: { onSuccess: () => void }) {
     <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
       <div className="mb-6 flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
         <div>
-          <p className="mb-2 inline-flex items-center gap-2 rounded-full bg-violet-50 px-3 py-1 text-sm font-black text-violet-700 dark:bg-violet-500/10 dark:text-violet-200">
+          <p className="mb-2 inline-flex items-center gap-2 rounded-xl bg-slate-950 px-3 py-1 text-sm font-black text-lime-200 dark:bg-lime-300 dark:text-slate-950">
             <Gauge size={16} />
             Super Admin Control Center
           </p>
           <h2 className="text-3xl font-black text-slate-950 dark:text-white">
-            ดูแลเว็บทั้งหมดโดยไม่ต้องแก้โค้ด
+            หลังบ้านแบบแผงควบคุม แก้ข้อมูลได้โดยไม่ต้องแตะโค้ด
           </h2>
         </div>
         <button
-          className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 font-black text-white shadow-lg shadow-blue-500/20"
+          className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-emerald-500 px-5 font-black text-slate-950 shadow-lg shadow-emerald-500/20"
           onClick={onSuccess}
           type="button"
         >
@@ -715,10 +753,10 @@ function AdminPanel({ onSuccess }: { onSuccess: () => void }) {
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {adminStats.map((stat) => (
           <article
-            className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-slate-900"
+            className="rounded-3xl border border-slate-900/10 bg-white/76 p-5 shadow-sm backdrop-blur dark:border-white/10 dark:bg-white/[0.06]"
             key={stat.label}
           >
-            <stat.icon className="mb-5 text-blue-600 dark:text-blue-300" size={28} />
+            <stat.icon className="mb-5 text-emerald-600 dark:text-emerald-300" size={28} />
             <p className="text-sm font-bold text-slate-500 dark:text-slate-400">
               {stat.label}
             </p>
@@ -729,8 +767,8 @@ function AdminPanel({ onSuccess }: { onSuccess: () => void }) {
         ))}
       </div>
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-[260px_1fr]">
-        <aside className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-slate-900">
+      <div className="mt-6 grid gap-6 lg:grid-cols-[270px_1fr]">
+        <aside className="rounded-3xl border border-slate-900/10 bg-slate-950 p-4 text-white shadow-xl shadow-emerald-950/10 dark:border-white/10">
           {[
             ['Dashboard', BarChart3],
             ['จัดการสื่อ', Layers3],
@@ -742,7 +780,7 @@ function AdminPanel({ onSuccess }: { onSuccess: () => void }) {
             const MenuIcon = Icon as typeof BarChart3
             return (
               <button
-                className="mb-2 flex min-h-12 w-full items-center gap-3 rounded-xl px-4 text-left font-black text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/10"
+                className="mb-2 flex min-h-12 w-full items-center gap-3 rounded-2xl px-4 text-left font-black text-slate-200 hover:bg-white/10"
                 key={label as string}
                 type="button"
               >
@@ -753,17 +791,17 @@ function AdminPanel({ onSuccess }: { onSuccess: () => void }) {
           })}
         </aside>
 
-        <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-slate-900">
+        <section className="rounded-3xl border border-slate-900/10 bg-white/76 p-4 shadow-sm backdrop-blur dark:border-white/10 dark:bg-white/[0.06]">
           <div className="mb-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
             <h3 className="text-xl font-black">รายการสื่อล่าสุด</h3>
-            <span className="rounded-full bg-slate-100 px-3 py-1 text-sm font-bold text-slate-500 dark:bg-white/10 dark:text-slate-300">
+            <span className="rounded-xl bg-lime-100 px-3 py-1 text-sm font-bold text-lime-900 dark:bg-lime-300/10 dark:text-lime-200">
               ตารางจะเปลี่ยนเป็น card บนมือถือ
             </span>
           </div>
 
-          <div className="hidden overflow-hidden rounded-xl border border-slate-200 md:block dark:border-white/10">
+          <div className="hidden overflow-hidden rounded-2xl border border-slate-200 md:block dark:border-white/10">
             <table className="w-full table-fixed text-left">
-              <thead className="bg-slate-50 text-sm text-slate-500 dark:bg-white/5 dark:text-slate-300">
+              <thead className="bg-slate-950 text-sm text-lime-200">
                 <tr>
                   <th className="w-[34%] px-4 py-3">สื่อ</th>
                   <th className="px-4 py-3">สิทธิ์</th>
@@ -785,7 +823,7 @@ function AdminPanel({ onSuccess }: { onSuccess: () => void }) {
                     <td className="px-4 py-4">{item.status}</td>
                     <td className="px-4 py-4">{item.downloads}</td>
                     <td className="px-4 py-4">
-                      <button className="rounded-lg bg-blue-50 px-3 py-2 text-sm font-black text-blue-700 dark:bg-blue-500/10 dark:text-blue-200">
+                      <button className="rounded-xl bg-emerald-50 px-3 py-2 text-sm font-black text-emerald-800 dark:bg-emerald-400/10 dark:text-emerald-200">
                         แก้ไข
                       </button>
                     </td>
@@ -798,14 +836,14 @@ function AdminPanel({ onSuccess }: { onSuccess: () => void }) {
           <div className="grid gap-3 md:hidden">
             {mediaItems.map((item) => (
               <article
-                className="rounded-xl border border-slate-200 p-4 dark:border-white/10"
+                className="rounded-2xl border border-slate-200 bg-white/70 p-4 dark:border-white/10 dark:bg-white/5"
                 key={item.id}
               >
                 <p className="font-black text-slate-950 dark:text-white">{item.title}</p>
                 <p className="mt-1 text-sm text-slate-500">
                   {item.category} · {item.access} · {item.status}
                 </p>
-                <button className="mt-3 min-h-11 rounded-lg bg-blue-600 px-4 font-black text-white">
+                <button className="mt-3 min-h-11 rounded-xl bg-emerald-500 px-4 font-black text-slate-950">
                   แก้ไข
                 </button>
               </article>
@@ -819,7 +857,7 @@ function AdminPanel({ onSuccess }: { onSuccess: () => void }) {
 
 function EmptyState() {
   return (
-    <div className="grid min-h-72 place-items-center rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center dark:border-white/10 dark:bg-slate-900">
+    <div className="grid min-h-72 place-items-center rounded-3xl border border-dashed border-slate-300 bg-white/76 p-8 text-center backdrop-blur dark:border-white/10 dark:bg-white/[0.06]">
       <div>
         <Search className="mx-auto mb-4 text-slate-400" size={42} />
         <h3 className="text-xl font-black text-slate-950 dark:text-white">
@@ -839,11 +877,11 @@ function LoadingOverlay() {
       <div className="text-center">
         <img
           alt="MIKPURINUT"
-          className="mx-auto mb-5 h-20 w-20 rounded-full border border-white/20 object-cover shadow-2xl"
+          className="mx-auto mb-5 h-20 w-20 rounded-2xl border border-white/20 object-cover shadow-2xl"
           src={LOGO_URL}
         />
-        <Loader2 className="mx-auto mb-4 animate-spin text-cyan-300" size={34} />
-        <p className="text-xl font-black">กำลังเตรียมระบบคลังสื่อ</p>
+        <Loader2 className="mx-auto mb-4 animate-spin text-lime-300" size={34} />
+        <p className="text-xl font-black">กำลังเตรียมศูนย์ควบคุมคลังสื่อ</p>
         <p className="mt-2 text-sm text-slate-300">Created by MIKPURINUT</p>
       </div>
     </div>
@@ -883,7 +921,7 @@ function Popup({
         <h3 className="text-2xl font-black text-slate-950 dark:text-white">{title}</h3>
         <p className="mt-3 leading-7 text-slate-600 dark:text-slate-300">{message}</p>
         <button
-          className="mt-6 min-h-12 w-full rounded-xl bg-slate-950 px-5 font-black text-white dark:bg-white dark:text-slate-950"
+          className="mt-6 min-h-12 w-full rounded-2xl bg-slate-950 px-5 font-black text-lime-200 dark:bg-lime-300 dark:text-slate-950"
           onClick={onClose}
           type="button"
         >
@@ -900,8 +938,12 @@ function Footer() {
       <div className="mx-auto grid max-w-7xl gap-8 md:grid-cols-[1.2fr_1fr_1fr]">
         <div>
           <div className="mb-4 flex items-center gap-3">
-            <img alt="MIKPURINUT" className="h-12 w-12 rounded-full object-cover" src={LOGO_URL} />
-            <p className="font-black">MIKPURINUT Media Platform</p>
+            <img
+              alt="MIKPURINUT"
+              className="h-12 w-12 rounded-xl object-cover"
+              src={LOGO_URL}
+            />
+            <p className="font-black">MIKPURINUT Grid</p>
           </div>
           <p className="max-w-md leading-7 text-slate-300">
             ระบบคลังสื่อสมาชิกสำหรับโรงเรียนและผู้จัดอบรม รองรับลิงก์ Drive,
@@ -923,7 +965,7 @@ function Footer() {
 
 function CreditBadge() {
   return (
-    <div className="pointer-events-none fixed bottom-3 right-3 z-30 rounded-full border border-slate-200 bg-white/90 px-3 py-1.5 text-[11px] font-black text-slate-500 shadow-lg backdrop-blur dark:border-white/10 dark:bg-slate-900/90 dark:text-slate-300">
+    <div className="pointer-events-none fixed bottom-3 right-3 z-30 rounded-xl border border-slate-200 bg-white/90 px-3 py-1.5 text-[11px] font-black text-slate-500 shadow-lg backdrop-blur dark:border-white/10 dark:bg-slate-900/90 dark:text-slate-300">
       Created by MIKPURINUT
     </div>
   )
