@@ -1927,6 +1927,9 @@ function AdminPanel({
   )
   const [adminSection, setAdminSection] = useState<AdminSection>('dashboard')
   const [adminToken, setAdminToken] = useState('')
+  const [adminMediaQuery, setAdminMediaQuery] = useState('')
+  const [adminMediaAccess, setAdminMediaAccess] = useState<AccessLevel | 'ทั้งหมด'>('ทั้งหมด')
+  const [adminMediaStatus, setAdminMediaStatus] = useState<MediaStatus | 'ทั้งหมด'>('ทั้งหมด')
   const [newTopicName, setNewTopicName] = useState('')
   const [settingsForm, setSettingsForm] = useState({
     ...settings,
@@ -1945,6 +1948,13 @@ function AdminPanel({
 
   const pendingVipRequests = vipRequests.filter((request) => request.status === 'pending')
   const linkedMedia = mediaItems.filter((item) => item.resourceUrl || item.previewUrl)
+  const adminFilteredMedia = mediaItems.filter((item) => {
+    const text = `${item.title} ${item.topic} ${item.description}`.toLowerCase()
+    const matchQuery = text.includes(adminMediaQuery.trim().toLowerCase())
+    const matchAccess = adminMediaAccess === 'ทั้งหมด' || item.access === adminMediaAccess
+    const matchStatus = adminMediaStatus === 'ทั้งหมด' || item.status === adminMediaStatus
+    return matchQuery && matchAccess && matchStatus
+  })
   const adminMenu: Array<{ id: AdminSection; label: string; icon: typeof BarChart3; detail: string }> = [
     { id: 'dashboard', label: 'Dashboard', icon: BarChart3, detail: 'ภาพรวมระบบ' },
     { id: 'media', label: 'จัดการสื่อ', icon: Layers3, detail: 'เพิ่ม แก้ไข ลบ' },
@@ -2847,13 +2857,53 @@ function AdminPanel({
 
           <section className="rounded-2xl border border-white/10 bg-white/[0.07] p-4 ring-1 ring-white/[0.03]">
             <div className="mb-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
-              <h3 className="text-xl font-black">รายการสื่อล่าสุด</h3>
+              <div>
+                <h3 className="text-xl font-black">รายการสื่อ</h3>
+                <p className="mt-1 text-sm font-semibold text-slate-400">
+                  ค้นหาและกรองสื่อก่อนแก้ไขหรือลบ
+                </p>
+              </div>
               <span className="rounded-xl bg-cyan-300/10 px-3 py-1 text-sm font-bold text-cyan-200">
-                ตารางจะเปลี่ยนเป็น card บนมือถือ
+                {adminFilteredMedia.length.toLocaleString('th-TH')} รายการ
               </span>
             </div>
 
+            <div className="mb-4 grid gap-3 lg:grid-cols-[1fr_180px_180px]">
+              <label className="relative">
+                <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
+                <input
+                  className="min-h-12 w-full rounded-2xl border border-white/10 bg-black/24 pl-11 pr-4 text-base text-white outline-none placeholder:text-slate-500 focus:border-cyan-300 focus:ring-4 focus:ring-cyan-300/10"
+                  onChange={(event) => setAdminMediaQuery(event.target.value)}
+                  placeholder="ค้นหาชื่อสื่อ หมวดหมู่ หรือคำอธิบาย"
+                  value={adminMediaQuery}
+                />
+              </label>
+              <select
+                className="min-h-12 rounded-2xl border border-white/10 bg-black/24 px-4 text-base font-bold text-white outline-none focus:border-cyan-300 focus:ring-4 focus:ring-cyan-300/10"
+                onChange={(event) => setAdminMediaAccess(event.target.value as AccessLevel | 'ทั้งหมด')}
+                value={adminMediaAccess}
+              >
+                {['ทั้งหมด', ...accessOptions].map((item) => (
+                  <option key={item}>{item}</option>
+                ))}
+              </select>
+              <select
+                className="min-h-12 rounded-2xl border border-white/10 bg-black/24 px-4 text-base font-bold text-white outline-none focus:border-cyan-300 focus:ring-4 focus:ring-cyan-300/10"
+                onChange={(event) => setAdminMediaStatus(event.target.value as MediaStatus | 'ทั้งหมด')}
+                value={adminMediaStatus}
+              >
+                {['ทั้งหมด', ...statusOptions].map((item) => (
+                  <option key={item}>{item}</option>
+                ))}
+              </select>
+            </div>
+
             <div className="hidden overflow-hidden rounded-2xl border border-white/10 md:block">
+              {adminFilteredMedia.length === 0 ? (
+                <div className="p-6 text-center text-sm font-bold text-slate-400">
+                  ไม่พบสื่อตามเงื่อนไขที่เลือก
+                </div>
+              ) : (
               <table className="w-full table-fixed text-left">
                 <thead className="bg-black/32 text-sm text-cyan-200">
                   <tr>
@@ -2865,7 +2915,7 @@ function AdminPanel({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/10">
-                  {mediaItems.map((item) => (
+                  {adminFilteredMedia.map((item) => (
                     <tr key={item.id}>
                       <td className="px-4 py-4">
                         <p className="truncate font-black text-white">{item.title}</p>
@@ -2898,10 +2948,16 @@ function AdminPanel({
                   ))}
                 </tbody>
               </table>
+              )}
             </div>
 
             <div className="grid gap-3 md:hidden">
-              {mediaItems.map((item) => (
+              {adminFilteredMedia.length === 0 && (
+                <div className="rounded-2xl border border-dashed border-white/15 p-5 text-sm font-bold text-slate-400">
+                  ไม่พบสื่อตามเงื่อนไขที่เลือก
+                </div>
+              )}
+              {adminFilteredMedia.map((item) => (
                 <article className="rounded-2xl border border-white/10 bg-black/20 p-4" key={item.id}>
                   <p className="font-black text-white">{item.title}</p>
                   <p className="mt-1 text-sm text-slate-400">
