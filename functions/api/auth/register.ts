@@ -1,7 +1,8 @@
 import { loginWithPassword, sessionCookie } from '../../_lib/auth'
+import { validateBotCheck, type BotCheckPayload } from '../../_lib/bot'
 import { ensureSchema, getSql, hashPassword, type Env } from '../../_lib/db'
 
-type RegisterPayload = {
+type RegisterPayload = BotCheckPayload & {
   name?: string
   phone?: string
   email?: string
@@ -19,6 +20,11 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
   const password = String(body.password ?? '')
   const phone = String(body.phone ?? '').trim()
   const membership = body.membership === 'vip' ? 'vip' : 'member'
+  const botError = validateBotCheck(body)
+
+  if (botError) {
+    return Response.json({ ok: false, error: botError }, { status: 400 })
+  }
 
   if (!name || !email || password.length < 8) {
     return Response.json(

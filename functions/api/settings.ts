@@ -8,15 +8,34 @@ type SiteSettings = {
   vipBankName: string
   vipAccountNumber: string
   vipAccountName: string
+  vipPaymentTitle: string
+  vipPaymentSubtitle: string
+  vipSlipLabel: string
+  vipAgreementLabel: string
+  vipSubmitLabel: string
 }
 
 const defaultSettings: SiteSettings = {
-  vipRegistrationEnabled: true,
-  vipPrice: 499,
+  vipRegistrationEnabled: false,
+  vipPrice: 0,
   vipQrUrl: '',
   vipBankName: 'พร้อมเพย์ (PromptPay)',
   vipAccountNumber: '',
   vipAccountName: 'MIKPURINUT',
+  vipPaymentTitle: 'ข้อมูลการชำระเงิน VIP',
+  vipPaymentSubtitle: 'กรุณาโอนเงินและแนบสลิปเพื่อยืนยันสิทธิ์',
+  vipSlipLabel: 'แนบสลิปโอนเงิน',
+  vipAgreementLabel: 'ข้อมูลถูกต้องและยอมรับเงื่อนไขการใช้งาน',
+  vipSubmitLabel: 'ลงทะเบียนสมาชิก',
+}
+
+function normalizeSettings(value?: Partial<SiteSettings>) {
+  return {
+    ...defaultSettings,
+    ...(value ?? {}),
+    vipRegistrationEnabled: Boolean(value?.vipRegistrationEnabled),
+    vipPrice: Number(value?.vipPrice ?? defaultSettings.vipPrice),
+  }
 }
 
 export const onRequestGet = async ({ env }: { env: Env }) => {
@@ -29,7 +48,7 @@ export const onRequestGet = async ({ env }: { env: Env }) => {
     limit 1
   `) as Array<{ value: SiteSettings }>
 
-  return Response.json({ ok: true, settings: row?.value ?? defaultSettings })
+  return Response.json({ ok: true, settings: normalizeSettings(row?.value) })
 }
 
 export const onRequestPut = async ({ env, request }: { env: Env; request: Request }) => {
@@ -39,14 +58,19 @@ export const onRequestPut = async ({ env, request }: { env: Env; request: Reques
   }
 
   const body = (await request.json().catch(() => ({}))) as Partial<SiteSettings>
-  const settings: SiteSettings = {
+  const settings: SiteSettings = normalizeSettings({
     vipRegistrationEnabled: Boolean(body.vipRegistrationEnabled),
     vipPrice: Number(body.vipPrice ?? defaultSettings.vipPrice),
     vipQrUrl: String(body.vipQrUrl ?? ''),
     vipBankName: String(body.vipBankName ?? defaultSettings.vipBankName),
     vipAccountNumber: String(body.vipAccountNumber ?? ''),
     vipAccountName: String(body.vipAccountName ?? defaultSettings.vipAccountName),
-  }
+    vipPaymentTitle: String(body.vipPaymentTitle ?? defaultSettings.vipPaymentTitle),
+    vipPaymentSubtitle: String(body.vipPaymentSubtitle ?? defaultSettings.vipPaymentSubtitle),
+    vipSlipLabel: String(body.vipSlipLabel ?? defaultSettings.vipSlipLabel),
+    vipAgreementLabel: String(body.vipAgreementLabel ?? defaultSettings.vipAgreementLabel),
+    vipSubmitLabel: String(body.vipSubmitLabel ?? defaultSettings.vipSubmitLabel),
+  })
 
   const sql = getSql(env)
   await sql`

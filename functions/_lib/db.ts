@@ -234,15 +234,40 @@ async function seedSettings(env: Env) {
     values (
       'site',
       ${JSON.stringify({
-        vipRegistrationEnabled: true,
-        vipPrice: 499,
+        vipRegistrationEnabled: false,
+        vipPrice: 0,
         vipQrUrl: '',
         vipBankName: 'พร้อมเพย์ (PromptPay)',
         vipAccountNumber: '',
         vipAccountName: 'MIKPURINUT',
+        vipPaymentTitle: 'ข้อมูลการชำระเงิน VIP',
+        vipPaymentSubtitle: 'กรุณาโอนเงินและแนบสลิปเพื่อยืนยันสิทธิ์',
+        vipSlipLabel: 'แนบสลิปโอนเงิน',
+        vipAgreementLabel: 'ข้อมูลถูกต้องและยอมรับเงื่อนไขการใช้งาน',
+        vipSubmitLabel: 'ลงทะเบียนสมาชิก',
       })}::jsonb
     )
     on conflict (key) do nothing
+  `
+
+  await sql`
+    update app_settings
+    set
+      value = value
+        || ${JSON.stringify({
+          vipRegistrationEnabled: false,
+          vipPrice: 0,
+          vipPaymentTitle: 'ข้อมูลการชำระเงิน VIP',
+          vipPaymentSubtitle: 'กรุณาโอนเงินและแนบสลิปเพื่อยืนยันสิทธิ์',
+          vipSlipLabel: 'แนบสลิปโอนเงิน',
+          vipAgreementLabel: 'ข้อมูลถูกต้องและยอมรับเงื่อนไขการใช้งาน',
+          vipSubmitLabel: 'ลงทะเบียนสมาชิก',
+        })}::jsonb,
+      updated_at = now()
+    where key = 'site'
+      and value->>'vipRegistrationEnabled' = 'true'
+      and value->>'vipPrice' = '499'
+      and coalesce(value->>'vipQrUrl', '') = ''
   `
 }
 

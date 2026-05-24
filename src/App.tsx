@@ -97,6 +97,11 @@ type SiteSettings = {
   vipBankName: string
   vipAccountNumber: string
   vipAccountName: string
+  vipPaymentTitle: string
+  vipPaymentSubtitle: string
+  vipSlipLabel: string
+  vipAgreementLabel: string
+  vipSubmitLabel: string
 }
 
 const mediaItems: MediaItem[] = [
@@ -176,12 +181,17 @@ const sourceOptions: MediaItem['source'][] = [
   'External Link',
 ]
 const defaultSiteSettings: SiteSettings = {
-  vipRegistrationEnabled: true,
-  vipPrice: 499,
+  vipRegistrationEnabled: false,
+  vipPrice: 0,
   vipQrUrl: '',
   vipBankName: 'พร้อมเพย์ (PromptPay)',
   vipAccountNumber: '',
   vipAccountName: 'MIKPURINUT',
+  vipPaymentTitle: 'ข้อมูลการชำระเงิน VIP',
+  vipPaymentSubtitle: 'กรุณาโอนเงินและแนบสลิปเพื่อยืนยันสิทธิ์',
+  vipSlipLabel: 'แนบสลิปโอนเงิน',
+  vipAgreementLabel: 'ข้อมูลถูกต้องและยอมรับเงื่อนไขการใช้งาน',
+  vipSubmitLabel: 'ลงทะเบียนสมาชิก',
 }
 
 function createEmptyMediaForm(topic = 'โรงเรียน'): MediaFormState {
@@ -1244,6 +1254,9 @@ function LoginPanel({
   const [submitting, setSubmitting] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [remember, setRemember] = useState(true)
+  const [botVerified, setBotVerified] = useState(false)
+  const [botTrap, setBotTrap] = useState('')
+  const [botStartedAt] = useState(() => Date.now())
 
   const submitLogin = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -1255,7 +1268,13 @@ function LoginPanel({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({
+          email,
+          password,
+          botVerified,
+          botStartedAt,
+          website: botTrap,
+        }),
       })
       const result = (await response.json()) as {
         user?: CurrentUser
@@ -1393,6 +1412,23 @@ function LoginPanel({
           </button>
         </div>
 
+        <input
+          aria-hidden="true"
+          className="hidden"
+          onChange={(event) => setBotTrap(event.target.value)}
+          tabIndex={-1}
+          value={botTrap}
+        />
+        <label className="mt-4 flex min-h-12 items-center justify-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-black text-slate-600 dark:border-white/10 dark:bg-white/10 dark:text-slate-200">
+          <input
+            checked={botVerified}
+            className="h-4 w-4"
+            onChange={(event) => setBotVerified(event.target.checked)}
+            type="checkbox"
+          />
+          ฉันไม่ใช่โปรแกรมอัตโนมัติ
+        </label>
+
           {error && (
             <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 p-3 text-sm font-bold text-red-700 dark:border-red-400/20 dark:bg-red-400/10 dark:text-red-200">
               {error}
@@ -1471,6 +1507,9 @@ function RegisterPanel({
   const [slipName, setSlipName] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
+  const [botVerified, setBotVerified] = useState(false)
+  const [botTrap, setBotTrap] = useState('')
+  const [botStartedAt] = useState(() => Date.now())
 
   const updateForm = (name: keyof typeof form, value: string) => {
     setForm((current) => ({ ...current, [name]: value }))
@@ -1499,6 +1538,9 @@ function RegisterPanel({
         body: JSON.stringify({
           ...form,
           slipName,
+          botVerified,
+          botStartedAt,
+          website: botTrap,
         }),
       })
       const result = (await response.json()) as {
@@ -1636,7 +1678,11 @@ function RegisterPanel({
           <MembershipCard
             active={vipSelected}
             badge="แนะนำ"
-            detail={`${settings.vipPrice.toLocaleString('th-TH')} บาท / ตลอดชีพ`}
+            detail={
+              settings.vipRegistrationEnabled && settings.vipPrice > 0
+                ? `${settings.vipPrice.toLocaleString('th-TH')} บาท / ตลอดชีพ`
+                : 'รอเปิดรับจากผู้ดูแล'
+            }
             disabled={!settings.vipRegistrationEnabled}
             icon={<Crown size={36} />}
             onClick={() => updateForm('membership', 'vip')}
@@ -1647,10 +1693,10 @@ function RegisterPanel({
         {vipSelected && settings.vipRegistrationEnabled && (
           <div className="mt-6 rounded-3xl bg-slate-50 p-5 shadow-lg shadow-slate-950/5 dark:bg-white/[0.06]">
             <h3 className="text-center text-xl font-black text-blue-700 dark:text-cyan-200">
-              ข้อมูลการชำระเงิน VIP
+              {settings.vipPaymentTitle}
             </h3>
             <p className="mt-2 text-center text-sm font-bold text-slate-500 dark:text-slate-400">
-              กรุณาโอนเงินและแนบสลิปเพื่อยืนยันสิทธิ์
+              {settings.vipPaymentSubtitle}
             </p>
             <div className="mt-5 grid gap-5 md:grid-cols-[220px_1fr] md:items-center">
               <div className="text-center">
@@ -1674,10 +1720,10 @@ function RegisterPanel({
                 <p>เลขที่บัญชี: {settings.vipAccountNumber || '-'}</p>
                 <p>ชื่อบัญชี: {settings.vipAccountName}</p>
                 <p className="text-red-500">
-                  ยอดโอน: {settings.vipPrice.toLocaleString('th-TH')} บาท
+                  ยอดโอน: {settings.vipPrice > 0 ? `${settings.vipPrice.toLocaleString('th-TH')} บาท` : 'รอผู้ดูแลกำหนด'}
                 </p>
                 <label className="block">
-                  <span className="mb-2 block font-black">แนบสลิปโอนเงิน</span>
+                  <span className="mb-2 block font-black">{settings.vipSlipLabel}</span>
                   <input
                     className="w-full rounded-xl border border-slate-300 bg-white px-3 py-3 text-sm dark:border-white/10 dark:bg-white/10"
                     onChange={(event) => setSlipName(event.target.files?.[0]?.name ?? '')}
@@ -1690,8 +1736,23 @@ function RegisterPanel({
         )}
 
         <div className="mx-auto mt-6 grid h-20 max-w-xs place-items-center border border-slate-300 bg-white text-sm text-slate-500">
-          ฉันไม่ใช่โปรแกรมอัตโนมัติ
+          <label className="flex items-center gap-3 font-bold">
+            <input
+              checked={botVerified}
+              className="h-4 w-4"
+              onChange={(event) => setBotVerified(event.target.checked)}
+              type="checkbox"
+            />
+            ฉันไม่ใช่โปรแกรมอัตโนมัติ
+          </label>
         </div>
+        <input
+          aria-hidden="true"
+          className="hidden"
+          onChange={(event) => setBotTrap(event.target.value)}
+          tabIndex={-1}
+          value={botTrap}
+        />
 
         <label className="mt-5 flex items-start gap-3 text-sm font-bold text-slate-500 dark:text-slate-300">
           <input
@@ -1700,7 +1761,7 @@ function RegisterPanel({
             onChange={(event) => setAgree(event.target.checked)}
             type="checkbox"
           />
-          ข้อมูลถูกต้องและยอมรับเงื่อนไขการใช้งาน
+          {settings.vipAgreementLabel}
         </label>
 
         {error && (
@@ -1715,7 +1776,7 @@ function RegisterPanel({
           type="submit"
         >
           {submitting ? <Loader2 className="animate-spin" size={22} /> : <UserPlus size={22} />}
-          {submitting ? 'กำลังลงทะเบียน...' : 'ลงทะเบียนสมาชิก'}
+          {submitting ? 'กำลังลงทะเบียน...' : settings.vipSubmitLabel}
         </button>
         <p className="mt-5 text-center text-sm font-bold text-slate-500 dark:text-slate-300">
           มีบัญชีผู้ใช้งานแล้ว?{' '}
@@ -2024,6 +2085,41 @@ function AdminPanel({
                 onChange={updateSettings}
                 placeholder="MIKPURINUT"
                 value={settingsForm.vipAccountName}
+              />
+              <AdminField
+                label="หัวข้อกล่องชำระเงิน"
+                name="vipPaymentTitle"
+                onChange={updateSettings}
+                placeholder="ข้อมูลการชำระเงิน VIP"
+                value={settingsForm.vipPaymentTitle}
+              />
+              <AdminField
+                label="คำอธิบายกล่องชำระเงิน"
+                name="vipPaymentSubtitle"
+                onChange={updateSettings}
+                placeholder="กรุณาโอนเงินและแนบสลิปเพื่อยืนยันสิทธิ์"
+                value={settingsForm.vipPaymentSubtitle}
+              />
+              <AdminField
+                label="ข้อความช่องแนบสลิป"
+                name="vipSlipLabel"
+                onChange={updateSettings}
+                placeholder="แนบสลิปโอนเงิน"
+                value={settingsForm.vipSlipLabel}
+              />
+              <AdminField
+                label="ข้อความยอมรับเงื่อนไข"
+                name="vipAgreementLabel"
+                onChange={updateSettings}
+                placeholder="ข้อมูลถูกต้องและยอมรับเงื่อนไขการใช้งาน"
+                value={settingsForm.vipAgreementLabel}
+              />
+              <AdminField
+                label="ข้อความปุ่มสมัคร"
+                name="vipSubmitLabel"
+                onChange={updateSettings}
+                placeholder="ลงทะเบียนสมาชิก"
+                value={settingsForm.vipSubmitLabel}
               />
             </div>
 
