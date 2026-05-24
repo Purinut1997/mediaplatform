@@ -53,3 +53,11 @@ After deploying to Cloudflare Pages, open:
 ```
 
 It should return JSON with `ok: true`.
+
+After adding `DATABASE_URL` in Cloudflare, open:
+
+```text
+/api/db-check
+```
+
+It should return JSON with `ok: true` and a timestamp from Neon.

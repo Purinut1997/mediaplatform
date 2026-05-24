@@ -30,6 +30,9 @@ function App() {
             <a href="/api/health" className="primary-action">
               Test API
             </a>
+            <a href="/api/db-check" className="secondary-action">
+              Test Neon
+            </a>
             <a href="https://dash.cloudflare.com/" className="secondary-action">
               Open Cloudflare
             </a>
