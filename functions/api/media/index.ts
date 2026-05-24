@@ -1,5 +1,5 @@
-import { getCurrentUser } from '../_lib/auth'
-import { ensureSchema, getSql, type Env } from '../_lib/db'
+import { getCurrentUser } from '../../_lib/auth'
+import { ensureSchema, getSql, type Env } from '../../_lib/db'
 
 const DEFAULT_COVER_URL =
   'https://raw.githubusercontent.com/Purinut1997/web-images/ab67fea68788dc5db9514475e8f2b8cb1c32d8b3/ChatGPT%20Image%2023%20%E0%B8%9E.%E0%B8%84.%202569%2008_05_56.png'
