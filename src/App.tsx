@@ -49,6 +49,7 @@ const BRAND_HERO_URL =
 
 type Theme = 'light' | 'dark'
 type View = 'home' | 'media' | 'detail' | 'admin' | 'login' | 'register'
+type AdminSection = 'dashboard' | 'media' | 'members' | 'taxonomy' | 'links' | 'settings'
 type AccessLevel = 'สาธารณะ' | 'สมาชิก' | 'VIP' | 'ซื้อแยก'
 type MediaStatus = 'เผยแพร่' | 'แบบร่าง' | 'ซ่อน'
 
@@ -1924,7 +1925,9 @@ function AdminPanel({
   const [form, setForm] = useState<MediaFormState>(() =>
     createEmptyMediaForm(topics[0]),
   )
+  const [adminSection, setAdminSection] = useState<AdminSection>('dashboard')
   const [adminToken, setAdminToken] = useState('')
+  const [newTopicName, setNewTopicName] = useState('')
   const [settingsForm, setSettingsForm] = useState({
     ...settings,
     vipPrice: String(settings.vipPrice),
@@ -1938,8 +1941,18 @@ function AdminPanel({
   const [error, setError] = useState('')
   const [settingsError, setSettingsError] = useState('')
   const [memberError, setMemberError] = useState('')
+  const [categoryError, setCategoryError] = useState('')
 
   const pendingVipRequests = vipRequests.filter((request) => request.status === 'pending')
+  const linkedMedia = mediaItems.filter((item) => item.resourceUrl || item.previewUrl)
+  const adminMenu: Array<{ id: AdminSection; label: string; icon: typeof BarChart3; detail: string }> = [
+    { id: 'dashboard', label: 'Dashboard', icon: BarChart3, detail: 'ภาพรวมระบบ' },
+    { id: 'media', label: 'จัดการสื่อ', icon: Layers3, detail: 'เพิ่ม แก้ไข ลบ' },
+    { id: 'members', label: 'สมาชิกและ VIP', icon: Users, detail: `${pendingVipRequests.length} รอตรวจ` },
+    { id: 'taxonomy', label: 'หมวดหมู่และแท็ก', icon: Tag, detail: `${topics.length} หมวด` },
+    { id: 'links', label: 'ลิงก์ภายนอก', icon: Link2, detail: `${linkedMedia.length} ลิงก์` },
+    { id: 'settings', label: 'ตั้งค่าเว็บ', icon: Settings, detail: 'หน้าแรกและ VIP' },
+  ]
   const adminMetrics = [
     { label: 'สมาชิกทั้งหมด', value: adminUsers.length.toLocaleString('th-TH'), icon: Users },
     { label: 'สื่อเผยแพร่', value: mediaItems.length.toLocaleString('th-TH'), icon: Layers3 },
@@ -2000,11 +2013,37 @@ function AdminPanel({
     }
   }
 
+  const submitCategory = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    setCategoryError('')
+    const name = newTopicName.trim()
+    if (!name) return
+
+    try {
+      const response = await fetch('/api/categories', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ name }),
+      })
+      const result = await readJson<{ error?: string }>(response)
+
+      if (!response.ok) throw new Error(result.error ?? 'เพิ่มหมวดหมู่ไม่สำเร็จ')
+      setNewTopicName('')
+      onCreated()
+    } catch (categorySaveError) {
+      setCategoryError(
+        categorySaveError instanceof Error ? categorySaveError.message : 'เพิ่มหมวดหมู่ไม่สำเร็จ',
+      )
+    }
+  }
+
   const updateForm = (name: keyof typeof form, value: string) => {
     setForm((current) => ({ ...current, [name]: value }))
   }
 
   const startEditMedia = (item: MediaItem) => {
+    setAdminSection('media')
     setEditingMediaId(item.id)
     setForm({
       title: item.title,
@@ -2139,6 +2178,7 @@ function AdminPanel({
             </p>
           </div>
           <a
+            onClick={() => setAdminSection('media')}
             className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-cyan-300 to-sky-400 px-5 font-black text-slate-950 shadow-lg shadow-cyan-500/20 transition hover:-translate-y-0.5"
             href="#admin-create-media"
           >
@@ -2162,29 +2202,79 @@ function AdminPanel({
 
         <div className="mt-5 grid gap-5 lg:grid-cols-[230px_1fr]">
           <aside className="h-max rounded-2xl border border-white/10 bg-black/25 p-3 lg:sticky lg:top-24">
-            {[
-              ['Dashboard', BarChart3],
-              ['จัดการสื่อ', Layers3],
-              ['สมาชิกและ VIP', Users],
-              ['หมวดหมู่และแท็ก', Tag],
-              ['ลิงก์ภายนอก', Link2],
-              ['ตั้งค่าเว็บ', Settings],
-            ].map(([label, Icon]) => {
-              const MenuIcon = Icon as typeof BarChart3
+            {adminMenu.map((item) => {
+              const MenuIcon = item.icon
+              const isActive = adminSection === item.id
               return (
                 <button
-                  className="mb-1 flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-left text-sm font-black text-slate-300 transition hover:bg-cyan-300/10 hover:text-cyan-100"
-                  key={label as string}
+                  className={`mb-1 flex min-h-12 w-full items-center gap-3 rounded-xl px-3 text-left text-sm font-black transition ${
+                    isActive
+                      ? 'bg-cyan-300 text-slate-950 shadow-lg shadow-cyan-500/15'
+                      : 'text-slate-300 hover:bg-cyan-300/10 hover:text-cyan-100'
+                  }`}
+                  key={item.id}
+                  onClick={() => setAdminSection(item.id)}
                   type="button"
                 >
                   <MenuIcon size={19} />
-                  {label as string}
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate">{item.label}</span>
+                    <span className={`block truncate text-xs ${isActive ? 'text-slate-700' : 'text-slate-500'}`}>
+                      {item.detail}
+                    </span>
+                  </span>
                 </button>
               )
             })}
           </aside>
 
           <div className="grid gap-6">
+          {adminSection === 'dashboard' && (
+            <section className="rounded-2xl border border-cyan-300/20 bg-white/[0.07] p-4 ring-1 ring-white/[0.03]">
+              <div className="grid gap-4 xl:grid-cols-[1fr_0.9fr]">
+                <div className="rounded-2xl border border-white/10 bg-black/20 p-5">
+                  <p className="text-sm font-black text-cyan-200">งานที่ควรดูวันนี้</p>
+                  <h3 className="mt-2 text-2xl font-black">ศูนย์ควบคุมระบบสื่อ</h3>
+                  <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                    {adminMenu.slice(1).map((item) => (
+                      <button
+                        className="flex min-h-20 items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.05] p-4 text-left transition hover:-translate-y-0.5 hover:border-cyan-300/40"
+                        key={item.id}
+                        onClick={() => setAdminSection(item.id)}
+                        type="button"
+                      >
+                        <item.icon className="text-cyan-300" size={22} />
+                        <span>
+                          <span className="block font-black text-white">{item.label}</span>
+                          <span className="text-sm font-semibold text-slate-400">{item.detail}</span>
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-white/10 bg-black/20 p-5">
+                  <p className="text-sm font-black text-cyan-200">สถานะระบบ</p>
+                  <div className="mt-4 grid gap-3">
+                    <div className="rounded-2xl bg-emerald-300/10 p-4">
+                      <p className="font-black text-emerald-200">ฐานข้อมูลพร้อมใช้งาน</p>
+                      <p className="text-sm font-semibold text-slate-400">Neon เชื่อมต่อกับ Cloudflare แล้ว</p>
+                    </div>
+                    <div className="rounded-2xl bg-sky-300/10 p-4">
+                      <p className="font-black text-sky-200">จัดการสื่อผ่านเว็บได้แล้ว</p>
+                      <p className="text-sm font-semibold text-slate-400">เพิ่ม แก้ไข ลบ และแปะลิงก์สื่อได้โดยไม่แก้โค้ด</p>
+                    </div>
+                    <div className="rounded-2xl bg-amber-300/10 p-4">
+                      <p className="font-black text-amber-200">คำขอ VIP</p>
+                      <p className="text-sm font-semibold text-slate-400">{pendingVipRequests.length} รายการรอตรวจ</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
+          )}
+
+          {adminSection === 'members' && (
           <section className="rounded-2xl border border-emerald-300/20 bg-white/[0.07] p-4 ring-1 ring-white/[0.03]">
             <div className="mb-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
               <div>
@@ -2328,7 +2418,10 @@ function AdminPanel({
               </div>
             </div>
           </section>
+          )}
 
+          {adminSection === 'settings' && (
+          <>
           <form
             className="rounded-2xl border border-sky-300/20 bg-white/[0.07] p-4 ring-1 ring-white/[0.03]"
             onSubmit={submitSettings}
@@ -2504,7 +2597,88 @@ function AdminPanel({
               {savingSettings ? 'กำลังบันทึก...' : 'บันทึกตั้งค่า VIP'}
             </button>
           </form>
+          </>
+          )}
 
+          {adminSection === 'taxonomy' && (
+          <section className="rounded-2xl border border-violet-300/20 bg-white/[0.07] p-4 ring-1 ring-white/[0.03]">
+            <div className="mb-4">
+              <h3 className="flex items-center gap-2 text-xl font-black">
+                <Tag className="text-violet-300" size={22} />
+                หมวดหมู่และแท็ก
+              </h3>
+              <p className="mt-1 text-sm font-semibold text-slate-400">
+                เพิ่มหมวดหมู่ใหม่เพื่อใช้ตอนสร้างการ์ดสื่อ ส่วนแท็กเชิงลึกจะต่อยอดจากหมวดนี้ได้
+              </p>
+            </div>
+            <form className="grid gap-3 sm:grid-cols-[1fr_auto]" onSubmit={submitCategory}>
+              <input
+                className="min-h-12 rounded-2xl border border-white/10 bg-black/24 px-4 text-base text-white outline-none placeholder:text-slate-500 focus:border-violet-300 focus:ring-4 focus:ring-violet-300/10"
+                onChange={(event) => setNewTopicName(event.target.value)}
+                placeholder="เช่น AI สำหรับครู, งานทะเบียน, คู่มืออบรม"
+                value={newTopicName}
+              />
+              <button className="min-h-12 rounded-2xl bg-violet-300 px-5 font-black text-slate-950" type="submit">
+                เพิ่มหมวด
+              </button>
+            </form>
+            {categoryError && (
+              <div className="mt-4 rounded-2xl border border-red-400/20 bg-red-400/10 p-3 text-sm font-bold text-red-200">
+                {categoryError}
+              </div>
+            )}
+            <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {topics.map((topicName) => {
+                const count = mediaItems.filter((item) => item.topic === topicName).length
+                return (
+                  <article className="rounded-2xl border border-white/10 bg-black/20 p-4" key={topicName}>
+                    <p className="font-black text-white">{topicName}</p>
+                    <p className="mt-1 text-sm font-semibold text-slate-400">{count} สื่อในหมวดนี้</p>
+                  </article>
+                )
+              })}
+            </div>
+          </section>
+          )}
+
+          {adminSection === 'links' && (
+          <section className="rounded-2xl border border-cyan-300/20 bg-white/[0.07] p-4 ring-1 ring-white/[0.03]">
+            <div className="mb-4">
+              <h3 className="flex items-center gap-2 text-xl font-black">
+                <Link2 className="text-cyan-300" size={22} />
+                ลิงก์ภายนอก
+              </h3>
+              <p className="mt-1 text-sm font-semibold text-slate-400">
+                รวมสื่อที่เชื่อม Google Drive, Google Sheet, YouTube หรือเว็บภายนอก กดแก้ไขเพื่อเปลี่ยนลิงก์ได้ทันที
+              </p>
+            </div>
+            <div className="grid gap-3">
+              {linkedMedia.length === 0 && (
+                <div className="rounded-2xl border border-dashed border-white/15 p-5 text-sm font-bold text-slate-400">
+                  ยังไม่มีสื่อที่แปะลิงก์ภายนอก
+                </div>
+              )}
+              {linkedMedia.map((item) => (
+                <article className="grid gap-3 rounded-2xl border border-white/10 bg-black/20 p-4 md:grid-cols-[1fr_auto]" key={item.id}>
+                  <div className="min-w-0">
+                    <p className="truncate font-black text-white">{item.title}</p>
+                    <p className="mt-1 truncate text-sm font-semibold text-slate-400">{item.source} · {item.resourceUrl || item.previewUrl}</p>
+                  </div>
+                  <button
+                    className="min-h-11 rounded-xl bg-cyan-300 px-4 font-black text-slate-950"
+                    onClick={() => startEditMedia(item)}
+                    type="button"
+                  >
+                    แก้ไขลิงก์
+                  </button>
+                </article>
+              ))}
+            </div>
+          </section>
+          )}
+
+          {adminSection === 'media' && (
+          <>
           <form
             className="rounded-2xl border border-cyan-300/20 bg-white/[0.07] p-4 ring-1 ring-white/[0.03]"
             id="admin-create-media"
@@ -2721,6 +2895,8 @@ function AdminPanel({
               ))}
             </div>
           </section>
+          </>
+          )}
         </div>
       </div>
       </div>
