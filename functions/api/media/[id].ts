@@ -14,6 +14,13 @@ type MediaPayload = {
   cover?: string
   resourceUrl?: string
   previewUrl?: string
+  links?: Array<{
+    label?: string
+    type?: string
+    url?: string
+    previewUrl?: string
+    access?: string
+  }>
   description?: string
 }
 
@@ -34,6 +41,32 @@ async function requireSuperAdmin(env: Env, request: Request) {
 function readId(params: Context['params']) {
   const id = Number(params.id)
   return Number.isInteger(id) && id > 0 ? id : 0
+}
+
+function readLinks(body: MediaPayload, title: string) {
+  const links = Array.isArray(body.links) ? body.links : []
+  const normalized = links
+    .map((link, index) => ({
+      label: String(link.label ?? '').trim() || `ลิงก์ ${index + 1}`,
+      type: String(link.type ?? body.source ?? 'Google Drive'),
+      url: String(link.url ?? '').trim(),
+      previewUrl: String(link.previewUrl ?? '').trim(),
+      access: String(link.access ?? body.access ?? 'สาธารณะ'),
+    }))
+    .filter((link) => link.url)
+
+  const resourceUrl = String(body.resourceUrl ?? '').trim()
+  if (!normalized.length && resourceUrl) {
+    normalized.push({
+      label: title,
+      type: String(body.source ?? 'Google Drive'),
+      url: resourceUrl,
+      previewUrl: String(body.previewUrl ?? '').trim(),
+      access: String(body.access ?? 'สาธารณะ'),
+    })
+  }
+
+  return normalized
 }
 
 export const onRequestPut = async ({ env, request, params }: Context) => {
@@ -67,17 +100,18 @@ export const onRequestPut = async ({ env, request, params }: Context) => {
   if (!row) return Response.json({ ok: false, error: 'Media not found' }, { status: 404 })
 
   await sql`delete from media_links where media_id = ${id}`
-  const resourceUrl = String(body.resourceUrl ?? '').trim()
-  if (resourceUrl) {
+  const links = readLinks(body, title)
+  for (let index = 0; index < links.length; index += 1) {
+    const link = links[index]
     await sql`
       insert into media_links (media_id, label, type, url, preview_url, access_level)
       values (
         ${id},
-        ${title},
-        ${body.source ?? 'Google Drive'},
-        ${resourceUrl},
-        ${String(body.previewUrl ?? '').trim() || null},
-        ${body.access ?? 'สาธารณะ'}
+        ${link.label},
+        ${link.type},
+        ${link.url},
+        ${link.previewUrl || null},
+        ${link.access}
       )
     `
   }

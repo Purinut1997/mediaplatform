@@ -51,7 +51,16 @@ type Theme = 'light' | 'dark'
 type View = 'home' | 'media' | 'detail' | 'admin' | 'login' | 'register'
 type AdminSection = 'dashboard' | 'media' | 'members' | 'taxonomy' | 'links' | 'settings'
 type AccessLevel = 'สาธารณะ' | 'สมาชิก' | 'VIP' | 'ซื้อแยก'
-type MediaStatus = 'เผยแพร่' | 'แบบร่าง' | 'ซ่อน'
+type MediaStatus = 'ฉบับร่าง' | 'รอตรวจสอบ' | 'เผยแพร่แล้ว' | 'ซ่อนชั่วคราว' | 'ถูกปฏิเสธ'
+type MediaSource = 'Google Drive' | 'Google Sheet' | 'YouTube' | 'External Link'
+
+type MediaLink = {
+  label: string
+  type: MediaSource
+  url: string
+  previewUrl: string
+  access: AccessLevel
+}
 
 type MediaItem = {
   id: number
@@ -59,16 +68,17 @@ type MediaItem = {
   title: string
   topic: string
   access: AccessLevel
-  status: MediaStatus
+  status: MediaStatus | 'เผยแพร่' | 'แบบร่าง' | 'ซ่อน'
   price: number
   downloads: number
   views: number
   rating: number
   cover: string
-  source: 'Google Drive' | 'Google Sheet' | 'YouTube' | 'External Link'
+  source: MediaSource
   description: string
   resourceUrl?: string
   previewUrl?: string
+  links?: MediaLink[]
   createdAt?: string
   updatedAt?: string
 }
@@ -107,10 +117,11 @@ type MediaFormState = {
   access: AccessLevel
   status: MediaStatus
   price: string
-  source: MediaItem['source']
+  source: MediaSource
   cover: string
   resourceUrl: string
   previewUrl: string
+  links: MediaLink[]
   description: string
 }
 
@@ -140,7 +151,7 @@ const mediaItems: MediaItem[] = [
     title: 'ชุดเอกสารอบรม AI สำหรับครู',
     topic: 'AI',
     access: 'สาธารณะ',
-    status: 'เผยแพร่',
+    status: 'เผยแพร่แล้ว',
     price: 0,
     downloads: 428,
     views: 2460,
@@ -156,7 +167,7 @@ const mediaItems: MediaItem[] = [
     title: 'Google Sheet ระบบเช็กชื่อออนไลน์',
     topic: 'AppScript',
     access: 'สมาชิก',
-    status: 'เผยแพร่',
+    status: 'เผยแพร่แล้ว',
     price: 0,
     downloads: 189,
     views: 1120,
@@ -172,7 +183,7 @@ const mediaItems: MediaItem[] = [
     title: 'วิดีโอสอนติดตั้งระบบคลังสื่อ',
     topic: 'อบรม',
     access: 'VIP',
-    status: 'เผยแพร่',
+    status: 'เผยแพร่แล้ว',
     price: 0,
     downloads: 76,
     views: 890,
@@ -188,7 +199,7 @@ const mediaItems: MediaItem[] = [
     title: 'Prompt Pack สำหรับงานบริหารโรงเรียน',
     topic: 'งานเอกสาร',
     access: 'ซื้อแยก',
-    status: 'แบบร่าง',
+    status: 'ฉบับร่าง',
     price: 499,
     downloads: 32,
     views: 510,
@@ -203,13 +214,21 @@ const mediaItems: MediaItem[] = [
 
 const topics = ['ทั้งหมด', 'AI', 'AppScript', 'โรงเรียน', 'งานเอกสาร', 'อบรม']
 const accessOptions: AccessLevel[] = ['สาธารณะ', 'สมาชิก', 'VIP', 'ซื้อแยก']
-const statusOptions: MediaStatus[] = ['เผยแพร่', 'แบบร่าง', 'ซ่อน']
-const sourceOptions: MediaItem['source'][] = [
+const statusOptions: MediaStatus[] = ['ฉบับร่าง', 'รอตรวจสอบ', 'เผยแพร่แล้ว', 'ซ่อนชั่วคราว', 'ถูกปฏิเสธ']
+const sourceOptions: MediaSource[] = [
   'Google Drive',
   'Google Sheet',
   'YouTube',
   'External Link',
 ]
+
+function normalizeMediaStatus(status: string): MediaStatus {
+  if (status === 'เผยแพร่') return 'เผยแพร่แล้ว'
+  if (status === 'แบบร่าง') return 'ฉบับร่าง'
+  if (status === 'ซ่อน') return 'ซ่อนชั่วคราว'
+  return statusOptions.includes(status as MediaStatus) ? (status as MediaStatus) : 'ฉบับร่าง'
+}
+
 const defaultSiteSettings: SiteSettings = {
   heroEyebrow: 'AI / Cyber / School Operations',
   heroTitle: 'ศูนย์กลางสื่อการเรียนรู้ที่สดใส ล้ำสมัย และใช้งานง่าย',
@@ -236,13 +255,24 @@ function createEmptyMediaForm(topic = 'โรงเรียน'): MediaFormStat
     title: '',
     topic,
     access: 'สาธารณะ',
-    status: 'เผยแพร่',
+    status: 'เผยแพร่แล้ว',
     price: '0',
     source: 'Google Drive',
     cover: '',
     resourceUrl: '',
     previewUrl: '',
+    links: [createEmptyMediaLink()],
     description: '',
+  }
+}
+
+function createEmptyMediaLink(): MediaLink {
+  return {
+    label: 'ไฟล์หลัก',
+    type: 'Google Drive',
+    url: '',
+    previewUrl: '',
+    access: 'สาธารณะ',
   }
 }
 const portalTiles = [
@@ -261,10 +291,13 @@ function canViewMedia(user: CurrentUser | null, item: MediaItem) {
 }
 
 function getPreviewUrl(item: MediaItem) {
-  const link = item.previewUrl || item.resourceUrl || ''
+  const primaryLink = item.links?.[0]
+  const link = primaryLink?.previewUrl || primaryLink?.url || item.previewUrl || item.resourceUrl || ''
   if (!link) return ''
 
-  if (item.source === 'YouTube') {
+  const source = primaryLink?.type || item.source
+
+  if (source === 'YouTube') {
     const id =
       link.match(/[?&]v=([^&]+)/)?.[1] ||
       link.match(/youtu\.be\/([^?&]+)/)?.[1] ||
@@ -272,12 +305,12 @@ function getPreviewUrl(item: MediaItem) {
     return id ? `https://www.youtube.com/embed/${id}` : link
   }
 
-  if (item.source === 'Google Drive') {
+  if (source === 'Google Drive') {
     const id = link.match(/\/d\/([^/]+)/)?.[1] || link.match(/[?&]id=([^&]+)/)?.[1]
     return id ? `https://drive.google.com/file/d/${id}/preview` : link
   }
 
-  if (item.source === 'Google Sheet') {
+  if (source === 'Google Sheet') {
     return link.replace(/\/edit.*$/, '/preview')
   }
 
@@ -377,7 +410,7 @@ function App() {
     async function loadData() {
       try {
         const [mediaResponse, categoriesResponse, settingsResponse] = await Promise.all([
-          fetch('/api/media'),
+          fetch(currentUser?.role === 'superadmin' ? '/api/media?status=all' : '/api/media'),
           fetch('/api/categories'),
           fetch('/api/settings'),
         ])
@@ -421,7 +454,7 @@ function App() {
     return () => {
       active = false
     }
-  }, [])
+  }, [currentUser?.role, refreshToken])
 
   const filteredMedia = useMemo(
     () =>
@@ -2078,12 +2111,29 @@ function AdminPanel({
       title: item.title,
       topic: item.topic,
       access: item.access,
-      status: item.status,
+      status: normalizeMediaStatus(item.status),
       price: String(item.price ?? 0),
       source: item.source,
       cover: item.cover,
       resourceUrl: item.resourceUrl ?? '',
       previewUrl: item.previewUrl ?? '',
+      links: item.links?.length
+        ? item.links.map((link) => ({
+            label: link.label || 'ไฟล์หลัก',
+            type: link.type,
+            url: link.url,
+            previewUrl: link.previewUrl ?? '',
+            access: link.access ?? item.access,
+          }))
+        : [
+            {
+              label: 'ไฟล์หลัก',
+              type: item.source,
+              url: item.resourceUrl ?? '',
+              previewUrl: item.previewUrl ?? '',
+              access: item.access,
+            },
+          ],
       description: item.description,
     })
     document.getElementById('admin-create-media')?.scrollIntoView({ behavior: 'smooth', block: 'start' })

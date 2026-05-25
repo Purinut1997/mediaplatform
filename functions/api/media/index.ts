@@ -20,6 +20,13 @@ type MediaRow = {
   description: string
   resource_url?: string | null
   preview_url?: string | null
+  links?: Array<{
+    label: string
+    type: string
+    url: string
+    previewUrl: string | null
+    access: string
+  }>
   created_at: string
   updated_at: string
 }
@@ -27,6 +34,46 @@ type MediaRow = {
 type MediaPayload = Partial<ReturnType<typeof toMedia>> & {
   resourceUrl?: string
   previewUrl?: string
+  links?: Array<{
+    label?: string
+    type?: string
+    url?: string
+    previewUrl?: string
+    access?: string
+  }>
+}
+
+function normalizeStatus(status: string) {
+  if (status === 'เผยแพร่') return 'เผยแพร่แล้ว'
+  if (status === 'แบบร่าง') return 'ฉบับร่าง'
+  if (status === 'ซ่อน') return 'ซ่อนชั่วคราว'
+  return status
+}
+
+function readLinks(body: MediaPayload, title: string) {
+  const links = Array.isArray(body.links) ? body.links : []
+  const normalized = links
+    .map((link, index) => ({
+      label: String(link.label ?? '').trim() || `ลิงก์ ${index + 1}`,
+      type: String(link.type ?? body.source ?? 'Google Drive'),
+      url: String(link.url ?? '').trim(),
+      previewUrl: String(link.previewUrl ?? '').trim(),
+      access: String(link.access ?? body.access ?? 'สาธารณะ'),
+    }))
+    .filter((link) => link.url)
+
+  const resourceUrl = String(body.resourceUrl ?? '').trim()
+  if (!normalized.length && resourceUrl) {
+    normalized.push({
+      label: title,
+      type: String(body.source ?? 'Google Drive'),
+      url: resourceUrl,
+      previewUrl: String(body.previewUrl ?? '').trim(),
+      access: String(body.access ?? 'สาธารณะ'),
+    })
+  }
+
+  return normalized
 }
 
 function toMedia(row: MediaRow) {
@@ -36,7 +83,7 @@ function toMedia(row: MediaRow) {
     slug: row.slug,
     topic: row.topic,
     access: row.access_level,
-    status: row.status,
+    status: normalizeStatus(row.status),
     price: row.price,
     downloads: row.downloads,
     views: row.views,
@@ -46,6 +93,15 @@ function toMedia(row: MediaRow) {
     description: row.description,
     resourceUrl: row.resource_url ?? '',
     previewUrl: row.preview_url ?? '',
+    links: Array.isArray(row.links)
+      ? row.links.map((link) => ({
+          label: link.label,
+          type: link.type,
+          url: link.url,
+          previewUrl: link.previewUrl ?? '',
+          access: link.access,
+        }))
+      : [],
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }
@@ -56,34 +112,56 @@ export const onRequestGet = async ({ env, request }: { env: Env; request: Reques
   const sql = getSql(env)
   const url = new URL(request.url)
   const topic = url.searchParams.get('topic')
-  const status = url.searchParams.get('status') ?? 'เผยแพร่'
+  const status = url.searchParams.get('status') ?? 'เผยแพร่แล้ว'
+  const isAllStatus = status === 'all'
+  const statusList = status === 'เผยแพร่แล้ว' ? ['เผยแพร่แล้ว', 'เผยแพร่'] : [status]
 
   const rows =
     topic && topic !== 'ทั้งหมด'
       ? await sql`
-          select media.*, link.url as resource_url, link.preview_url
+          select media.*, link.url as resource_url, link.preview_url, link.links
           from media
           left join lateral (
-            select url, preview_url
+            select
+              (array_agg(url order by sort_order asc, id asc))[1] as url,
+              (array_agg(preview_url order by sort_order asc, id asc))[1] as preview_url,
+              jsonb_agg(
+                jsonb_build_object(
+                  'label', label,
+                  'type', type,
+                  'url', url,
+                  'previewUrl', preview_url,
+                  'access', access_level
+                )
+                order by sort_order asc, id asc
+              ) as links
             from media_links
             where media_links.media_id = media.id
-            order by sort_order asc, id asc
-            limit 1
           ) link on true
-          where media.status = ${status} and media.topic = ${topic}
+          where (${isAllStatus} or media.status = any(${statusList})) and media.topic = ${topic}
           order by updated_at desc, id desc
         `
       : await sql`
-          select media.*, link.url as resource_url, link.preview_url
+          select media.*, link.url as resource_url, link.preview_url, link.links
           from media
           left join lateral (
-            select url, preview_url
+            select
+              (array_agg(url order by sort_order asc, id asc))[1] as url,
+              (array_agg(preview_url order by sort_order asc, id asc))[1] as preview_url,
+              jsonb_agg(
+                jsonb_build_object(
+                  'label', label,
+                  'type', type,
+                  'url', url,
+                  'previewUrl', preview_url,
+                  'access', access_level
+                )
+                order by sort_order asc, id asc
+              ) as links
             from media_links
             where media_links.media_id = media.id
-            order by sort_order asc, id asc
-            limit 1
           ) link on true
-          where media.status = ${status}
+          where (${isAllStatus} or media.status = any(${statusList}))
           order by updated_at desc, id desc
         `
 
@@ -149,10 +227,10 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
       returning *
     `) as MediaRow[]
 
-    const resourceUrl = String(body.resourceUrl ?? '').trim()
-    const previewUrl = String(body.previewUrl ?? '').trim()
+    const links = readLinks(body, title)
 
-    if (resourceUrl) {
+    for (let index = 0; index < links.length; index += 1) {
+      const link = links[index]
       await sql`
         insert into media_links (
           media_id,
@@ -164,11 +242,11 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
         )
         values (
           ${row.id},
-          ${title},
-          ${body.source ?? 'Google Drive'},
-          ${resourceUrl},
-          ${previewUrl || null},
-          ${body.access ?? 'สาธารณะ'}
+          ${link.label},
+          ${link.type},
+          ${link.url},
+          ${link.previewUrl || null},
+          ${link.access}
         )
       `
     }
