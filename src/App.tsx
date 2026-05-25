@@ -171,6 +171,17 @@ type LinkCheckResult = {
   message: string
 }
 
+type RestorePreview = {
+  categories: number
+  media: number
+  mediaLinks: number
+  users: number
+  vipRequests: number
+  settings: number
+  skippedUsers?: number
+  warnings: string[]
+}
+
 type MediaFormState = {
   title: string
   topic: string
@@ -2099,6 +2110,10 @@ function AdminPanel({
   const [errorLogs, setErrorLogs] = useState<ErrorLog[]>([])
   const [systemHealth, setSystemHealth] = useState<SystemHealth | null>(null)
   const [linkChecks, setLinkChecks] = useState<LinkCheckResult[]>([])
+  const [restoreText, setRestoreText] = useState('')
+  const [restorePreview, setRestorePreview] = useState<RestorePreview | null>(null)
+  const [activityQuery, setActivityQuery] = useState('')
+  const [errorQuery, setErrorQuery] = useState('')
   const [loadingMembers, setLoadingMembers] = useState(false)
   const [loadingOps, setLoadingOps] = useState(false)
   const [error, setError] = useState('')
@@ -2183,6 +2198,16 @@ function AdminPanel({
     tone: 'amber' | 'sky' | 'red'
     action: () => void
   }>
+  const filteredAuditLogs = auditLogs.filter((log) => {
+    const query = activityQuery.trim().toLowerCase()
+    if (!query) return true
+    return `${log.actor} ${log.action} ${log.targetType} ${log.targetId ?? ''}`.toLowerCase().includes(query)
+  })
+  const filteredErrorLogs = errorLogs.filter((log) => {
+    const query = errorQuery.trim().toLowerCase()
+    if (!query) return true
+    return `${log.source} ${log.message}`.toLowerCase().includes(query)
+  })
   const adminMenu: Array<{ id: AdminSection; label: string; icon: typeof BarChart3; detail: string }> = [
     { id: 'dashboard', label: 'Dashboard', icon: BarChart3, detail: 'ภาพรวมระบบ' },
     { id: 'media', label: 'จัดการสื่อ', icon: Layers3, detail: 'เพิ่ม แก้ไข ลบ' },
@@ -2307,6 +2332,78 @@ function AdminPanel({
       await loadOpsData()
     } catch (backupError) {
       setOpsError(backupError instanceof Error ? backupError.message : 'ดาวน์โหลดสำรองข้อมูลไม่สำเร็จ')
+    } finally {
+      setLoadingOps(false)
+    }
+  }
+
+  const downloadCsv = (filename: string, rows: Array<Record<string, unknown>>) => {
+    const columns = Object.keys(rows[0] ?? { empty: '' })
+    const escape = (value: unknown) => `"${String(value ?? '').replaceAll('"', '""')}"`
+    const csv = [columns.join(','), ...rows.map((row) => columns.map((column) => escape(row[column])).join(','))].join('\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = filename
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    URL.revokeObjectURL(url)
+  }
+
+  const readRestoreBackup = () => {
+    try {
+      return JSON.parse(restoreText) as Record<string, unknown>
+    } catch {
+      throw new Error('ไฟล์ backup ต้องเป็น JSON ที่ถูกต้อง')
+    }
+  }
+
+  const previewRestore = async () => {
+    setLoadingOps(true)
+    setOpsError('')
+    try {
+      const backup = readRestoreBackup()
+      const response = await fetch('/api/admin/restore', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ action: 'preview', backup }),
+      })
+      const result = await readJson<{ preview?: RestorePreview; error?: string }>(response)
+      if (!response.ok || !result.preview) throw new Error(result.error ?? 'Preview restore ไม่สำเร็จ')
+      setRestorePreview(result.preview)
+    } catch (restoreError) {
+      setRestorePreview(null)
+      setOpsError(restoreError instanceof Error ? restoreError.message : 'Preview restore ไม่สำเร็จ')
+    } finally {
+      setLoadingOps(false)
+    }
+  }
+
+  const commitRestore = async () => {
+    if (!restorePreview) {
+      setOpsError('กรุณา preview ไฟล์ backup ก่อนนำเข้า')
+      return
+    }
+    if (!window.confirm('ยืนยันนำเข้า backup แบบ merge ใช่ไหม? ระบบจะไม่ลบข้อมูลเดิม')) return
+    setLoadingOps(true)
+    setOpsError('')
+    try {
+      const backup = readRestoreBackup()
+      const response = await fetch('/api/admin/restore', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ action: 'commit', confirm: true, backup }),
+      })
+      const result = await readJson<{ restored?: RestorePreview; error?: string }>(response)
+      if (!response.ok || !result.restored) throw new Error(result.error ?? 'Restore ไม่สำเร็จ')
+      setRestorePreview(result.restored)
+      await Promise.all([onCreated(), loadMembers(), loadOpsData()])
+    } catch (restoreError) {
+      setOpsError(restoreError instanceof Error ? restoreError.message : 'Restore ไม่สำเร็จ')
     } finally {
       setLoadingOps(false)
     }
@@ -3360,17 +3457,31 @@ function AdminPanel({
                   บันทึกว่าใครทำอะไรกับระบบ เพื่อไล่ตรวจย้อนหลังได้เร็วขึ้น
                 </p>
               </div>
-              <button className="min-h-11 rounded-2xl bg-sky-300 px-4 font-black text-slate-950" onClick={loadOpsData} type="button">
-                รีเฟรช
-              </button>
+              <div className="flex flex-wrap gap-2">
+                <button className="min-h-11 rounded-2xl bg-white/10 px-4 font-black text-white" onClick={() => downloadCsv('activity-log.csv', filteredAuditLogs)} type="button">
+                  Export CSV
+                </button>
+                <button className="min-h-11 rounded-2xl bg-sky-300 px-4 font-black text-slate-950" onClick={loadOpsData} type="button">
+                  รีเฟรช
+                </button>
+              </div>
             </div>
+            <label className="relative mb-4 block">
+              <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
+              <input
+                className="min-h-12 w-full rounded-2xl border border-white/10 bg-black/24 pl-11 pr-4 text-base text-white outline-none placeholder:text-slate-500 focus:border-sky-300 focus:ring-4 focus:ring-sky-300/10"
+                onChange={(event) => setActivityQuery(event.target.value)}
+                placeholder="ค้นหา actor, action, target"
+                value={activityQuery}
+              />
+            </label>
             <div className="grid gap-3">
-              {auditLogs.length === 0 && (
+              {filteredAuditLogs.length === 0 && (
                 <div className="rounded-2xl border border-dashed border-white/15 p-5 text-sm font-bold text-slate-400">
-                  ยังไม่มีบันทึกกิจกรรม
+                  ไม่พบ Activity Log ตามเงื่อนไข
                 </div>
               )}
-              {auditLogs.map((log) => (
+              {filteredAuditLogs.map((log) => (
                 <article className="rounded-2xl border border-white/10 bg-black/20 p-4" key={log.id}>
                   <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-start">
                     <div className="min-w-0">
@@ -3399,17 +3510,31 @@ function AdminPanel({
                   รวม API error, database error และเหตุการณ์ที่ควรตรวจแก้
                 </p>
               </div>
-              <button className="min-h-11 rounded-2xl bg-red-300 px-4 font-black text-slate-950" onClick={loadOpsData} type="button">
-                รีเฟรช
-              </button>
+              <div className="flex flex-wrap gap-2">
+                <button className="min-h-11 rounded-2xl bg-white/10 px-4 font-black text-white" onClick={() => downloadCsv('error-log.csv', filteredErrorLogs)} type="button">
+                  Export CSV
+                </button>
+                <button className="min-h-11 rounded-2xl bg-red-300 px-4 font-black text-slate-950" onClick={loadOpsData} type="button">
+                  รีเฟรช
+                </button>
+              </div>
             </div>
+            <label className="relative mb-4 block">
+              <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
+              <input
+                className="min-h-12 w-full rounded-2xl border border-white/10 bg-black/24 pl-11 pr-4 text-base text-white outline-none placeholder:text-slate-500 focus:border-red-300 focus:ring-4 focus:ring-red-300/10"
+                onChange={(event) => setErrorQuery(event.target.value)}
+                placeholder="ค้นหา source หรือข้อความ error"
+                value={errorQuery}
+              />
+            </label>
             <div className="grid gap-3">
-              {errorLogs.length === 0 && (
+              {filteredErrorLogs.length === 0 && (
                 <div className="rounded-2xl border border-dashed border-white/15 p-5 text-sm font-bold text-slate-400">
-                  ยังไม่พบ error ในระบบ
+                  ไม่พบ Error Log ตามเงื่อนไข
                 </div>
               )}
-              {errorLogs.map((log) => (
+              {filteredErrorLogs.map((log) => (
                 <article className="rounded-2xl border border-red-300/10 bg-red-400/10 p-4" key={log.id}>
                   <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-start">
                     <div className="min-w-0">
@@ -3464,7 +3589,89 @@ function AdminPanel({
               ))}
             </div>
             <div className="mt-4 rounded-2xl border border-amber-300/20 bg-amber-300/10 p-4 text-sm font-bold text-amber-100">
-              ตอนนี้รองรับการ export ก่อน ส่วน Restore จะเพิ่มเป็นขั้นตอนถัดไปแบบมีหน้าตรวจไฟล์ก่อนนำเข้าจริง เพื่อกันข้อมูลพัง
+              Export เหมาะสำหรับสำรองข้อมูลก่อนแก้ชุดใหญ่ หรือย้ายระบบไปเครื่อง/บัญชีใหม่
+            </div>
+
+            <div className="mt-5 rounded-2xl border border-emerald-300/20 bg-black/20 p-4">
+              <div className="mb-4">
+                <h4 className="text-lg font-black text-white">Restore Import แบบปลอดภัย</h4>
+                <p className="mt-1 text-sm font-semibold text-slate-400">
+                  นำเข้าไฟล์ JSON จาก backup แบบ merge ไม่ลบข้อมูลเดิม และต้อง preview ก่อนยืนยันทุกครั้ง
+                </p>
+              </div>
+              <div className="grid gap-3">
+                <input
+                  accept="application/json,.json"
+                  className="min-h-12 rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm font-bold text-slate-200 file:mr-4 file:rounded-xl file:border-0 file:bg-emerald-300 file:px-4 file:py-2 file:font-black file:text-slate-950"
+                  onChange={async (event) => {
+                    const file = event.target.files?.[0]
+                    if (!file) return
+                    setRestoreText(await file.text())
+                    setRestorePreview(null)
+                    setOpsError('')
+                  }}
+                  type="file"
+                />
+                <textarea
+                  className="min-h-36 rounded-2xl border border-white/10 bg-black/24 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-emerald-300 focus:ring-4 focus:ring-emerald-300/10"
+                  onChange={(event) => {
+                    setRestoreText(event.target.value)
+                    setRestorePreview(null)
+                  }}
+                  placeholder="วาง JSON backup ที่ export จากระบบนี้"
+                  value={restoreText}
+                />
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <button
+                    className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-emerald-300 px-5 font-black text-slate-950 disabled:opacity-60"
+                    disabled={loadingOps || !restoreText.trim()}
+                    onClick={previewRestore}
+                    type="button"
+                  >
+                    {loadingOps ? <Loader2 className="animate-spin" size={18} /> : <Eye size={18} />}
+                    Preview Restore
+                  </button>
+                  <button
+                    className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-amber-300 px-5 font-black text-slate-950 disabled:opacity-50"
+                    disabled={loadingOps || !restorePreview}
+                    onClick={commitRestore}
+                    type="button"
+                  >
+                    <Archive size={18} />
+                    ยืนยันนำเข้าแบบ Merge
+                  </button>
+                </div>
+                {restorePreview && (
+                  <div className="rounded-2xl border border-emerald-300/20 bg-emerald-300/10 p-4">
+                    <p className="font-black text-emerald-100">Preview ล่าสุด</p>
+                    <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                      {[
+                        ['หมวดหมู่', restorePreview.categories],
+                        ['สื่อ', restorePreview.media],
+                        ['ลิงก์สื่อ', restorePreview.mediaLinks],
+                        ['ผู้ใช้', restorePreview.users],
+                        ['คำขอ VIP', restorePreview.vipRequests],
+                        ['Settings', restorePreview.settings],
+                      ].map(([label, value]) => (
+                        <div className="rounded-xl bg-black/20 p-3" key={label}>
+                          <p className="text-xs font-bold text-slate-400">{label}</p>
+                          <p className="text-2xl font-black text-white">{Number(value).toLocaleString('th-TH')}</p>
+                        </div>
+                      ))}
+                    </div>
+                    {typeof restorePreview.skippedUsers === 'number' && restorePreview.skippedUsers > 0 && (
+                      <p className="mt-3 rounded-xl bg-amber-300/10 p-3 text-sm font-bold text-amber-100">
+                        ข้ามผู้ใช้ใหม่ {restorePreview.skippedUsers} รายการ เพราะไม่มี password hash ใน backup
+                      </p>
+                    )}
+                    <ul className="mt-3 grid gap-2 text-sm font-semibold text-emerald-100/80">
+                      {restorePreview.warnings.map((warning) => (
+                        <li key={warning}>- {warning}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
             </div>
           </section>
           )}

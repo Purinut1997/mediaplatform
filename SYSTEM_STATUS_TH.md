@@ -96,6 +96,11 @@
 - มี System Health ดู Cloudflare, Neon, API, response time, last backup, error ล่าสุด และจำนวนข้อมูลสำคัญ
 - มี Broken Link Checker ตรวจลิงก์จาก media links และบันทึกผลลงฐานข้อมูล
 - มี Backup Export เป็น JSON ทั้งระบบ และ CSV แยกตาราง
+- มี Restore Import แบบปลอดภัยจากไฟล์ JSON backup
+  - Preview ข้อมูลก่อนนำเข้า
+  - ยืนยันก่อน restore จริง
+  - Restore แบบ merge ไม่ลบข้อมูลเดิม
+  - ข้ามผู้ใช้ใหม่ที่ไม่มี password hash เพื่อความปลอดภัย
 - มี Telegram Notification แบบ optional ผ่าน env `TELEGRAM_BOT_TOKEN` และ `TELEGRAM_CHAT_ID`
   - แจ้งคำขอ VIP ใหม่
   - แจ้งผลอนุมัติ/ปฏิเสธ VIP
@@ -112,20 +117,16 @@
 
 ### สำคัญมาก
 
-1. Restore Import
-   - ตอนนี้มี export แล้ว แต่ยังไม่มีการ restore กลับเข้าระบบ
-   - ควรทำแบบปลอดภัย: อัปโหลดไฟล์, preview ข้อมูล, validate, แล้วค่อยยืนยันนำเข้า
-
-2. ระบบสิทธิ์ admin แบบละเอียด
+1. ระบบสิทธิ์ admin แบบละเอียด
    - ตอนนี้ปรับ role admin/member ได้แล้ว
    - ยังไม่มี permission รายเมนู เช่น admin จัดการสื่อได้ แต่แก้ setting ไม่ได้
    - ควรเพิ่มตารางหรือ config permissions ภายหลัง
 
-3. ระบบแท็กจริง
+2. ระบบแท็กจริง
    - ตอนนี้มี filter แท็กแบบค้นข้อความ
    - ยังไม่มีตาราง tags และ media_tags จริง
 
-4. Graph เชิงเวลาจริง
+3. Graph เชิงเวลาจริง
    - ตอนนี้ dashboard มีกราฟจากข้อมูลปัจจุบัน
    - ยังไม่มี daily download, monthly new members, weekly VIP requests จาก event table จริง
 
@@ -140,12 +141,12 @@
    - ถ้าต้องการอัตโนมัติควรใช้ Cron Trigger ของ Cloudflare
 
 3. Error Log รายละเอียดมากขึ้น
-   - เพิ่ม filter ตาม source/date/severity
+   - เพิ่ม filter ตาม date/severity
    - เพิ่มปุ่ม clear เฉพาะ superadmin
 
 4. Audit Log รายละเอียดมากขึ้น
-   - เพิ่ม filter actor/action/date
-   - เพิ่ม export เฉพาะ activity log
+   - เพิ่ม filter date
+   - เพิ่ม export เฉพาะ activity log แล้ว
 
 5. Telegram settings ผ่านหลังบ้าน
    - ตอนนี้ใช้ env เพื่อความปลอดภัย
@@ -153,12 +154,12 @@
 
 ## ลำดับงานแนะนำต่อไป
 
-1. ทำ Restore Import แบบ preview ก่อนนำเข้า
-2. ทำ Admin Permission รายเมนู
-3. ทำตาราง tags และ media_tags จริง
-4. ทำ notification table พร้อม read/unread
-5. ทำกราฟเชิงเวลาโดยเก็บ event/download log จริง
-6. ทำ Cron ตรวจลิงก์อัตโนมัติ
+1. ทำ Admin Permission รายเมนู
+2. ทำตาราง tags และ media_tags จริง
+3. ทำ notification table พร้อม read/unread
+4. ทำกราฟเชิงเวลาโดยเก็บ event/download log จริง
+5. ทำ Cron ตรวจลิงก์อัตโนมัติ
+6. ทำ Restore แบบ replace เฉพาะตารางที่เลือกได้ หากต้องการล้างข้อมูลเดิมก่อนนำเข้า
 
 ## ไฟล์หลักที่ควรดูเมื่อทำงานต่อ
 
@@ -171,6 +172,7 @@
 - `functions/api/admin/users.ts`
 - `functions/api/admin/activity.ts`
 - `functions/api/admin/backup.ts`
+- `functions/api/admin/restore.ts`
 - `functions/api/admin/errors.ts`
 - `functions/api/admin/health.ts`
 - `functions/api/admin/link-checks.ts`
@@ -180,4 +182,4 @@
 
 - `npm run lint` ผ่าน
 - `npm run build` ผ่าน
-- ฟีเจอร์ที่เพิ่มล่าสุด: Activity Log, Error Log, System Health, Backup Export, Broken Link Checker, Maintenance Mode, Notification Center, กราฟ dashboard เบื้องต้น, admin role toggle และ Telegram optional notification
+- ฟีเจอร์ที่เพิ่มล่าสุด: Restore Import แบบ preview/merge, Activity/Error Log filter + CSV export, Activity Log, Error Log, System Health, Backup Export, Broken Link Checker, Maintenance Mode, Notification Center, กราฟ dashboard เบื้องต้น, admin role toggle และ Telegram optional notification
