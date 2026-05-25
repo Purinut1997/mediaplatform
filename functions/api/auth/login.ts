@@ -1,4 +1,5 @@
 import { loginWithPassword, sessionCookie } from '../../_lib/auth'
+import { writeErrorLog } from '../../_lib/admin'
 import { validateBotCheck, type BotCheckPayload } from '../../_lib/bot'
 import type { Env } from '../../_lib/db'
 
@@ -14,6 +15,7 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
   const botError = validateBotCheck(body)
 
   if (botError) {
+    await writeErrorLog(env, 'auth.login.bot_check', botError, { email })
     return Response.json({ ok: false, error: botError }, { status: 400 })
   }
 
@@ -29,6 +31,7 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
     result = await loginWithPassword(env, email, password)
   } catch (error) {
     console.error('Login failed', error)
+    await writeErrorLog(env, 'auth.login.error', error, { email })
     return Response.json(
       {
         ok: false,
@@ -38,6 +41,7 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
     )
   }
   if (!result) {
+    await writeErrorLog(env, 'auth.login.failed', 'Invalid credentials', { email })
     return Response.json(
       { ok: false, error: 'อีเมลหรือรหัสผ่านไม่ถูกต้อง' },
       { status: 401 },

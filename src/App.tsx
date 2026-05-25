@@ -49,7 +49,17 @@ const BRAND_HERO_URL =
 
 type Theme = 'light' | 'dark'
 type View = 'home' | 'media' | 'detail' | 'admin' | 'login' | 'register'
-type AdminSection = 'dashboard' | 'media' | 'members' | 'taxonomy' | 'links' | 'settings'
+type AdminSection =
+  | 'dashboard'
+  | 'media'
+  | 'members'
+  | 'taxonomy'
+  | 'links'
+  | 'activity'
+  | 'health'
+  | 'backup'
+  | 'errors'
+  | 'settings'
 type AccessLevel = 'สาธารณะ' | 'สมาชิก' | 'VIP' | 'ซื้อแยก'
 type MediaStatus = 'ฉบับร่าง' | 'รอตรวจสอบ' | 'เผยแพร่แล้ว' | 'ซ่อนชั่วคราว' | 'ถูกปฏิเสธ'
 type MediaSource = 'Google Drive' | 'Google Sheet' | 'YouTube' | 'External Link'
@@ -113,6 +123,54 @@ type VipRequest = {
   createdAt: string
 }
 
+type AuditLog = {
+  id: number
+  actor: string
+  action: string
+  targetType: string
+  targetId: string | null
+  detail: Record<string, unknown>
+  createdAt: string
+}
+
+type ErrorLog = {
+  id: number
+  source: string
+  message: string
+  stack: string
+  detail: Record<string, unknown>
+  createdAt: string
+}
+
+type SystemHealth = {
+  cloudflare: string
+  neon: string
+  api: string
+  storage: string
+  responseTimeMs: number
+  lastBackupAt: string | null
+  lastError: { source: string; message: string; createdAt: string } | null
+  counts: {
+    media: number
+    users: number
+    pendingVip: number
+    links: number
+    errors24h: number
+  }
+}
+
+type LinkCheckResult = {
+  mediaId: number
+  mediaTitle: string
+  linkId: number
+  label: string
+  type: string
+  url: string
+  status: 'ok' | 'warning' | 'error'
+  statusCode: number | null
+  message: string
+}
+
 type MediaFormState = {
   title: string
   topic: string
@@ -134,6 +192,10 @@ type SiteSettings = {
   heroImageUrl: string
   heroPrimaryLabel: string
   heroSecondaryLabel: string
+  announcementText: string
+  maintenanceEnabled: boolean
+  maintenanceTitle: string
+  maintenanceMessage: string
   vipRegistrationEnabled: boolean
   vipPrice: number
   vipQrUrl: string
@@ -239,6 +301,10 @@ const defaultSiteSettings: SiteSettings = {
   heroImageUrl: BRAND_HERO_URL,
   heroPrimaryLabel: 'เปิดคลังสื่อ',
   heroSecondaryLabel: 'ดูสิทธิ์ VIP',
+  announcementText: '',
+  maintenanceEnabled: false,
+  maintenanceTitle: 'ระบบกำลังปรับปรุง',
+  maintenanceMessage: 'กรุณากลับมาใหม่ภายหลัง',
   vipRegistrationEnabled: false,
   vipPrice: 0,
   vipQrUrl: '',
@@ -498,6 +564,9 @@ function App() {
     setView('home')
   }
 
+  const showMaintenance =
+    siteSettings.maintenanceEnabled && currentUser?.role !== 'superadmin'
+
   return (
     <div className="relative min-h-screen overflow-hidden bg-[#f2fbff] text-slate-900 transition-colors duration-300 dark:bg-[#06111d] dark:text-slate-100">
       <TechBackground />
@@ -516,6 +585,11 @@ function App() {
         />
 
         <main>
+          {showMaintenance && (
+            <MaintenanceScreen settings={siteSettings} setView={setView} />
+          )}
+          {!showMaintenance && (
+          <>
           {view === 'home' && (
             <>
               <Hero settings={siteSettings} setView={setView} />
@@ -588,6 +662,8 @@ function App() {
           )}
           {view === 'admin' && currentUser?.role !== 'superadmin' && (
             <LoginPanel onLogin={handleLogin} setView={setView} />
+          )}
+          </>
           )}
         </main>
 
@@ -843,6 +919,11 @@ function Hero({
             <BrainCircuit size={18} />
             {settings.heroEyebrow}
           </div>
+          {settings.announcementText && (
+            <div className="mb-5 rounded-2xl border border-amber-300/60 bg-amber-50 px-4 py-3 text-sm font-black text-amber-800 dark:border-amber-300/20 dark:bg-amber-300/10 dark:text-amber-100">
+              {settings.announcementText}
+            </div>
+          )}
           <h1 className="max-w-3xl text-4xl font-black leading-tight text-slate-950 sm:text-5xl dark:text-white">
             {settings.heroTitle}
           </h1>
@@ -870,6 +951,40 @@ function Hero({
         </div>
 
         <BrandShowcase imageUrl={settings.heroImageUrl} />
+      </div>
+    </section>
+  )
+}
+
+function MaintenanceScreen({
+  setView,
+  settings,
+}: {
+  setView: (view: View) => void
+  settings: SiteSettings
+}) {
+  return (
+    <section className="mx-auto grid min-h-[64vh] max-w-4xl place-items-center px-4 py-16 text-center sm:px-6">
+      <div className="rounded-[2rem] border border-cyan-200/70 bg-white/82 p-8 shadow-2xl shadow-sky-900/10 backdrop-blur-2xl dark:border-white/10 dark:bg-white/[0.07]">
+        <img
+          alt="MIKPURINUT logo"
+          className="mx-auto h-20 w-20 rounded-3xl border border-cyan-200/50 object-cover shadow-xl shadow-cyan-500/10"
+          src={LOGO_URL}
+        />
+        <p className="mt-6 text-sm font-black text-cyan-700 dark:text-cyan-200">MIKPURINUT Maintenance Mode</p>
+        <h1 className="mt-3 text-3xl font-black text-slate-950 sm:text-5xl dark:text-white">
+          {settings.maintenanceTitle}
+        </h1>
+        <p className="mx-auto mt-4 max-w-2xl text-base font-semibold leading-8 text-slate-600 dark:text-slate-300">
+          {settings.maintenanceMessage}
+        </p>
+        <button
+          className="mt-8 inline-flex min-h-12 items-center justify-center rounded-2xl bg-slate-950 px-6 font-black text-cyan-200 dark:bg-cyan-300 dark:text-slate-950"
+          onClick={() => setView('login')}
+          type="button"
+        >
+          เข้าสู่ระบบผู้ดูแล
+        </button>
       </div>
     </section>
   )
@@ -1980,11 +2095,17 @@ function AdminPanel({
   const [savingSettings, setSavingSettings] = useState(false)
   const [adminUsers, setAdminUsers] = useState<AdminUser[]>([])
   const [vipRequests, setVipRequests] = useState<VipRequest[]>([])
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([])
+  const [errorLogs, setErrorLogs] = useState<ErrorLog[]>([])
+  const [systemHealth, setSystemHealth] = useState<SystemHealth | null>(null)
+  const [linkChecks, setLinkChecks] = useState<LinkCheckResult[]>([])
   const [loadingMembers, setLoadingMembers] = useState(false)
+  const [loadingOps, setLoadingOps] = useState(false)
   const [error, setError] = useState('')
   const [settingsError, setSettingsError] = useState('')
   const [memberError, setMemberError] = useState('')
   const [categoryError, setCategoryError] = useState('')
+  const [opsError, setOpsError] = useState('')
 
   const pendingVipRequests = vipRequests.filter((request) => request.status === 'pending')
   const linkedMedia = mediaItems.filter((item) => item.resourceUrl || item.previewUrl || item.links?.some((link) => link.url || link.previewUrl))
@@ -2012,12 +2133,66 @@ function AdminPanel({
     if (adminMediaSort === 'ชื่อ A-Z') return a.title.localeCompare(b.title, 'th')
     return Date.parse(b.updatedAt ?? b.createdAt ?? '') - Date.parse(a.updatedAt ?? a.createdAt ?? '')
   })
+  const topDownloadedMedia = [...mediaItems]
+    .sort((a, b) => b.downloads - a.downloads)
+    .slice(0, 5)
+  const categoryStats = topics
+    .map((topic) => ({
+      topic,
+      count: mediaItems.filter((item) => item.topic === topic).length,
+    }))
+    .filter((item) => item.count > 0)
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 5)
+  const maxDownloads = Math.max(1, ...topDownloadedMedia.map((item) => item.downloads))
+  const maxCategoryCount = Math.max(1, ...categoryStats.map((item) => item.count))
+  const adminNotifications = [
+    pendingVipRequests.length > 0 && {
+      title: 'มีคำขอ VIP รอตรวจ',
+      detail: `${pendingVipRequests.length} รายการต้องตรวจสอบ`,
+      tone: 'amber',
+      action: () => setAdminSection('members'),
+    },
+    pendingMediaCount > 0 && {
+      title: 'มีสื่อรอตรวจสอบ',
+      detail: `${pendingMediaCount} รายการควรตรวจก่อนเผยแพร่`,
+      tone: 'sky',
+      action: () => setAdminSection('media'),
+    },
+    errorLogs.length > 0 && {
+      title: 'พบ Error ล่าสุด',
+      detail: `${errorLogs.length} รายการใน log`,
+      tone: 'red',
+      action: () => setAdminSection('errors'),
+    },
+    linkChecks.some((item) => item.status === 'error') && {
+      title: 'มีลิงก์ที่ควรแก้',
+      detail: `${linkChecks.filter((item) => item.status === 'error').length} ลิงก์มีปัญหา`,
+      tone: 'red',
+      action: () => setAdminSection('links'),
+    },
+    settings.maintenanceEnabled && {
+      title: 'Maintenance Mode เปิดอยู่',
+      detail: 'ผู้ใช้ทั่วไปจะเห็นหน้าปิดปรับปรุง',
+      tone: 'amber',
+      action: () => setAdminSection('settings'),
+    },
+  ].filter(Boolean) as Array<{
+    title: string
+    detail: string
+    tone: 'amber' | 'sky' | 'red'
+    action: () => void
+  }>
   const adminMenu: Array<{ id: AdminSection; label: string; icon: typeof BarChart3; detail: string }> = [
     { id: 'dashboard', label: 'Dashboard', icon: BarChart3, detail: 'ภาพรวมระบบ' },
     { id: 'media', label: 'จัดการสื่อ', icon: Layers3, detail: 'เพิ่ม แก้ไข ลบ' },
     { id: 'members', label: 'สมาชิกและ VIP', icon: Users, detail: `${pendingVipRequests.length} รอตรวจ` },
     { id: 'taxonomy', label: 'หมวดหมู่และแท็ก', icon: Tag, detail: `${topics.length} หมวด` },
     { id: 'links', label: 'ลิงก์ภายนอก', icon: Link2, detail: `${linkedMedia.length} ลิงก์` },
+    { id: 'activity', label: 'Activity Log', icon: FileText, detail: `${auditLogs.length} รายการ` },
+    { id: 'health', label: 'System Health', icon: Gauge, detail: systemHealth ? `${systemHealth.responseTimeMs} ms` : 'ตรวจระบบ' },
+    { id: 'backup', label: 'Backup', icon: Database, detail: 'JSON / CSV' },
+    { id: 'errors', label: 'Error Log', icon: AlertCircle, detail: `${errorLogs.length} รายการ` },
     { id: 'settings', label: 'ตั้งค่าเว็บ', icon: Settings, detail: 'หน้าแรกและ VIP' },
   ]
   const adminMetrics = [
@@ -2054,8 +2229,94 @@ function AdminPanel({
     }
   }
 
+  const formatAdminDate = (value?: string | null) =>
+    value
+      ? new Intl.DateTimeFormat('th-TH', {
+          dateStyle: 'medium',
+          timeStyle: 'short',
+        }).format(new Date(value))
+      : '-'
+
+  const loadOpsData = async () => {
+    setLoadingOps(true)
+    setOpsError('')
+    try {
+      const [activityResponse, errorsResponse, healthResponse] = await Promise.all([
+        fetch('/api/admin/activity', { credentials: 'include' }),
+        fetch('/api/admin/errors', { credentials: 'include' }),
+        fetch('/api/admin/health', { credentials: 'include' }),
+      ])
+      const [activity, errors, health] = await Promise.all([
+        readJson<{ logs?: AuditLog[]; error?: string }>(activityResponse),
+        readJson<{ logs?: ErrorLog[]; error?: string }>(errorsResponse),
+        readJson<{ health?: SystemHealth; error?: string }>(healthResponse),
+      ])
+
+      if (!activityResponse.ok) throw new Error(activity.error ?? 'โหลด Activity Log ไม่สำเร็จ')
+      if (!errorsResponse.ok) throw new Error(errors.error ?? 'โหลด Error Log ไม่สำเร็จ')
+      if (!healthResponse.ok) throw new Error(health.error ?? 'โหลด System Health ไม่สำเร็จ')
+
+      setAuditLogs(activity.logs ?? [])
+      setErrorLogs(errors.logs ?? [])
+      setSystemHealth(health.health ?? null)
+    } catch (opsLoadError) {
+      setOpsError(opsLoadError instanceof Error ? opsLoadError.message : 'โหลดข้อมูลหลังบ้านไม่สำเร็จ')
+    } finally {
+      setLoadingOps(false)
+    }
+  }
+
+  const runLinkCheck = async () => {
+    setLoadingOps(true)
+    setOpsError('')
+    try {
+      const response = await fetch('/api/admin/link-checks', {
+        method: 'POST',
+        credentials: 'include',
+      })
+      const result = await readJson<{ results?: LinkCheckResult[]; error?: string }>(response)
+      if (!response.ok) throw new Error(result.error ?? 'ตรวจสุขภาพลิงก์ไม่สำเร็จ')
+      setLinkChecks(result.results ?? [])
+      await loadOpsData()
+    } catch (linkError) {
+      setOpsError(linkError instanceof Error ? linkError.message : 'ตรวจสุขภาพลิงก์ไม่สำเร็จ')
+    } finally {
+      setLoadingOps(false)
+    }
+  }
+
+  const downloadBackup = async (format: 'json' | 'csv', table = 'media') => {
+    setLoadingOps(true)
+    setOpsError('')
+    try {
+      const query = format === 'json' ? '?format=json' : `?format=csv&table=${encodeURIComponent(table)}`
+      const response = await fetch(`/api/admin/backup${query}`, { credentials: 'include' })
+      if (!response.ok) {
+        const result = await readJson<{ error?: string }>(response)
+        throw new Error(result.error ?? 'ดาวน์โหลดสำรองข้อมูลไม่สำเร็จ')
+      }
+      const blob = await response.blob()
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `mikpurinut-backup-${format === 'json' ? 'full.json' : `${table}.csv`}`
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      URL.revokeObjectURL(url)
+      await loadOpsData()
+    } catch (backupError) {
+      setOpsError(backupError instanceof Error ? backupError.message : 'ดาวน์โหลดสำรองข้อมูลไม่สำเร็จ')
+    } finally {
+      setLoadingOps(false)
+    }
+  }
+
   useEffect(() => {
-    queueMicrotask(() => void loadMembers())
+    queueMicrotask(() => {
+      void loadMembers()
+      void loadOpsData()
+    })
   }, [])
 
   const submitMemberAction = async (payload: Record<string, unknown>) => {
@@ -2410,6 +2671,79 @@ function AdminPanel({
                   </div>
                 </div>
               </div>
+
+              <div className="mt-4 grid gap-4 xl:grid-cols-[1fr_1fr_0.9fr]">
+                <div className="rounded-2xl border border-white/10 bg-black/20 p-5">
+                  <p className="mb-4 font-black text-white">สื่อยอดดาวน์โหลดสูงสุด</p>
+                  <div className="grid gap-3">
+                    {topDownloadedMedia.map((item) => (
+                      <div key={item.id}>
+                        <div className="mb-1 flex items-center justify-between gap-3 text-sm">
+                          <span className="truncate font-bold text-slate-200">{item.title}</span>
+                          <span className="font-black text-cyan-200">{item.downloads}</span>
+                        </div>
+                        <div className="h-2 overflow-hidden rounded-full bg-white/10">
+                          <div
+                            className="h-full rounded-full bg-gradient-to-r from-cyan-300 to-violet-400"
+                            style={{ width: `${Math.max(8, (item.downloads / maxDownloads) * 100)}%` }}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-white/10 bg-black/20 p-5">
+                  <p className="mb-4 font-black text-white">หมวดหมู่ที่มีสื่อมากสุด</p>
+                  <div className="grid gap-3">
+                    {categoryStats.length === 0 && (
+                      <p className="text-sm font-bold text-slate-500">ยังไม่มีข้อมูลหมวดหมู่</p>
+                    )}
+                    {categoryStats.map((item) => (
+                      <div key={item.topic}>
+                        <div className="mb-1 flex items-center justify-between gap-3 text-sm">
+                          <span className="truncate font-bold text-slate-200">{item.topic}</span>
+                          <span className="font-black text-emerald-200">{item.count}</span>
+                        </div>
+                        <div className="h-2 overflow-hidden rounded-full bg-white/10">
+                          <div
+                            className="h-full rounded-full bg-gradient-to-r from-emerald-300 to-cyan-300"
+                            style={{ width: `${Math.max(8, (item.count / maxCategoryCount) * 100)}%` }}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-white/10 bg-black/20 p-5">
+                  <p className="mb-4 font-black text-white">Notification Center</p>
+                  <div className="grid gap-3">
+                    {adminNotifications.length === 0 && (
+                      <div className="rounded-2xl border border-dashed border-white/15 p-4 text-sm font-bold text-slate-400">
+                        ตอนนี้ไม่มีแจ้งเตือนสำคัญ
+                      </div>
+                    )}
+                    {adminNotifications.map((notice) => (
+                      <button
+                        className={`rounded-2xl p-4 text-left transition hover:-translate-y-0.5 ${
+                          notice.tone === 'red'
+                            ? 'bg-red-400/10 text-red-100'
+                            : notice.tone === 'amber'
+                              ? 'bg-amber-300/10 text-amber-100'
+                              : 'bg-sky-300/10 text-sky-100'
+                        }`}
+                        key={notice.title}
+                        onClick={notice.action}
+                        type="button"
+                      >
+                        <span className="block font-black">{notice.title}</span>
+                        <span className="mt-1 block text-sm font-semibold opacity-75">{notice.detail}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
             </section>
           )}
 
@@ -2536,6 +2870,20 @@ function AdminPanel({
                             {user.access === 'VIP' ? 'ลดเป็นสมาชิก' : 'ให้สิทธิ์ VIP'}
                           </button>
                           <button
+                            className="min-h-10 rounded-xl bg-violet-300/10 px-3 text-sm font-black text-violet-100 disabled:cursor-not-allowed disabled:opacity-40"
+                            disabled={loadingMembers || isSuperAdmin}
+                            onClick={() =>
+                              submitMemberAction({
+                                action: 'set-role',
+                                userId: user.id,
+                                role: user.role === 'admin' ? 'member' : 'admin',
+                              })
+                            }
+                            type="button"
+                          >
+                            {user.role === 'admin' ? 'ลดเป็นสมาชิกทั่วไป' : 'ตั้งเป็น Admin'}
+                          </button>
+                          <button
                             className="min-h-10 rounded-xl bg-white/10 px-3 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-40"
                             disabled={loadingMembers || isSuperAdmin}
                             onClick={() =>
@@ -2614,6 +2962,41 @@ function AdminPanel({
                 placeholder="ดูสิทธิ์ VIP"
                 value={settingsForm.heroSecondaryLabel}
               />
+              <label className="md:col-span-2">
+                <span className="text-sm font-black text-slate-200">ข้อความประกาศหน้าแรก</span>
+                <textarea
+                  className="mt-2 min-h-24 w-full rounded-2xl border border-white/10 bg-black/24 px-4 py-3 text-base text-white outline-none transition placeholder:text-slate-500 focus:border-sky-300 focus:ring-4 focus:ring-sky-300/10"
+                  onChange={(event) => updateSettings('announcementText', event.target.value)}
+                  placeholder="เช่น เปิดรับสื่ออบรมรุ่นใหม่ หรือแจ้งข่าวสำคัญ"
+                  value={settingsForm.announcementText}
+                />
+              </label>
+              <div className="md:col-span-2 rounded-2xl border border-amber-300/20 bg-amber-300/10 p-4">
+                <label className="inline-flex min-h-11 items-center gap-3 font-black text-amber-100">
+                  <input
+                    checked={settingsForm.maintenanceEnabled}
+                    onChange={(event) => updateSettings('maintenanceEnabled', event.target.checked)}
+                    type="checkbox"
+                  />
+                  เปิดโหมดปิดปรับปรุงระบบสำหรับผู้ใช้ทั่วไป
+                </label>
+                <div className="mt-4 grid gap-4 md:grid-cols-2">
+                  <AdminField
+                    label="หัวข้อหน้าปิดปรับปรุง"
+                    name="maintenanceTitle"
+                    onChange={updateSettings}
+                    placeholder="ระบบกำลังปรับปรุง"
+                    value={settingsForm.maintenanceTitle}
+                  />
+                  <AdminField
+                    label="ข้อความหน้าปิดปรับปรุง"
+                    name="maintenanceMessage"
+                    onChange={updateSettings}
+                    placeholder="กรุณากลับมาใหม่ภายหลัง"
+                    value={settingsForm.maintenanceMessage}
+                  />
+                </div>
+              </div>
             </div>
             <button
               className="mt-5 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-sky-300 px-5 font-black text-slate-950 shadow-lg shadow-sky-500/20 disabled:opacity-60 sm:w-auto"
@@ -2825,6 +3208,263 @@ function AdminPanel({
                   </button>
                 </article>
               ))}
+            </div>
+          </section>
+          )}
+
+          {adminSection === 'links' && (
+          <section className="rounded-2xl border border-cyan-300/20 bg-white/[0.07] p-4 ring-1 ring-white/[0.03]">
+            <div className="mb-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+              <div>
+                <h3 className="flex items-center gap-2 text-xl font-black">
+                  <Gauge className="text-cyan-300" size={22} />
+                  ตรวจสุขภาพลิงก์
+                </h3>
+                <p className="mt-1 text-sm font-semibold text-slate-400">
+                  ตรวจว่า Drive, Sheet, YouTube และลิงก์ภายนอกยังเปิดได้หรือไม่
+                </p>
+              </div>
+              <button
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-cyan-300 px-4 font-black text-slate-950 disabled:opacity-60"
+                disabled={loadingOps}
+                onClick={runLinkCheck}
+                type="button"
+              >
+                {loadingOps ? <Loader2 className="animate-spin" size={18} /> : <Link2 size={18} />}
+                ตรวจลิงก์ตอนนี้
+              </button>
+            </div>
+            {opsError && (
+              <div className="mb-4 rounded-2xl border border-red-400/20 bg-red-400/10 p-3 text-sm font-bold text-red-200">
+                {opsError}
+              </div>
+            )}
+            <div className="grid gap-3">
+              {linkChecks.length === 0 && (
+                <div className="rounded-2xl border border-dashed border-white/15 p-5 text-sm font-bold text-slate-400">
+                  ยังไม่มีผลตรวจล่าสุด กดปุ่มตรวจลิงก์เพื่อเริ่มตรวจสุขภาพลิงก์ทั้งหมด
+                </div>
+              )}
+              {linkChecks.map((result) => (
+                <article className="grid gap-3 rounded-2xl border border-white/10 bg-black/20 p-4 md:grid-cols-[1fr_auto]" key={`${result.mediaId}-${result.linkId}-${result.url}`}>
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="truncate font-black text-white">{result.mediaTitle}</p>
+                      <span
+                        className={`rounded-full px-3 py-1 text-xs font-black ${
+                          result.status === 'ok'
+                            ? 'bg-emerald-300/15 text-emerald-200'
+                            : result.status === 'warning'
+                              ? 'bg-amber-300/15 text-amber-200'
+                              : 'bg-red-400/15 text-red-200'
+                        }`}
+                      >
+                        {result.status === 'ok' ? 'ปกติ' : result.status === 'warning' ? 'ควรตรวจ' : 'มีปัญหา'}
+                      </span>
+                    </div>
+                    <p className="mt-1 truncate text-sm font-semibold text-slate-400">
+                      {result.label} · {result.type} · {result.message}
+                    </p>
+                    <p className="mt-1 truncate text-xs font-semibold text-slate-500">{result.url}</p>
+                  </div>
+                  <a
+                    className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-white/10 px-4 font-black text-cyan-100"
+                    href={result.url}
+                    rel="noreferrer"
+                    target="_blank"
+                  >
+                    เปิดดู
+                    <ExternalLink size={16} />
+                  </a>
+                </article>
+              ))}
+            </div>
+          </section>
+          )}
+
+          {adminSection === 'health' && (
+          <section className="rounded-2xl border border-emerald-300/20 bg-white/[0.07] p-4 ring-1 ring-white/[0.03]">
+            <div className="mb-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+              <div>
+                <h3 className="flex items-center gap-2 text-xl font-black">
+                  <Gauge className="text-emerald-300" size={22} />
+                  System Health
+                </h3>
+                <p className="mt-1 text-sm font-semibold text-slate-400">
+                  ดูสถานะ Cloudflare, Neon, API, Error ล่าสุด และข้อมูลสำรองล่าสุด
+                </p>
+              </div>
+              <button
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-emerald-300 px-4 font-black text-slate-950 disabled:opacity-60"
+                disabled={loadingOps}
+                onClick={loadOpsData}
+                type="button"
+              >
+                {loadingOps ? <Loader2 className="animate-spin" size={18} /> : <Database size={18} />}
+                รีเฟรชสถานะ
+              </button>
+            </div>
+            {opsError && (
+              <div className="mb-4 rounded-2xl border border-red-400/20 bg-red-400/10 p-3 text-sm font-bold text-red-200">
+                {opsError}
+              </div>
+            )}
+            {!systemHealth ? (
+              <div className="rounded-2xl border border-dashed border-white/15 p-5 text-sm font-bold text-slate-400">
+                กำลังรอข้อมูลสถานะระบบ
+              </div>
+            ) : (
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                {[
+                  ['Cloudflare', systemHealth.cloudflare],
+                  ['Neon Database', systemHealth.neon],
+                  ['API', systemHealth.api],
+                  ['Storage', systemHealth.storage],
+                  ['Response Time', `${systemHealth.responseTimeMs} ms`],
+                  ['Last Backup', formatAdminDate(systemHealth.lastBackupAt)],
+                  ['สื่อทั้งหมด', systemHealth.counts.media.toLocaleString('th-TH')],
+                  ['Error 24 ชม.', systemHealth.counts.errors24h.toLocaleString('th-TH')],
+                ].map(([label, value]) => (
+                  <article className="rounded-2xl border border-white/10 bg-black/20 p-4" key={label}>
+                    <p className="text-sm font-bold text-slate-400">{label}</p>
+                    <p className="mt-2 break-words text-xl font-black text-white">{value}</p>
+                  </article>
+                ))}
+                <article className="rounded-2xl border border-white/10 bg-black/20 p-4 md:col-span-2 xl:col-span-4">
+                  <p className="text-sm font-bold text-slate-400">Error ล่าสุด</p>
+                  <p className="mt-2 text-base font-black text-white">
+                    {systemHealth.lastError
+                      ? `${systemHealth.lastError.source}: ${systemHealth.lastError.message}`
+                      : 'ยังไม่พบ error ล่าสุด'}
+                  </p>
+                  {systemHealth.lastError && (
+                    <p className="mt-1 text-sm font-semibold text-slate-500">
+                      {formatAdminDate(systemHealth.lastError.createdAt)}
+                    </p>
+                  )}
+                </article>
+              </div>
+            )}
+          </section>
+          )}
+
+          {adminSection === 'activity' && (
+          <section className="rounded-2xl border border-sky-300/20 bg-white/[0.07] p-4 ring-1 ring-white/[0.03]">
+            <div className="mb-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+              <div>
+                <h3 className="flex items-center gap-2 text-xl font-black">
+                  <FileText className="text-sky-300" size={22} />
+                  Activity Log
+                </h3>
+                <p className="mt-1 text-sm font-semibold text-slate-400">
+                  บันทึกว่าใครทำอะไรกับระบบ เพื่อไล่ตรวจย้อนหลังได้เร็วขึ้น
+                </p>
+              </div>
+              <button className="min-h-11 rounded-2xl bg-sky-300 px-4 font-black text-slate-950" onClick={loadOpsData} type="button">
+                รีเฟรช
+              </button>
+            </div>
+            <div className="grid gap-3">
+              {auditLogs.length === 0 && (
+                <div className="rounded-2xl border border-dashed border-white/15 p-5 text-sm font-bold text-slate-400">
+                  ยังไม่มีบันทึกกิจกรรม
+                </div>
+              )}
+              {auditLogs.map((log) => (
+                <article className="rounded-2xl border border-white/10 bg-black/20 p-4" key={log.id}>
+                  <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-start">
+                    <div className="min-w-0">
+                      <p className="font-black text-white">{log.action}</p>
+                      <p className="mt-1 text-sm font-semibold text-slate-400">
+                        {log.actor} · {log.targetType}{log.targetId ? ` #${log.targetId}` : ''}
+                      </p>
+                    </div>
+                    <span className="text-sm font-bold text-slate-500">{formatAdminDate(log.createdAt)}</span>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </section>
+          )}
+
+          {adminSection === 'errors' && (
+          <section className="rounded-2xl border border-red-300/20 bg-white/[0.07] p-4 ring-1 ring-white/[0.03]">
+            <div className="mb-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+              <div>
+                <h3 className="flex items-center gap-2 text-xl font-black">
+                  <AlertCircle className="text-red-300" size={22} />
+                  Error Log
+                </h3>
+                <p className="mt-1 text-sm font-semibold text-slate-400">
+                  รวม API error, database error และเหตุการณ์ที่ควรตรวจแก้
+                </p>
+              </div>
+              <button className="min-h-11 rounded-2xl bg-red-300 px-4 font-black text-slate-950" onClick={loadOpsData} type="button">
+                รีเฟรช
+              </button>
+            </div>
+            <div className="grid gap-3">
+              {errorLogs.length === 0 && (
+                <div className="rounded-2xl border border-dashed border-white/15 p-5 text-sm font-bold text-slate-400">
+                  ยังไม่พบ error ในระบบ
+                </div>
+              )}
+              {errorLogs.map((log) => (
+                <article className="rounded-2xl border border-red-300/10 bg-red-400/10 p-4" key={log.id}>
+                  <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-start">
+                    <div className="min-w-0">
+                      <p className="font-black text-red-100">{log.source}</p>
+                      <p className="mt-1 break-words text-sm font-semibold text-red-100/80">{log.message}</p>
+                    </div>
+                    <span className="text-sm font-bold text-red-100/60">{formatAdminDate(log.createdAt)}</span>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </section>
+          )}
+
+          {adminSection === 'backup' && (
+          <section className="rounded-2xl border border-violet-300/20 bg-white/[0.07] p-4 ring-1 ring-white/[0.03]">
+            <div className="mb-4">
+              <h3 className="flex items-center gap-2 text-xl font-black">
+                <Database className="text-violet-300" size={22} />
+                Backup Export
+              </h3>
+              <p className="mt-1 text-sm font-semibold text-slate-400">
+                สำรองข้อมูลเป็น JSON เต็มระบบ หรือ CSV แยกตาราง สำหรับตรวจสอบและย้ายข้อมูลในอนาคต
+              </p>
+            </div>
+            {opsError && (
+              <div className="mb-4 rounded-2xl border border-red-400/20 bg-red-400/10 p-3 text-sm font-bold text-red-200">
+                {opsError}
+              </div>
+            )}
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              <button
+                className="inline-flex min-h-16 items-center justify-center gap-2 rounded-2xl bg-violet-300 px-5 font-black text-slate-950 disabled:opacity-60"
+                disabled={loadingOps}
+                onClick={() => downloadBackup('json')}
+                type="button"
+              >
+                <Archive size={20} />
+                ดาวน์โหลด JSON ทั้งระบบ
+              </button>
+              {['media', 'media_links', 'categories', 'users', 'vip_requests', 'app_settings'].map((table) => (
+                <button
+                  className="inline-flex min-h-16 items-center justify-center gap-2 rounded-2xl border border-white/10 bg-black/20 px-5 font-black text-white disabled:opacity-60"
+                  disabled={loadingOps}
+                  key={table}
+                  onClick={() => downloadBackup('csv', table)}
+                  type="button"
+                >
+                  <Download size={18} />
+                  CSV: {table}
+                </button>
+              ))}
+            </div>
+            <div className="mt-4 rounded-2xl border border-amber-300/20 bg-amber-300/10 p-4 text-sm font-bold text-amber-100">
+              ตอนนี้รองรับการ export ก่อน ส่วน Restore จะเพิ่มเป็นขั้นตอนถัดไปแบบมีหน้าตรวจไฟล์ก่อนนำเข้าจริง เพื่อกันข้อมูลพัง
             </div>
           </section>
           )}

@@ -1,17 +1,20 @@
 import { getCurrentUser } from '../../_lib/auth'
+import { writeAuditLog } from '../../_lib/admin'
 import { ensureSchema, getSql, type Env } from '../../_lib/db'
+import { notifyTelegram } from '../../_lib/notify'
 
 type AdminAction = {
-  action?: 'approve-vip' | 'reject-vip' | 'set-access' | 'set-status'
+  action?: 'approve-vip' | 'reject-vip' | 'set-access' | 'set-status' | 'set-role'
   requestId?: number
   userId?: number
   access?: 'สมาชิก' | 'VIP'
+  role?: 'admin' | 'member'
   status?: 'active' | 'disabled'
 }
 
 async function requireSuperAdmin(env: Env, request: Request) {
   const currentUser = await getCurrentUser(env, request)
-  return currentUser?.role === 'superadmin'
+  return currentUser?.role === 'superadmin' ? currentUser : null
 }
 
 export const onRequestGet = async ({ env, request }: { env: Env; request: Request }) => {
@@ -59,7 +62,8 @@ export const onRequestGet = async ({ env, request }: { env: Env; request: Reques
 }
 
 export const onRequestPost = async ({ env, request }: { env: Env; request: Request }) => {
-  if (!(await requireSuperAdmin(env, request))) {
+  const currentUser = await requireSuperAdmin(env, request)
+  if (!currentUser) {
     return Response.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -81,24 +85,37 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
         where id = ${vipRequest.user_id}
       `
     }
+    await writeAuditLog(env, currentUser, 'approve_vip', 'vip_request', body.requestId)
+    await notifyTelegram(env, `MIKPURINUT Media Platform\nอนุมัติคำขอ VIP แล้ว\nRequest ID: ${body.requestId}`)
   } else if (body.action === 'reject-vip' && body.requestId) {
     await sql`
       update vip_requests
       set status = 'rejected', updated_at = now()
       where id = ${body.requestId}
     `
+    await writeAuditLog(env, currentUser, 'reject_vip', 'vip_request', body.requestId)
+    await notifyTelegram(env, `MIKPURINUT Media Platform\nปฏิเสธคำขอ VIP\nRequest ID: ${body.requestId}`)
   } else if (body.action === 'set-access' && body.userId && body.access) {
     await sql`
       update users
       set access_level = ${body.access}, updated_at = now()
       where id = ${body.userId} and role <> 'superadmin'
     `
+    await writeAuditLog(env, currentUser, 'set_user_access', 'user', body.userId, { access: body.access })
   } else if (body.action === 'set-status' && body.userId && body.status) {
     await sql`
       update users
       set status = ${body.status}, updated_at = now()
       where id = ${body.userId} and role <> 'superadmin'
     `
+    await writeAuditLog(env, currentUser, 'set_user_status', 'user', body.userId, { status: body.status })
+  } else if (body.action === 'set-role' && body.userId && body.role) {
+    await sql`
+      update users
+      set role = ${body.role}, updated_at = now()
+      where id = ${body.userId} and role <> 'superadmin'
+    `
+    await writeAuditLog(env, currentUser, 'set_user_role', 'user', body.userId, { role: body.role })
   } else {
     return Response.json({ ok: false, error: 'Invalid action' }, { status: 400 })
   }

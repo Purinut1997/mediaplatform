@@ -8,6 +8,8 @@ export type Env = {
   ADMIN_BOOTSTRAP_EMAIL?: string
   ADMIN_BOOTSTRAP_PASSWORD?: string
   ADMIN_BOOTSTRAP_NAME?: string
+  TELEGRAM_BOT_TOKEN?: string
+  TELEGRAM_CHAT_ID?: string
 }
 
 export const OWNER_ADMIN_EMAIL = 'themikthemik4015@gmail.com'
@@ -82,6 +84,30 @@ export async function ensureSchema(env: Env) {
       target_id text,
       detail jsonb not null default '{}'::jsonb,
       created_at timestamptz not null default now()
+    )
+  `
+
+  await sql`
+    create table if not exists error_logs (
+      id serial primary key,
+      source text not null,
+      message text not null,
+      stack text not null default '',
+      detail jsonb not null default '{}'::jsonb,
+      created_at timestamptz not null default now()
+    )
+  `
+
+  await sql`
+    create table if not exists link_checks (
+      id serial primary key,
+      media_id integer references media(id) on delete cascade,
+      media_link_id integer references media_links(id) on delete cascade,
+      url text not null,
+      status text not null,
+      status_code integer,
+      message text not null default '',
+      checked_at timestamptz not null default now()
     )
   `
 
@@ -166,6 +192,18 @@ export async function ensureSchema(env: Env) {
 
   await sql`
     create index if not exists vip_requests_status_idx on vip_requests(status, created_at)
+  `
+
+  await sql`
+    create index if not exists audit_logs_created_idx on audit_logs(created_at desc)
+  `
+
+  await sql`
+    create index if not exists error_logs_created_idx on error_logs(created_at desc)
+  `
+
+  await sql`
+    create index if not exists link_checks_checked_idx on link_checks(checked_at desc)
   `
 
   await seedInitialData(env)

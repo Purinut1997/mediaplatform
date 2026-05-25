@@ -1,4 +1,5 @@
 import { getCurrentUser } from '../../_lib/auth'
+import { writeErrorLog } from '../../_lib/admin'
 import { ensureSchema, getSql, type Env } from '../../_lib/db'
 
 const DEFAULT_COVER_URL =
@@ -259,6 +260,7 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
     return Response.json({ ok: true, media: toMedia(row) }, { status: 201 })
   } catch (error) {
     console.error('Create media failed', error)
+    await writeErrorLog(env, 'media.create', error)
     return Response.json(
       {
         ok: false,

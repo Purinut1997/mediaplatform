@@ -1,4 +1,5 @@
 import { getCurrentUser } from '../_lib/auth'
+import { writeAuditLog, writeErrorLog } from '../_lib/admin'
 import { ensureSchema, getSql, type Env } from '../_lib/db'
 
 type SiteSettings = {
@@ -8,6 +9,10 @@ type SiteSettings = {
   heroImageUrl: string
   heroPrimaryLabel: string
   heroSecondaryLabel: string
+  announcementText: string
+  maintenanceEnabled: boolean
+  maintenanceTitle: string
+  maintenanceMessage: string
   vipRegistrationEnabled: boolean
   vipPrice: number
   vipQrUrl: string
@@ -30,6 +35,10 @@ const defaultSettings: SiteSettings = {
     'https://raw.githubusercontent.com/Purinut1997/web-images/c70597729a1ba58a7b7b672d2bcace2f673a5a49/bdbeb65d-b4f5-4f65-a388-e95d950eac84%20%281%29.png',
   heroPrimaryLabel: 'เปิดคลังสื่อ',
   heroSecondaryLabel: 'ดูสิทธิ์ VIP',
+  announcementText: '',
+  maintenanceEnabled: false,
+  maintenanceTitle: 'ระบบกำลังปรับปรุง',
+  maintenanceMessage: 'กรุณากลับมาใหม่ภายหลัง',
   vipRegistrationEnabled: false,
   vipPrice: 0,
   vipQrUrl: '',
@@ -48,6 +57,7 @@ function normalizeSettings(value?: Partial<SiteSettings>) {
     ...defaultSettings,
     ...(value ?? {}),
     vipRegistrationEnabled: Boolean(value?.vipRegistrationEnabled),
+    maintenanceEnabled: Boolean(value?.maintenanceEnabled),
     vipPrice: Number(value?.vipPrice ?? defaultSettings.vipPrice),
   }
 }
@@ -71,35 +81,48 @@ export const onRequestPut = async ({ env, request }: { env: Env; request: Reques
     return Response.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
   }
 
-  const body = (await request.json().catch(() => ({}))) as Partial<SiteSettings>
-  const settings: SiteSettings = normalizeSettings({
-    heroEyebrow: String(body.heroEyebrow ?? defaultSettings.heroEyebrow),
-    heroTitle: String(body.heroTitle ?? defaultSettings.heroTitle),
-    heroDescription: String(body.heroDescription ?? defaultSettings.heroDescription),
-    heroImageUrl: String(body.heroImageUrl ?? defaultSettings.heroImageUrl),
-    heroPrimaryLabel: String(body.heroPrimaryLabel ?? defaultSettings.heroPrimaryLabel),
-    heroSecondaryLabel: String(body.heroSecondaryLabel ?? defaultSettings.heroSecondaryLabel),
-    vipRegistrationEnabled: Boolean(body.vipRegistrationEnabled),
-    vipPrice: Number(body.vipPrice ?? defaultSettings.vipPrice),
-    vipQrUrl: String(body.vipQrUrl ?? ''),
-    vipBankName: String(body.vipBankName ?? defaultSettings.vipBankName),
-    vipAccountNumber: String(body.vipAccountNumber ?? ''),
-    vipAccountName: String(body.vipAccountName ?? defaultSettings.vipAccountName),
-    vipPaymentTitle: String(body.vipPaymentTitle ?? defaultSettings.vipPaymentTitle),
-    vipPaymentSubtitle: String(body.vipPaymentSubtitle ?? defaultSettings.vipPaymentSubtitle),
-    vipSlipLabel: String(body.vipSlipLabel ?? defaultSettings.vipSlipLabel),
-    vipAgreementLabel: String(body.vipAgreementLabel ?? defaultSettings.vipAgreementLabel),
-    vipSubmitLabel: String(body.vipSubmitLabel ?? defaultSettings.vipSubmitLabel),
-  })
+  try {
+    const body = (await request.json().catch(() => ({}))) as Partial<SiteSettings>
+    const settings: SiteSettings = normalizeSettings({
+      heroEyebrow: String(body.heroEyebrow ?? defaultSettings.heroEyebrow),
+      heroTitle: String(body.heroTitle ?? defaultSettings.heroTitle),
+      heroDescription: String(body.heroDescription ?? defaultSettings.heroDescription),
+      heroImageUrl: String(body.heroImageUrl ?? defaultSettings.heroImageUrl),
+      heroPrimaryLabel: String(body.heroPrimaryLabel ?? defaultSettings.heroPrimaryLabel),
+      heroSecondaryLabel: String(body.heroSecondaryLabel ?? defaultSettings.heroSecondaryLabel),
+      announcementText: String(body.announcementText ?? ''),
+      maintenanceEnabled: Boolean(body.maintenanceEnabled),
+      maintenanceTitle: String(body.maintenanceTitle ?? defaultSettings.maintenanceTitle),
+      maintenanceMessage: String(body.maintenanceMessage ?? defaultSettings.maintenanceMessage),
+      vipRegistrationEnabled: Boolean(body.vipRegistrationEnabled),
+      vipPrice: Number(body.vipPrice ?? defaultSettings.vipPrice),
+      vipQrUrl: String(body.vipQrUrl ?? ''),
+      vipBankName: String(body.vipBankName ?? defaultSettings.vipBankName),
+      vipAccountNumber: String(body.vipAccountNumber ?? ''),
+      vipAccountName: String(body.vipAccountName ?? defaultSettings.vipAccountName),
+      vipPaymentTitle: String(body.vipPaymentTitle ?? defaultSettings.vipPaymentTitle),
+      vipPaymentSubtitle: String(body.vipPaymentSubtitle ?? defaultSettings.vipPaymentSubtitle),
+      vipSlipLabel: String(body.vipSlipLabel ?? defaultSettings.vipSlipLabel),
+      vipAgreementLabel: String(body.vipAgreementLabel ?? defaultSettings.vipAgreementLabel),
+      vipSubmitLabel: String(body.vipSubmitLabel ?? defaultSettings.vipSubmitLabel),
+    })
 
-  const sql = getSql(env)
-  await sql`
-    insert into app_settings (key, value, updated_at)
-    values ('site', ${JSON.stringify(settings)}::jsonb, now())
-    on conflict (key) do update set
-      value = excluded.value,
-      updated_at = now()
-  `
+    const sql = getSql(env)
+    await sql`
+      insert into app_settings (key, value, updated_at)
+      values ('site', ${JSON.stringify(settings)}::jsonb, now())
+      on conflict (key) do update set
+        value = excluded.value,
+        updated_at = now()
+    `
+    await writeAuditLog(env, currentUser, 'update_settings', 'app_settings', 'site', {
+      maintenanceEnabled: settings.maintenanceEnabled,
+      vipRegistrationEnabled: settings.vipRegistrationEnabled,
+    })
 
-  return Response.json({ ok: true, settings })
+    return Response.json({ ok: true, settings })
+  } catch (error) {
+    await writeErrorLog(env, 'settings.update', error)
+    return Response.json({ ok: false, error: 'บันทึกการตั้งค่าไม่สำเร็จ' }, { status: 500 })
+  }
 }

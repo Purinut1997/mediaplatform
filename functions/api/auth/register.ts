@@ -1,6 +1,8 @@
 import { loginWithPassword, sessionCookie } from '../../_lib/auth'
+import { writeAuditLog, writeErrorLog } from '../../_lib/admin'
 import { validateBotCheck, type BotCheckPayload } from '../../_lib/bot'
 import { ensureSchema, getSql, hashPassword, type Env } from '../../_lib/db'
+import { notifyTelegram } from '../../_lib/notify'
 
 type RegisterPayload = BotCheckPayload & {
   name?: string
@@ -23,6 +25,7 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
   const botError = validateBotCheck(body)
 
   if (botError) {
+    await writeErrorLog(env, 'auth.register.bot_check', botError, { email })
     return Response.json({ ok: false, error: botError }, { status: 400 })
   }
 
@@ -38,6 +41,7 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
   `) as Array<{ id: number }>
 
   if (existing) {
+    await writeErrorLog(env, 'auth.register.duplicate_email', 'Duplicate email', { email })
     return Response.json(
       { ok: false, error: 'อีเมลนี้ถูกใช้สมัครสมาชิกแล้ว' },
       { status: 409 },
@@ -56,10 +60,13 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
       insert into vip_requests (user_id, name, email, phone, slip_name)
       values (${user.id}, ${name}, ${email}, ${phone || null}, ${body.slipName ?? null})
     `
+    await notifyTelegram(env, `MIKPURINUT Media Platform\nมีคำขอ VIP ใหม่\nชื่อ: ${name}\nอีเมล: ${email}`)
   }
+  await writeAuditLog(env, email, 'register_user', 'user', user.id, { membership })
 
   const login = await loginWithPassword(env, email, password)
   if (!login) {
+    await writeErrorLog(env, 'auth.register.login_after_create', 'Login after registration failed', { email })
     return Response.json({ ok: false, error: 'สมัครสำเร็จ แต่เข้าสู่ระบบไม่สำเร็จ' }, { status: 500 })
   }
 

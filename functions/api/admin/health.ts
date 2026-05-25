@@ -1,0 +1,61 @@
+import { requireSuperAdmin } from '../../_lib/admin'
+import { ensureSchema, getSql, type Env } from '../../_lib/db'
+
+export const onRequestGet = async ({ env, request }: { env: Env; request: Request }) => {
+  if (!(await requireSuperAdmin(env, request))) {
+    return Response.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const startedAt = Date.now()
+  await ensureSchema(env)
+  const sql = getSql(env)
+  const [dbNow] = await sql`select now() as now`
+  const [counts] = await sql`
+    select
+      (select count(*)::int from media) as media_count,
+      (select count(*)::int from users) as user_count,
+      (select count(*)::int from vip_requests where status = 'pending') as pending_vip_count,
+      (select count(*)::int from media_links) as link_count,
+      (select count(*)::int from error_logs where created_at > now() - interval '24 hours') as error_24h_count
+  `
+  const [lastBackup] = await sql`
+    select created_at
+    from audit_logs
+    where action = 'backup_export'
+    order by created_at desc
+    limit 1
+  `
+  const [lastError] = await sql`
+    select source, message, created_at
+    from error_logs
+    order by created_at desc
+    limit 1
+  `
+
+  return Response.json({
+    ok: true,
+    health: {
+      cloudflare: 'Online',
+      neon: 'Connected',
+      api: 'OK',
+      storage: 'External links',
+      databaseTime: dbNow?.now,
+      responseTimeMs: Date.now() - startedAt,
+      lastBackupAt: lastBackup?.created_at ?? null,
+      lastError: lastError
+        ? {
+            source: lastError.source,
+            message: lastError.message,
+            createdAt: lastError.created_at,
+          }
+        : null,
+      counts: {
+        media: counts?.media_count ?? 0,
+        users: counts?.user_count ?? 0,
+        pendingVip: counts?.pending_vip_count ?? 0,
+        links: counts?.link_count ?? 0,
+        errors24h: counts?.error_24h_count ?? 0,
+      },
+    },
+  })
+}
