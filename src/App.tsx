@@ -53,6 +53,8 @@ type AdminSection = 'dashboard' | 'media' | 'members' | 'taxonomy' | 'links' | '
 type AccessLevel = 'สาธารณะ' | 'สมาชิก' | 'VIP' | 'ซื้อแยก'
 type MediaStatus = 'ฉบับร่าง' | 'รอตรวจสอบ' | 'เผยแพร่แล้ว' | 'ซ่อนชั่วคราว' | 'ถูกปฏิเสธ'
 type MediaSource = 'Google Drive' | 'Google Sheet' | 'YouTube' | 'External Link'
+type AdminDateFilter = 'ทั้งหมด' | 'วันนี้' | '7 วัน' | '30 วัน'
+type AdminMediaSort = 'ล่าสุด' | 'ดาวน์โหลดมากสุด' | 'เข้าชมมากสุด' | 'ชื่อ A-Z'
 
 type MediaLink = {
   label: string
@@ -1963,6 +1965,11 @@ function AdminPanel({
   const [adminMediaQuery, setAdminMediaQuery] = useState('')
   const [adminMediaAccess, setAdminMediaAccess] = useState<AccessLevel | 'ทั้งหมด'>('ทั้งหมด')
   const [adminMediaStatus, setAdminMediaStatus] = useState<MediaStatus | 'ทั้งหมด'>('ทั้งหมด')
+  const [adminMediaTopic, setAdminMediaTopic] = useState('ทั้งหมด')
+  const [adminMediaTagQuery, setAdminMediaTagQuery] = useState('')
+  const [adminMediaDate, setAdminMediaDate] = useState<AdminDateFilter>('ทั้งหมด')
+  const [adminMediaSort, setAdminMediaSort] = useState<AdminMediaSort>('ล่าสุด')
+  const [filterNow] = useState(() => Date.now())
   const [newTopicName, setNewTopicName] = useState('')
   const [settingsForm, setSettingsForm] = useState({
     ...settings,
@@ -1980,13 +1987,30 @@ function AdminPanel({
   const [categoryError, setCategoryError] = useState('')
 
   const pendingVipRequests = vipRequests.filter((request) => request.status === 'pending')
-  const linkedMedia = mediaItems.filter((item) => item.resourceUrl || item.previewUrl)
-  const adminFilteredMedia = mediaItems.filter((item) => {
-    const text = `${item.title} ${item.topic} ${item.description}`.toLowerCase()
+  const linkedMedia = mediaItems.filter((item) => item.resourceUrl || item.previewUrl || item.links?.some((link) => link.url || link.previewUrl))
+  const publishedMediaCount = mediaItems.filter((item) => normalizeMediaStatus(item.status) === 'เผยแพร่แล้ว').length
+  const pendingMediaCount = mediaItems.filter((item) => normalizeMediaStatus(item.status) === 'รอตรวจสอบ').length
+  const adminFilteredMedia = [...mediaItems].filter((item) => {
+    const linkText = item.links?.map((link) => `${link.label} ${link.type} ${link.url}`).join(' ') ?? ''
+    const text = `${item.title} ${item.topic} ${item.description} ${linkText}`.toLowerCase()
     const matchQuery = text.includes(adminMediaQuery.trim().toLowerCase())
+    const matchTag = !adminMediaTagQuery.trim() || text.includes(adminMediaTagQuery.trim().toLowerCase())
+    const matchTopic = adminMediaTopic === 'ทั้งหมด' || item.topic === adminMediaTopic
     const matchAccess = adminMediaAccess === 'ทั้งหมด' || item.access === adminMediaAccess
-    const matchStatus = adminMediaStatus === 'ทั้งหมด' || item.status === adminMediaStatus
-    return matchQuery && matchAccess && matchStatus
+    const matchStatus = adminMediaStatus === 'ทั้งหมด' || normalizeMediaStatus(item.status) === adminMediaStatus
+    const createdAt = item.createdAt ? Date.parse(item.createdAt) : 0
+    const ageDays = createdAt ? (filterNow - createdAt) / 86400000 : Number.POSITIVE_INFINITY
+    const matchDate =
+      adminMediaDate === 'ทั้งหมด' ||
+      (adminMediaDate === 'วันนี้' && ageDays <= 1) ||
+      (adminMediaDate === '7 วัน' && ageDays <= 7) ||
+      (adminMediaDate === '30 วัน' && ageDays <= 30)
+    return matchQuery && matchTag && matchTopic && matchAccess && matchStatus && matchDate
+  }).sort((a, b) => {
+    if (adminMediaSort === 'ดาวน์โหลดมากสุด') return b.downloads - a.downloads
+    if (adminMediaSort === 'เข้าชมมากสุด') return b.views - a.views
+    if (adminMediaSort === 'ชื่อ A-Z') return a.title.localeCompare(b.title, 'th')
+    return Date.parse(b.updatedAt ?? b.createdAt ?? '') - Date.parse(a.updatedAt ?? a.createdAt ?? '')
   })
   const adminMenu: Array<{ id: AdminSection; label: string; icon: typeof BarChart3; detail: string }> = [
     { id: 'dashboard', label: 'Dashboard', icon: BarChart3, detail: 'ภาพรวมระบบ' },
@@ -1998,13 +2022,13 @@ function AdminPanel({
   ]
   const adminMetrics = [
     { label: 'สมาชิกทั้งหมด', value: adminUsers.length.toLocaleString('th-TH'), icon: Users },
-    { label: 'สื่อเผยแพร่', value: mediaItems.length.toLocaleString('th-TH'), icon: Layers3 },
+    { label: 'สื่อเผยแพร่', value: publishedMediaCount.toLocaleString('th-TH'), icon: Layers3 },
     {
       label: 'ดาวน์โหลดรวม',
       value: mediaItems.reduce((sum, item) => sum + item.downloads, 0).toLocaleString('th-TH'),
       icon: Download,
     },
-    { label: 'คำขอรอตรวจ', value: pendingVipRequests.length.toLocaleString('th-TH'), icon: AlertCircle },
+    { label: 'รอตรวจทั้งหมด', value: (pendingVipRequests.length + pendingMediaCount).toLocaleString('th-TH'), icon: AlertCircle },
   ]
 
   const loadMembers = async () => {
@@ -2104,6 +2128,29 @@ function AdminPanel({
     setForm((current) => ({ ...current, [name]: value }))
   }
 
+  const updateMediaLink = (index: number, key: keyof MediaLink, value: string) => {
+    setForm((current) => ({
+      ...current,
+      links: current.links.map((link, linkIndex) =>
+        linkIndex === index ? { ...link, [key]: value } : link,
+      ),
+    }))
+  }
+
+  const addMediaLink = () => {
+    setForm((current) => ({
+      ...current,
+      links: [...current.links, { ...createEmptyMediaLink(), access: current.access }],
+    }))
+  }
+
+  const removeMediaLink = (index: number) => {
+    setForm((current) => ({
+      ...current,
+      links: current.links.length > 1 ? current.links.filter((_, linkIndex) => linkIndex !== index) : current.links,
+    }))
+  }
+
   const startEditMedia = (item: MediaItem) => {
     setAdminSection('media')
     setEditingMediaId(item.id)
@@ -2157,6 +2204,15 @@ function AdminPanel({
     setSaving(true)
 
     try {
+      const cleanLinks = form.links
+        .map((link) => ({
+          ...link,
+          label: link.label.trim() || 'ไฟล์หลัก',
+          url: link.url.trim(),
+          previewUrl: link.previewUrl.trim(),
+        }))
+        .filter((link) => link.url || link.previewUrl)
+      const primaryLink = cleanLinks[0]
       const response = await fetch(editingMediaId ? `/api/media/${editingMediaId}` : '/api/media', {
         method: editingMediaId ? 'PUT' : 'POST',
         headers: {
@@ -2167,6 +2223,10 @@ function AdminPanel({
         body: JSON.stringify({
           ...form,
           price: Number(form.price || 0),
+          source: primaryLink?.type ?? form.source,
+          resourceUrl: primaryLink?.url ?? form.resourceUrl,
+          previewUrl: primaryLink?.previewUrl ?? form.previewUrl,
+          links: cleanLinks.length ? cleanLinks : form.links,
         }),
       })
 
@@ -2250,10 +2310,10 @@ function AdminPanel({
               Super Admin Control Center
             </p>
             <h2 className="text-3xl font-black leading-tight sm:text-4xl">
-              หลังบ้านดาร์กแบบ programmer dashboard
+              MIKPURINUT Media Command Center
             </h2>
             <p className="mt-2 max-w-2xl text-sm font-semibold leading-7 text-slate-400">
-              จัดการสื่อ สมาชิก VIP และข้อความหน้าเว็บจากพื้นที่เดียว ออกแบบให้สแกนง่ายบนคอมและมือถือ
+              ศูนย์ควบคุมคลังสื่อ สิทธิ์สมาชิก VIP และข้อความหน้าเว็บ ใช้ตรวจงาน อนุมัติสื่อ และดูแลระบบจากพื้นที่เดียว
             </p>
           </div>
           <a
@@ -2842,13 +2902,6 @@ function AdminPanel({
                 options={statusOptions}
                 value={form.status}
               />
-              <AdminSelect
-                label="ชนิดลิงก์"
-                name="source"
-                onChange={updateForm}
-                options={sourceOptions}
-                value={form.source}
-              />
               <AdminField
                 label="ราคา"
                 name="price"
@@ -2864,20 +2917,105 @@ function AdminPanel({
                 placeholder="https://..."
                 value={form.cover}
               />
-              <AdminField
-                label="ลิงก์ไฟล์หรือวิดีโอ"
-                name="resourceUrl"
-                onChange={updateForm}
-                placeholder="Google Drive / Sheet / YouTube URL"
-                value={form.resourceUrl}
-              />
-              <AdminField
-                label="Preview URL (ถ้ามี)"
-                name="previewUrl"
-                onChange={updateForm}
-                placeholder="ปล่อยว่างได้ ระบบจะเดา preview ให้"
-                value={form.previewUrl}
-              />
+              <div className="md:col-span-2">
+                <div className="mb-3 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+                  <div>
+                    <p className="text-sm font-black text-slate-200">ชุดลิงก์ไฟล์และวิดีโอ</p>
+                    <p className="mt-1 text-xs font-semibold text-slate-500">
+                      เพิ่ม Drive, Sheet, YouTube หรือ preview ได้หลายรายการในสื่อเดียว
+                    </p>
+                  </div>
+                  <button
+                    className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-cyan-300/10 px-4 text-sm font-black text-cyan-200 ring-1 ring-cyan-300/20 transition hover:bg-cyan-300/20"
+                    onClick={addMediaLink}
+                    type="button"
+                  >
+                    <Plus size={16} />
+                    เพิ่มลิงก์
+                  </button>
+                </div>
+                <div className="grid gap-3">
+                  {form.links.map((link, index) => (
+                    <div
+                      className="rounded-2xl border border-white/10 bg-black/20 p-3 ring-1 ring-white/[0.03]"
+                      key={`${index}-${link.type}`}
+                    >
+                      <div className="mb-3 flex items-center justify-between gap-3">
+                        <span className="rounded-xl bg-white/10 px-3 py-1 text-xs font-black text-slate-300">
+                          ลิงก์ที่ {index + 1}
+                        </span>
+                        {form.links.length > 1 && (
+                          <button
+                            className="inline-flex min-h-9 items-center gap-2 rounded-xl bg-red-400/10 px-3 text-xs font-black text-red-200"
+                            onClick={() => removeMediaLink(index)}
+                            type="button"
+                          >
+                            <Trash2 size={14} />
+                            ลบ
+                          </button>
+                        )}
+                      </div>
+                      <div className="grid gap-3 lg:grid-cols-[1fr_160px_160px]">
+                        <label>
+                          <span className="text-xs font-black text-slate-300">ชื่อปุ่ม/ไฟล์</span>
+                          <input
+                            className="mt-2 min-h-11 w-full rounded-xl border border-white/10 bg-black/24 px-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-300 focus:ring-4 focus:ring-cyan-300/10"
+                            onChange={(event) => updateMediaLink(index, 'label', event.target.value)}
+                            placeholder="เช่น ดาวน์โหลดไฟล์, ดูวิดีโอสอนใช้"
+                            value={link.label}
+                          />
+                        </label>
+                        <label>
+                          <span className="text-xs font-black text-slate-300">ชนิดลิงก์</span>
+                          <select
+                            className="mt-2 min-h-11 w-full rounded-xl border border-white/10 bg-black/24 px-3 text-sm text-white outline-none focus:border-cyan-300 focus:ring-4 focus:ring-cyan-300/10"
+                            onChange={(event) => updateMediaLink(index, 'type', event.target.value)}
+                            value={link.type}
+                          >
+                            {sourceOptions.map((option) => (
+                              <option className="bg-slate-950" key={option} value={option}>
+                                {option}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <label>
+                          <span className="text-xs font-black text-slate-300">สิทธิ์ลิงก์</span>
+                          <select
+                            className="mt-2 min-h-11 w-full rounded-xl border border-white/10 bg-black/24 px-3 text-sm text-white outline-none focus:border-cyan-300 focus:ring-4 focus:ring-cyan-300/10"
+                            onChange={(event) => updateMediaLink(index, 'access', event.target.value)}
+                            value={link.access}
+                          >
+                            {accessOptions.map((option) => (
+                              <option className="bg-slate-950" key={option} value={option}>
+                                {option}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <label className="lg:col-span-2">
+                          <span className="text-xs font-black text-slate-300">URL ไฟล์/วิดีโอ</span>
+                          <input
+                            className="mt-2 min-h-11 w-full rounded-xl border border-white/10 bg-black/24 px-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-300 focus:ring-4 focus:ring-cyan-300/10"
+                            onChange={(event) => updateMediaLink(index, 'url', event.target.value)}
+                            placeholder="Google Drive / Google Sheet / YouTube / External URL"
+                            value={link.url}
+                          />
+                        </label>
+                        <label>
+                          <span className="text-xs font-black text-slate-300">Preview URL</span>
+                          <input
+                            className="mt-2 min-h-11 w-full rounded-xl border border-white/10 bg-black/24 px-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-300 focus:ring-4 focus:ring-cyan-300/10"
+                            onChange={(event) => updateMediaLink(index, 'previewUrl', event.target.value)}
+                            placeholder="ปล่อยว่างได้"
+                            value={link.previewUrl}
+                          />
+                        </label>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
               <label className="md:col-span-2">
                 <span className="text-sm font-black text-slate-200">รายละเอียด</span>
                 <textarea
@@ -2918,7 +3056,7 @@ function AdminPanel({
               </span>
             </div>
 
-            <div className="mb-4 grid gap-3 lg:grid-cols-[1fr_180px_180px]">
+            <div className="mb-4 grid gap-3 lg:grid-cols-[1.35fr_0.85fr_180px_180px]">
               <label className="relative">
                 <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
                 <input
@@ -2928,13 +3066,40 @@ function AdminPanel({
                   value={adminMediaQuery}
                 />
               </label>
+              <label className="relative">
+                <Tag className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
+                <input
+                  className="min-h-12 w-full rounded-2xl border border-white/10 bg-black/24 pl-11 pr-4 text-base text-white outline-none placeholder:text-slate-500 focus:border-cyan-300 focus:ring-4 focus:ring-cyan-300/10"
+                  onChange={(event) => setAdminMediaTagQuery(event.target.value)}
+                  placeholder="แท็กหรือคำค้นเฉพาะ"
+                  value={adminMediaTagQuery}
+                />
+              </label>
+              <select
+                className="min-h-12 rounded-2xl border border-white/10 bg-black/24 px-4 text-base font-bold text-white outline-none focus:border-cyan-300 focus:ring-4 focus:ring-cyan-300/10"
+                onChange={(event) => setAdminMediaTopic(event.target.value)}
+                value={adminMediaTopic}
+              >
+                {['ทั้งหมด', ...topics.filter((topic) => topic !== 'ทั้งหมด')].map((item) => (
+                  <option className="bg-slate-950" key={item}>{item}</option>
+                ))}
+              </select>
               <select
                 className="min-h-12 rounded-2xl border border-white/10 bg-black/24 px-4 text-base font-bold text-white outline-none focus:border-cyan-300 focus:ring-4 focus:ring-cyan-300/10"
                 onChange={(event) => setAdminMediaAccess(event.target.value as AccessLevel | 'ทั้งหมด')}
                 value={adminMediaAccess}
               >
                 {['ทั้งหมด', ...accessOptions].map((item) => (
-                  <option key={item}>{item}</option>
+                  <option className="bg-slate-950" key={item}>{item}</option>
+                ))}
+              </select>
+              <select
+                className="min-h-12 rounded-2xl border border-white/10 bg-black/24 px-4 text-base font-bold text-white outline-none focus:border-cyan-300 focus:ring-4 focus:ring-cyan-300/10"
+                onChange={(event) => setAdminMediaDate(event.target.value as AdminDateFilter)}
+                value={adminMediaDate}
+              >
+                {(['ทั้งหมด', 'วันนี้', '7 วัน', '30 วัน'] as const).map((item) => (
+                  <option className="bg-slate-950" key={item}>{item}</option>
                 ))}
               </select>
               <select
@@ -2943,7 +3108,16 @@ function AdminPanel({
                 value={adminMediaStatus}
               >
                 {['ทั้งหมด', ...statusOptions].map((item) => (
-                  <option key={item}>{item}</option>
+                  <option className="bg-slate-950" key={item}>{item}</option>
+                ))}
+              </select>
+              <select
+                className="min-h-12 rounded-2xl border border-white/10 bg-black/24 px-4 text-base font-bold text-white outline-none focus:border-cyan-300 focus:ring-4 focus:ring-cyan-300/10 lg:col-span-2"
+                onChange={(event) => setAdminMediaSort(event.target.value as AdminMediaSort)}
+                value={adminMediaSort}
+              >
+                {(['ล่าสุด', 'ดาวน์โหลดมากสุด', 'เข้าชมมากสุด', 'ชื่อ A-Z'] as const).map((item) => (
+                  <option className="bg-slate-950" key={item}>{item}</option>
                 ))}
               </select>
             </div>
