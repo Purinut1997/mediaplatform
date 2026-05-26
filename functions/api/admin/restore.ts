@@ -6,18 +6,30 @@ type BackupPayload = {
   action?: 'preview' | 'commit'
   confirm?: boolean
   backup?: {
-    data?: Partial<Record<'media' | 'mediaLinks' | 'categories' | 'users' | 'vipRequests' | 'settings', BackupRow[]>>
-  } & Partial<Record<'media' | 'mediaLinks' | 'categories' | 'users' | 'vipRequests' | 'settings', BackupRow[]>>
+    data?: Partial<Record<'media' | 'mediaLinks' | 'tags' | 'mediaTags' | 'categories' | 'users' | 'vipRequests' | 'settings', BackupRow[]>>
+  } & Partial<Record<'media' | 'mediaLinks' | 'tags' | 'mediaTags' | 'categories' | 'users' | 'vipRequests' | 'settings', BackupRow[]>>
 }
 
 const text = (value: unknown, fallback = '') => String(value ?? fallback).trim()
 const int = (value: unknown, fallback = 0) => Number.isFinite(Number(value)) ? Number(value) : fallback
+
+function tagSlug(name: string) {
+  const base =
+    name
+      .toLowerCase()
+      .replace(/[^a-z0-9ก-๙]+/g, '-')
+      .replace(/^-|-$/g, '') || 'tag'
+  const hash = Array.from(name).reduce((sum, char) => (sum * 31 + char.charCodeAt(0)) >>> 0, 7)
+  return `${base}-${hash.toString(36)}`
+}
 
 function readData(payload: BackupPayload) {
   const source = payload.backup?.data ?? payload.backup ?? {}
   return {
     media: Array.isArray(source.media) ? source.media : [],
     mediaLinks: Array.isArray(source.mediaLinks) ? source.mediaLinks : [],
+    tags: Array.isArray(source.tags) ? source.tags : [],
+    mediaTags: Array.isArray(source.mediaTags) ? source.mediaTags : [],
     categories: Array.isArray(source.categories) ? source.categories : [],
     users: Array.isArray(source.users) ? source.users : [],
     vipRequests: Array.isArray(source.vipRequests) ? source.vipRequests : [],
@@ -30,6 +42,8 @@ function preview(data: ReturnType<typeof readData>) {
     categories: data.categories.length,
     media: data.media.length,
     mediaLinks: data.mediaLinks.length,
+    tags: data.tags.length,
+    mediaTags: data.mediaTags.length,
     users: data.users.length,
     vipRequests: data.vipRequests.length,
     settings: data.settings.length,
@@ -63,6 +77,7 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
 
     const sql = getSql(env)
     const mediaIdMap = new Map<number, number>()
+    const tagIdMap = new Map<number, number>()
     let skippedUsers = 0
 
     for (const category of data.categories) {
@@ -120,6 +135,31 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
       if (row?.id && Number.isFinite(Number(item.id))) {
         mediaIdMap.set(Number(item.id), Number(row.id))
       }
+    }
+
+    for (const tagRow of data.tags) {
+      const name = text(tagRow.name)
+      if (!name) continue
+      const [tag] = await sql`
+        insert into tags (name, slug)
+        values (${name}, ${tagSlug(name)})
+        on conflict (name) do update set name = excluded.name
+        returning id
+      `
+      if (tag?.id && Number.isFinite(Number(tagRow.id))) {
+        tagIdMap.set(Number(tagRow.id), Number(tag.id))
+      }
+    }
+
+    for (const mediaTag of data.mediaTags) {
+      const mediaId = mediaIdMap.get(Number(mediaTag.media_id))
+      const tagId = tagIdMap.get(Number(mediaTag.tag_id))
+      if (!mediaId || !tagId) continue
+      await sql`
+        insert into media_tags (media_id, tag_id)
+        values (${mediaId}, ${tagId})
+        on conflict do nothing
+      `
     }
 
     for (const link of data.mediaLinks) {

@@ -76,6 +76,24 @@ export async function ensureSchema(env: Env) {
   `
 
   await sql`
+    create table if not exists tags (
+      id serial primary key,
+      name text not null unique,
+      slug text not null unique,
+      created_at timestamptz not null default now()
+    )
+  `
+
+  await sql`
+    create table if not exists media_tags (
+      media_id integer not null references media(id) on delete cascade,
+      tag_id integer not null references tags(id) on delete cascade,
+      created_at timestamptz not null default now(),
+      primary key (media_id, tag_id)
+    )
+  `
+
+  await sql`
     create table if not exists audit_logs (
       id serial primary key,
       actor text not null default 'system',
@@ -204,6 +222,10 @@ export async function ensureSchema(env: Env) {
 
   await sql`
     create index if not exists link_checks_checked_idx on link_checks(checked_at desc)
+  `
+
+  await sql`
+    create index if not exists media_tags_tag_idx on media_tags(tag_id, media_id)
   `
 
   await seedInitialData(env)

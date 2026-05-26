@@ -1,8 +1,8 @@
-import { requireSuperAdmin } from '../../_lib/admin'
+import { requireAdminPermission } from '../../_lib/admin'
 import { ensureSchema, getSql, type Env } from '../../_lib/db'
 
 export const onRequestGet = async ({ env, request }: { env: Env; request: Request }) => {
-  if (!(await requireSuperAdmin(env, request))) {
+  if (!(await requireAdminPermission(env, request, 'system:read'))) {
     return Response.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
   }
 

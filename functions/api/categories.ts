@@ -1,4 +1,4 @@
-import { getCurrentUser } from '../_lib/auth'
+import { requireAdminPermission } from '../_lib/admin'
 import { ensureSchema, getSql, type Env } from '../_lib/db'
 
 type CategoryRow = {
@@ -30,8 +30,7 @@ export const onRequestGet = async ({ env }: { env: Env }) => {
 }
 
 export const onRequestPost = async ({ env, request }: { env: Env; request: Request }) => {
-  const currentUser = await getCurrentUser(env, request)
-  if (currentUser?.role !== 'superadmin') {
+  if (!(await requireAdminPermission(env, request, 'categories:write'))) {
     return Response.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -61,8 +60,7 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
 }
 
 export const onRequestDelete = async ({ env, request }: { env: Env; request: Request }) => {
-  const currentUser = await getCurrentUser(env, request)
-  if (currentUser?.role !== 'superadmin') {
+  if (!(await requireAdminPermission(env, request, 'categories:write'))) {
     return Response.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
   }
 

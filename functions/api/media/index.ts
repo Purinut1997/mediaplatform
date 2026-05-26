@@ -1,5 +1,5 @@
 import { getCurrentUser } from '../../_lib/auth'
-import { writeErrorLog } from '../../_lib/admin'
+import { requireAdminPermission, writeErrorLog } from '../../_lib/admin'
 import { ensureSchema, getSql, type Env } from '../../_lib/db'
 
 const DEFAULT_COVER_URL =
@@ -28,6 +28,7 @@ type MediaRow = {
     previewUrl: string | null
     access: string
   }>
+  tags?: string[]
   created_at: string
   updated_at: string
 }
@@ -42,6 +43,7 @@ type MediaPayload = Partial<ReturnType<typeof toMedia>> & {
     previewUrl?: string
     access?: string
   }>
+  tags?: string[] | string
 }
 
 function normalizeStatus(status: string) {
@@ -77,6 +79,43 @@ function readLinks(body: MediaPayload, title: string) {
   return normalized
 }
 
+function readTags(body: MediaPayload) {
+  const raw = Array.isArray(body.tags)
+    ? body.tags
+    : String(body.tags ?? '')
+        .split(',')
+  return Array.from(new Set(raw.map((tag) => String(tag).trim()).filter(Boolean))).slice(0, 12)
+}
+
+function tagSlug(name: string) {
+  const base =
+    name
+      .toLowerCase()
+      .replace(/[^a-z0-9ก-๙]+/g, '-')
+      .replace(/^-|-$/g, '') || 'tag'
+  const hash = Array.from(name).reduce((sum, char) => (sum * 31 + char.charCodeAt(0)) >>> 0, 7)
+  return `${base}-${hash.toString(36)}`
+}
+
+async function saveTags(sql: ReturnType<typeof getSql>, mediaId: number, tags: string[]) {
+  await sql`delete from media_tags where media_id = ${mediaId}`
+  for (const name of tags) {
+    const [tag] = await sql`
+      insert into tags (name, slug)
+      values (${name}, ${tagSlug(name)})
+      on conflict (name) do update set name = excluded.name
+      returning id
+    `
+    if (tag?.id) {
+      await sql`
+        insert into media_tags (media_id, tag_id)
+        values (${mediaId}, ${tag.id})
+        on conflict do nothing
+      `
+    }
+  }
+}
+
 function toMedia(row: MediaRow) {
   return {
     id: row.id,
@@ -103,6 +142,7 @@ function toMedia(row: MediaRow) {
           access: link.access,
         }))
       : [],
+    tags: Array.isArray(row.tags) ? row.tags : [],
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }
@@ -113,14 +153,16 @@ export const onRequestGet = async ({ env, request }: { env: Env; request: Reques
   const sql = getSql(env)
   const url = new URL(request.url)
   const topic = url.searchParams.get('topic')
-  const status = url.searchParams.get('status') ?? 'เผยแพร่แล้ว'
+  const requestedStatus = url.searchParams.get('status')
+  const canReadAll = await requireAdminPermission(env, request, 'media:read')
+  const status = requestedStatus === 'all' && canReadAll ? 'all' : requestedStatus ?? 'เผยแพร่แล้ว'
   const isAllStatus = status === 'all'
   const statusList = status === 'เผยแพร่แล้ว' ? ['เผยแพร่แล้ว', 'เผยแพร่'] : [status]
 
   const rows =
     topic && topic !== 'ทั้งหมด'
       ? await sql`
-          select media.*, link.url as resource_url, link.preview_url, link.links
+          select media.*, link.url as resource_url, link.preview_url, link.links, tagset.tags
           from media
           left join lateral (
             select
@@ -139,11 +181,17 @@ export const onRequestGet = async ({ env, request }: { env: Env; request: Reques
             from media_links
             where media_links.media_id = media.id
           ) link on true
+          left join lateral (
+            select array_agg(tags.name order by tags.name asc) as tags
+            from media_tags
+            join tags on tags.id = media_tags.tag_id
+            where media_tags.media_id = media.id
+          ) tagset on true
           where (${isAllStatus} or media.status = any(${statusList})) and media.topic = ${topic}
           order by updated_at desc, id desc
         `
       : await sql`
-          select media.*, link.url as resource_url, link.preview_url, link.links
+          select media.*, link.url as resource_url, link.preview_url, link.links, tagset.tags
           from media
           left join lateral (
             select
@@ -162,6 +210,12 @@ export const onRequestGet = async ({ env, request }: { env: Env; request: Reques
             from media_links
             where media_links.media_id = media.id
           ) link on true
+          left join lateral (
+            select array_agg(tags.name order by tags.name asc) as tags
+            from media_tags
+            join tags on tags.id = media_tags.tag_id
+            where media_tags.media_id = media.id
+          ) tagset on true
           where (${isAllStatus} or media.status = any(${statusList}))
           order by updated_at desc, id desc
         `
@@ -178,9 +232,9 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
     const hasToken =
       Boolean(env.ADMIN_WRITE_TOKEN) &&
       request.headers.get('x-admin-token') === env.ADMIN_WRITE_TOKEN
-    const isSuperAdmin = currentUser?.role === 'superadmin'
+    const canWrite = currentUser?.role === 'superadmin' || currentUser?.role === 'admin'
 
-    if (!isSuperAdmin && !hasToken) {
+    if (!canWrite && !hasToken) {
       return Response.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -219,7 +273,7 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
         ${slug},
         ${body.topic ?? 'โรงเรียน'},
         ${body.access ?? 'สาธารณะ'},
-        ${body.status ?? 'แบบร่าง'},
+        ${body.status ?? 'ฉบับร่าง'},
         ${body.price ?? 0},
         ${coverUrl},
         ${body.source ?? 'Google Drive'},
@@ -229,6 +283,7 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
     `) as MediaRow[]
 
     const links = readLinks(body, title)
+    const tags = readTags(body)
 
     for (let index = 0; index < links.length; index += 1) {
       const link = links[index]
@@ -251,13 +306,14 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
         )
       `
     }
+    await saveTags(sql, row.id, tags)
 
     await sql`
       insert into audit_logs (actor, action, target_type, target_id, detail)
-      values (${currentUser?.email ?? 'token-superadmin'}, 'create', 'media', ${String(row.id)}, ${JSON.stringify({ title })}::jsonb)
+      values (${currentUser?.email ?? 'token-superadmin'}, 'create', 'media', ${String(row.id)}, ${JSON.stringify({ title, tags })}::jsonb)
     `
 
-    return Response.json({ ok: true, media: toMedia(row) }, { status: 201 })
+    return Response.json({ ok: true, media: { ...toMedia(row), tags } }, { status: 201 })
   } catch (error) {
     console.error('Create media failed', error)
     await writeErrorLog(env, 'media.create', error)

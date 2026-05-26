@@ -1,7 +1,7 @@
 import { requireSuperAdmin, writeAuditLog } from '../../_lib/admin'
 import { ensureSchema, getSql, type Env } from '../../_lib/db'
 
-const allowedTables = ['media', 'media_links', 'categories', 'users', 'vip_requests', 'app_settings'] as const
+const allowedTables = ['media', 'media_links', 'tags', 'media_tags', 'categories', 'users', 'vip_requests', 'app_settings'] as const
 type BackupTable = (typeof allowedTables)[number]
 
 function toCsv(rows: Record<string, unknown>[]) {
@@ -17,6 +17,10 @@ async function readTable(sql: ReturnType<typeof getSql>, table: BackupTable) {
       return sql`select * from media order by id desc`
     case 'media_links':
       return sql`select * from media_links order by id desc`
+    case 'tags':
+      return sql`select * from tags order by name asc`
+    case 'media_tags':
+      return sql`select * from media_tags order by media_id desc, tag_id asc`
     case 'categories':
       return sql`select * from categories order by sort_order asc, id asc`
     case 'users':
@@ -54,9 +58,11 @@ export const onRequestGet = async ({ env, request }: { env: Env; request: Reques
     })
   }
 
-  const [media, mediaLinks, categories, users, vipRequests, settings] = await Promise.all([
+  const [media, mediaLinks, tags, mediaTags, categories, users, vipRequests, settings] = await Promise.all([
     readTable(sql, 'media'),
     readTable(sql, 'media_links'),
+    readTable(sql, 'tags'),
+    readTable(sql, 'media_tags'),
     readTable(sql, 'categories'),
     readTable(sql, 'users'),
     readTable(sql, 'vip_requests'),
@@ -70,6 +76,8 @@ export const onRequestGet = async ({ env, request }: { env: Env; request: Reques
     data: {
       media,
       mediaLinks,
+      tags,
+      mediaTags,
       categories,
       users,
       vipRequests,

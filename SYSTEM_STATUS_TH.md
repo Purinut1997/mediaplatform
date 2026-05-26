@@ -28,6 +28,7 @@
 - แสดงสื่อแบบการ์ดและหน้ารายละเอียดสื่อ
 - แยกสิทธิ์ Public / Member / VIP / ซื้อแยก
 - รองรับลิงก์สื่อหลายรายการต่อการ์ด เช่น Google Drive, Google Sheet, YouTube และ External Link
+- รองรับแท็กจริงต่อสื่อผ่านตาราง `tags` และ `media_tags`
 - มีหน้า Login และ Register พร้อม bot check แบบพื้นฐาน
 - มีหน้า Maintenance Mode สำหรับผู้ใช้ทั่วไป เมื่อเปิดจากหลังบ้าน
 
@@ -53,6 +54,7 @@
 - ตั้งชื่อ หมวดหมู่ สิทธิ์ สถานะ ราคา หน้าปก รายละเอียด และลิงก์ได้
 - เพิ่มลิงก์หลายรายการได้ในสื่อเดียว
 - แต่ละลิงก์ตั้งชนิด URL, preview URL, label และสิทธิ์ได้
+- เพิ่มแท็กได้หลายรายการต่อสื่อ โดยระบบสร้าง/ผูกแท็กให้อัตโนมัติ
 - มีสถานะ workflow:
   - ฉบับร่าง
   - รอตรวจสอบ
@@ -62,7 +64,7 @@
 - มีตัวกรองขั้นสูง:
   - ค้นหาจากชื่อ/คำอธิบาย/ลิงก์
   - กรองหมวดหมู่
-  - กรองคำค้นหรือแท็กแบบข้อความ
+  - กรองคำค้นหรือแท็กจริง
   - กรองสิทธิ์
   - กรองสถานะ
   - กรองวันที่เพิ่ม
@@ -77,6 +79,12 @@
 - เปิด/ปิดบัญชีสมาชิก
 - ตั้งผู้ใช้ทั่วไปเป็น admin หรือลด admin กลับเป็น member ได้
 - ป้องกันไม่ให้แก้ role/status/access ของ superadmin ผ่านปุ่มหน้าเว็บ
+- มีระบบสิทธิ์ admin รายเมนูแบบ config ในโค้ดแล้ว
+  - admin จัดการสื่อได้
+  - admin จัดการหมวดหมู่ได้
+  - admin ตรวจลิงก์และดู System Health ได้
+  - admin เข้าเมนูสมาชิก, settings, backup, restore, error log และ activity log ไม่ได้
+  - superadmin ยังทำได้ทั้งหมด
 
 ### ตั้งค่าเว็บ
 
@@ -96,6 +104,7 @@
 - มี System Health ดู Cloudflare, Neon, API, response time, last backup, error ล่าสุด และจำนวนข้อมูลสำคัญ
 - มี Broken Link Checker ตรวจลิงก์จาก media links และบันทึกผลลงฐานข้อมูล
 - มี Backup Export เป็น JSON ทั้งระบบ และ CSV แยกตาราง
+- Backup/Restore รองรับ `tags` และ `media_tags`
 - มี Restore Import แบบปลอดภัยจากไฟล์ JSON backup
   - Preview ข้อมูลก่อนนำเข้า
   - ยืนยันก่อน restore จริง
@@ -117,16 +126,7 @@
 
 ### สำคัญมาก
 
-1. ระบบสิทธิ์ admin แบบละเอียด
-   - ตอนนี้ปรับ role admin/member ได้แล้ว
-   - ยังไม่มี permission รายเมนู เช่น admin จัดการสื่อได้ แต่แก้ setting ไม่ได้
-   - ควรเพิ่มตารางหรือ config permissions ภายหลัง
-
-2. ระบบแท็กจริง
-   - ตอนนี้มี filter แท็กแบบค้นข้อความ
-   - ยังไม่มีตาราง tags และ media_tags จริง
-
-3. Graph เชิงเวลาจริง
+1. Graph เชิงเวลาจริง
    - ตอนนี้ dashboard มีกราฟจากข้อมูลปัจจุบัน
    - ยังไม่มี daily download, monthly new members, weekly VIP requests จาก event table จริง
 
@@ -154,12 +154,10 @@
 
 ## ลำดับงานแนะนำต่อไป
 
-1. ทำ Admin Permission รายเมนู
-2. ทำตาราง tags และ media_tags จริง
-3. ทำ notification table พร้อม read/unread
-4. ทำกราฟเชิงเวลาโดยเก็บ event/download log จริง
-5. ทำ Cron ตรวจลิงก์อัตโนมัติ
-6. ทำ Restore แบบ replace เฉพาะตารางที่เลือกได้ หากต้องการล้างข้อมูลเดิมก่อนนำเข้า
+1. ทำ notification table พร้อม read/unread
+2. ทำกราฟเชิงเวลาโดยเก็บ event/download log จริง
+3. ทำ Cron ตรวจลิงก์อัตโนมัติ
+4. ทำ Restore แบบ replace เฉพาะตารางที่เลือกได้ หากต้องการล้างข้อมูลเดิมก่อนนำเข้า
 
 ## ไฟล์หลักที่ควรดูเมื่อทำงานต่อ
 
@@ -182,4 +180,4 @@
 
 - `npm run lint` ผ่าน
 - `npm run build` ผ่าน
-- ฟีเจอร์ที่เพิ่มล่าสุด: Restore Import แบบ preview/merge, Activity/Error Log filter + CSV export, Activity Log, Error Log, System Health, Backup Export, Broken Link Checker, Maintenance Mode, Notification Center, กราฟ dashboard เบื้องต้น, admin role toggle และ Telegram optional notification
+- ฟีเจอร์ที่เพิ่มล่าสุด: ระบบแท็กจริง `tags/media_tags`, Admin Permission รายเมนู, Restore Import แบบ preview/merge, Activity/Error Log filter + CSV export, Activity Log, Error Log, System Health, Backup Export, Broken Link Checker, Maintenance Mode, Notification Center, กราฟ dashboard เบื้องต้น, admin role toggle และ Telegram optional notification

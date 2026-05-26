@@ -1,9 +1,39 @@
 import { getCurrentUser, type PublicUser } from './auth'
 import { getSql, type Env } from './db'
 
+export type AdminPermission =
+  | 'media:read'
+  | 'media:write'
+  | 'categories:write'
+  | 'links:check'
+  | 'system:read'
+  | 'members:manage'
+  | 'settings:write'
+  | 'backup:manage'
+  | 'logs:read'
+
+const adminPermissions = new Set<AdminPermission>([
+  'media:read',
+  'media:write',
+  'categories:write',
+  'links:check',
+  'system:read',
+])
+
 export async function requireSuperAdmin(env: Env, request: Request) {
   const user = await getCurrentUser(env, request)
   return user?.role === 'superadmin' ? user : null
+}
+
+export async function requireAdminPermission(
+  env: Env,
+  request: Request,
+  permission: AdminPermission,
+) {
+  const user = await getCurrentUser(env, request)
+  if (user?.role === 'superadmin') return user
+  if (user?.role === 'admin' && adminPermissions.has(permission)) return user
+  return null
 }
 
 export async function writeAuditLog(

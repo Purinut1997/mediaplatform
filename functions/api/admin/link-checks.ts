@@ -1,4 +1,4 @@
-import { requireSuperAdmin, writeAuditLog } from '../../_lib/admin'
+import { requireAdminPermission, writeAuditLog } from '../../_lib/admin'
 import { ensureSchema, getSql, type Env } from '../../_lib/db'
 import { notifyTelegram } from '../../_lib/notify'
 
@@ -36,7 +36,7 @@ async function checkUrl(url: string) {
 }
 
 async function runChecks(env: Env, request: Request) {
-  const currentUser = await requireSuperAdmin(env, request)
+  const currentUser = await requireAdminPermission(env, request, 'links:check')
   if (!currentUser) {
     return Response.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
   }

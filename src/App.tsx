@@ -91,6 +91,7 @@ type MediaItem = {
   resourceUrl?: string
   previewUrl?: string
   links?: MediaLink[]
+  tags?: string[]
   createdAt?: string
   updatedAt?: string
 }
@@ -175,6 +176,8 @@ type RestorePreview = {
   categories: number
   media: number
   mediaLinks: number
+  tags: number
+  mediaTags: number
   users: number
   vipRequests: number
   settings: number
@@ -193,6 +196,7 @@ type MediaFormState = {
   resourceUrl: string
   previewUrl: string
   links: MediaLink[]
+  tags: string
   description: string
 }
 
@@ -341,6 +345,7 @@ function createEmptyMediaForm(topic = 'โรงเรียน'): MediaFormStat
     resourceUrl: '',
     previewUrl: '',
     links: [createEmptyMediaLink()],
+    tags: '',
     description: '',
   }
 }
@@ -362,11 +367,15 @@ const portalTiles = [
 ]
 
 function canViewMedia(user: CurrentUser | null, item: MediaItem) {
-  if (user?.role === 'superadmin') return true
+  if (user?.role === 'superadmin' || user?.role === 'admin') return true
   if (item.access === 'สาธารณะ') return true
   if (user?.access === 'VIP') return item.access !== 'ซื้อแยก'
   if (user?.access === 'สมาชิก') return item.access === 'สมาชิก'
   return false
+}
+
+function canAccessAdmin(user: CurrentUser | null) {
+  return user?.role === 'superadmin' || user?.role === 'admin'
 }
 
 function getPreviewUrl(item: MediaItem) {
@@ -489,7 +498,7 @@ function App() {
     async function loadData() {
       try {
         const [mediaResponse, categoriesResponse, settingsResponse] = await Promise.all([
-          fetch(currentUser?.role === 'superadmin' ? '/api/media?status=all' : '/api/media'),
+          fetch(currentUser?.role === 'superadmin' || currentUser?.role === 'admin' ? '/api/media?status=all' : '/api/media'),
           fetch('/api/categories'),
           fetch('/api/settings'),
         ])
@@ -565,7 +574,7 @@ function App() {
   const handleLogin = (user: CurrentUser) => {
     setCurrentUser(user)
     setToast(`เข้าสู่ระบบแล้ว: ${user.name}`)
-    setView(user.role === 'superadmin' ? 'admin' : 'media')
+    setView(canAccessAdmin(user) ? 'admin' : 'media')
   }
 
   const logout = () => {
@@ -576,7 +585,7 @@ function App() {
   }
 
   const showMaintenance =
-    siteSettings.maintenanceEnabled && currentUser?.role !== 'superadmin'
+    siteSettings.maintenanceEnabled && !canAccessAdmin(currentUser)
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-[#f2fbff] text-slate-900 transition-colors duration-300 dark:bg-[#06111d] dark:text-slate-100">
@@ -656,8 +665,9 @@ function App() {
               settings={siteSettings}
             />
           )}
-          {view === 'admin' && currentUser?.role === 'superadmin' && (
+          {view === 'admin' && canAccessAdmin(currentUser) && currentUser && (
             <AdminPanel
+              currentUser={currentUser}
               mediaItems={mediaRecords}
               onCreated={() => {
                 setRefreshToken((value) => value + 1)
@@ -671,7 +681,7 @@ function App() {
               topics={topicOptions.filter((item) => item !== 'ทั้งหมด')}
             />
           )}
-          {view === 'admin' && currentUser?.role !== 'superadmin' && (
+          {view === 'admin' && !canAccessAdmin(currentUser) && (
             <LoginPanel onLogin={handleLogin} setView={setView} />
           )}
           </>
@@ -776,7 +786,7 @@ function Header({
     { label: 'คลังสื่อ', value: 'media' as View },
   ]
   const visibleNav =
-    currentUser?.role === 'superadmin'
+    canAccessAdmin(currentUser)
       ? [...nav, { label: 'หลังบ้าน', value: 'admin' as View }]
       : nav
 
@@ -833,11 +843,11 @@ function Header({
             <button
               className="hidden min-h-11 rounded-xl bg-slate-950 px-5 text-sm font-black text-cyan-200 shadow-lg shadow-slate-900/15 transition hover:-translate-y-0.5 dark:bg-cyan-300 dark:text-slate-950 sm:inline-flex sm:items-center"
               onClick={() =>
-                currentUser.role === 'superadmin' ? setView('admin') : onLogout()
+                canAccessAdmin(currentUser) ? setView('admin') : onLogout()
               }
               type="button"
             >
-              {currentUser.role === 'superadmin' ? 'หลังบ้าน' : 'ออกจากระบบ'}
+              {canAccessAdmin(currentUser) ? 'หลังบ้าน' : 'ออกจากระบบ'}
             </button>
           ) : (
             <>
@@ -1273,6 +1283,18 @@ function MediaCard({
             {item.source}
           </span>
         </div>
+        {item.tags && item.tags.length > 0 && (
+          <div className="mb-3 flex flex-wrap gap-2">
+            {item.tags.slice(0, 3).map((tag) => (
+              <span
+                className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-black text-sky-700 dark:border-sky-300/20 dark:bg-sky-300/10 dark:text-sky-100"
+                key={tag}
+              >
+                #{tag}
+              </span>
+            ))}
+          </div>
+        )}
         <h3 className="line-clamp-2 text-xl font-black leading-snug text-slate-950 dark:text-white">
           {item.title}
         </h3>
@@ -1359,6 +1381,14 @@ function MediaDetail({
             <span className="rounded-xl bg-violet-50 px-3 py-1 text-sm font-black text-violet-800 dark:bg-violet-400/10 dark:text-violet-200">
               {item.access}
             </span>
+            {item.tags?.slice(0, 4).map((tag) => (
+              <span
+                className="rounded-xl bg-sky-50 px-3 py-1 text-sm font-black text-sky-800 dark:bg-sky-400/10 dark:text-sky-200"
+                key={tag}
+              >
+                #{tag}
+              </span>
+            ))}
           </div>
           <h2 className="text-3xl font-black leading-tight text-slate-950 dark:text-white sm:text-4xl">
             {item.title}
@@ -2071,12 +2101,14 @@ function MembershipCard({
 }
 
 function AdminPanel({
+  currentUser,
   mediaItems,
   onCreated,
   onSettingsSaved,
   settings,
   topics,
 }: {
+  currentUser: CurrentUser
   mediaItems: MediaItem[]
   onCreated: () => void
   onSettingsSaved: (settings: SiteSettings) => void
@@ -2121,14 +2153,22 @@ function AdminPanel({
   const [memberError, setMemberError] = useState('')
   const [categoryError, setCategoryError] = useState('')
   const [opsError, setOpsError] = useState('')
+  const isSuperAdmin = currentUser.role === 'superadmin'
 
   const pendingVipRequests = vipRequests.filter((request) => request.status === 'pending')
   const linkedMedia = mediaItems.filter((item) => item.resourceUrl || item.previewUrl || item.links?.some((link) => link.url || link.previewUrl))
   const publishedMediaCount = mediaItems.filter((item) => normalizeMediaStatus(item.status) === 'เผยแพร่แล้ว').length
   const pendingMediaCount = mediaItems.filter((item) => normalizeMediaStatus(item.status) === 'รอตรวจสอบ').length
+  const tagStats = Array.from(
+    mediaItems.reduce((map, item) => {
+      item.tags?.forEach((tag) => map.set(tag, (map.get(tag) ?? 0) + 1))
+      return map
+    }, new Map<string, number>()),
+  ).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'th'))
   const adminFilteredMedia = [...mediaItems].filter((item) => {
     const linkText = item.links?.map((link) => `${link.label} ${link.type} ${link.url}`).join(' ') ?? ''
-    const text = `${item.title} ${item.topic} ${item.description} ${linkText}`.toLowerCase()
+    const tagText = item.tags?.join(' ') ?? ''
+    const text = `${item.title} ${item.topic} ${item.description} ${linkText} ${tagText}`.toLowerCase()
     const matchQuery = text.includes(adminMediaQuery.trim().toLowerCase())
     const matchTag = !adminMediaTagQuery.trim() || text.includes(adminMediaTagQuery.trim().toLowerCase())
     const matchTopic = adminMediaTopic === 'ทั้งหมด' || item.topic === adminMediaTopic
@@ -2162,7 +2202,7 @@ function AdminPanel({
   const maxDownloads = Math.max(1, ...topDownloadedMedia.map((item) => item.downloads))
   const maxCategoryCount = Math.max(1, ...categoryStats.map((item) => item.count))
   const adminNotifications = [
-    pendingVipRequests.length > 0 && {
+    isSuperAdmin && pendingVipRequests.length > 0 && {
       title: 'มีคำขอ VIP รอตรวจ',
       detail: `${pendingVipRequests.length} รายการต้องตรวจสอบ`,
       tone: 'amber',
@@ -2174,7 +2214,7 @@ function AdminPanel({
       tone: 'sky',
       action: () => setAdminSection('media'),
     },
-    errorLogs.length > 0 && {
+    isSuperAdmin && errorLogs.length > 0 && {
       title: 'พบ Error ล่าสุด',
       detail: `${errorLogs.length} รายการใน log`,
       tone: 'red',
@@ -2186,7 +2226,7 @@ function AdminPanel({
       tone: 'red',
       action: () => setAdminSection('links'),
     },
-    settings.maintenanceEnabled && {
+    isSuperAdmin && settings.maintenanceEnabled && {
       title: 'Maintenance Mode เปิดอยู่',
       detail: 'ผู้ใช้ทั่วไปจะเห็นหน้าปิดปรับปรุง',
       tone: 'amber',
@@ -2208,18 +2248,19 @@ function AdminPanel({
     if (!query) return true
     return `${log.source} ${log.message}`.toLowerCase().includes(query)
   })
-  const adminMenu: Array<{ id: AdminSection; label: string; icon: typeof BarChart3; detail: string }> = [
+  const allAdminMenu: Array<{ id: AdminSection; label: string; icon: typeof BarChart3; detail: string; ownerOnly?: boolean }> = [
     { id: 'dashboard', label: 'Dashboard', icon: BarChart3, detail: 'ภาพรวมระบบ' },
     { id: 'media', label: 'จัดการสื่อ', icon: Layers3, detail: 'เพิ่ม แก้ไข ลบ' },
-    { id: 'members', label: 'สมาชิกและ VIP', icon: Users, detail: `${pendingVipRequests.length} รอตรวจ` },
-    { id: 'taxonomy', label: 'หมวดหมู่และแท็ก', icon: Tag, detail: `${topics.length} หมวด` },
+    { id: 'members', label: 'สมาชิกและ VIP', icon: Users, detail: `${pendingVipRequests.length} รอตรวจ`, ownerOnly: true },
+    { id: 'taxonomy', label: 'หมวดหมู่และแท็ก', icon: Tag, detail: `${topics.length} หมวด / ${tagStats.length} แท็ก` },
     { id: 'links', label: 'ลิงก์ภายนอก', icon: Link2, detail: `${linkedMedia.length} ลิงก์` },
-    { id: 'activity', label: 'Activity Log', icon: FileText, detail: `${auditLogs.length} รายการ` },
+    { id: 'activity', label: 'Activity Log', icon: FileText, detail: `${auditLogs.length} รายการ`, ownerOnly: true },
     { id: 'health', label: 'System Health', icon: Gauge, detail: systemHealth ? `${systemHealth.responseTimeMs} ms` : 'ตรวจระบบ' },
-    { id: 'backup', label: 'Backup', icon: Database, detail: 'JSON / CSV' },
-    { id: 'errors', label: 'Error Log', icon: AlertCircle, detail: `${errorLogs.length} รายการ` },
-    { id: 'settings', label: 'ตั้งค่าเว็บ', icon: Settings, detail: 'หน้าแรกและ VIP' },
+    { id: 'backup', label: 'Backup', icon: Database, detail: 'JSON / CSV', ownerOnly: true },
+    { id: 'errors', label: 'Error Log', icon: AlertCircle, detail: `${errorLogs.length} รายการ`, ownerOnly: true },
+    { id: 'settings', label: 'ตั้งค่าเว็บ', icon: Settings, detail: 'หน้าแรกและ VIP', ownerOnly: true },
   ]
+  const adminMenu = allAdminMenu.filter((item) => isSuperAdmin || !item.ownerOnly)
   const adminMetrics = [
     { label: 'สมาชิกทั้งหมด', value: adminUsers.length.toLocaleString('th-TH'), icon: Users },
     { label: 'สื่อเผยแพร่', value: publishedMediaCount.toLocaleString('th-TH'), icon: Layers3 },
@@ -2266,23 +2307,27 @@ function AdminPanel({
     setLoadingOps(true)
     setOpsError('')
     try {
-      const [activityResponse, errorsResponse, healthResponse] = await Promise.all([
-        fetch('/api/admin/activity', { credentials: 'include' }),
-        fetch('/api/admin/errors', { credentials: 'include' }),
-        fetch('/api/admin/health', { credentials: 'include' }),
-      ])
-      const [activity, errors, health] = await Promise.all([
-        readJson<{ logs?: AuditLog[]; error?: string }>(activityResponse),
-        readJson<{ logs?: ErrorLog[]; error?: string }>(errorsResponse),
-        readJson<{ health?: SystemHealth; error?: string }>(healthResponse),
-      ])
-
-      if (!activityResponse.ok) throw new Error(activity.error ?? 'โหลด Activity Log ไม่สำเร็จ')
-      if (!errorsResponse.ok) throw new Error(errors.error ?? 'โหลด Error Log ไม่สำเร็จ')
+      const healthResponse = await fetch('/api/admin/health', { credentials: 'include' })
+      const health = await readJson<{ health?: SystemHealth; error?: string }>(healthResponse)
       if (!healthResponse.ok) throw new Error(health.error ?? 'โหลด System Health ไม่สำเร็จ')
 
-      setAuditLogs(activity.logs ?? [])
-      setErrorLogs(errors.logs ?? [])
+      if (isSuperAdmin) {
+        const [activityResponse, errorsResponse] = await Promise.all([
+          fetch('/api/admin/activity', { credentials: 'include' }),
+          fetch('/api/admin/errors', { credentials: 'include' }),
+        ])
+        const [activity, errors] = await Promise.all([
+          readJson<{ logs?: AuditLog[]; error?: string }>(activityResponse),
+          readJson<{ logs?: ErrorLog[]; error?: string }>(errorsResponse),
+        ])
+        if (!activityResponse.ok) throw new Error(activity.error ?? 'โหลด Activity Log ไม่สำเร็จ')
+        if (!errorsResponse.ok) throw new Error(errors.error ?? 'โหลด Error Log ไม่สำเร็จ')
+        setAuditLogs(activity.logs ?? [])
+        setErrorLogs(errors.logs ?? [])
+      } else {
+        setAuditLogs([])
+        setErrorLogs([])
+      }
       setSystemHealth(health.health ?? null)
     } catch (opsLoadError) {
       setOpsError(opsLoadError instanceof Error ? opsLoadError.message : 'โหลดข้อมูลหลังบ้านไม่สำเร็จ')
@@ -2411,9 +2456,11 @@ function AdminPanel({
 
   useEffect(() => {
     queueMicrotask(() => {
-      void loadMembers()
+      if (isSuperAdmin) void loadMembers()
       void loadOpsData()
     })
+    // Initial admin data load only; later refreshes are triggered by explicit actions.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const submitMemberAction = async (payload: Record<string, unknown>) => {
@@ -2539,6 +2586,7 @@ function AdminPanel({
               access: item.access,
             },
           ],
+      tags: item.tags?.join(', ') ?? '',
       description: item.description,
     })
     document.getElementById('admin-create-media')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -2585,6 +2633,10 @@ function AdminPanel({
           resourceUrl: primaryLink?.url ?? form.resourceUrl,
           previewUrl: primaryLink?.previewUrl ?? form.previewUrl,
           links: cleanLinks.length ? cleanLinks : form.links,
+          tags: form.tags
+            .split(',')
+            .map((tag) => tag.trim())
+            .filter(Boolean),
         }),
       })
 
@@ -3227,7 +3279,7 @@ function AdminPanel({
                 หมวดหมู่และแท็ก
               </h3>
               <p className="mt-1 text-sm font-semibold text-slate-400">
-                เพิ่มหมวดหมู่ใหม่เพื่อใช้ตอนสร้างการ์ดสื่อ ส่วนแท็กเชิงลึกจะต่อยอดจากหมวดนี้ได้
+                เพิ่มหมวดหลักสำหรับการ์ดสื่อ และดูแท็กจริงที่ผูกกับสื่อจากช่องแท็กในหน้าจัดการสื่อ
               </p>
             </div>
             <form className="grid gap-3 sm:grid-cols-[1fr_auto]" onSubmit={submitCategory}>
@@ -3269,6 +3321,38 @@ function AdminPanel({
                   </article>
                 )
               })}
+            </div>
+            <div className="mt-6 rounded-2xl border border-sky-300/20 bg-black/20 p-4">
+              <div className="mb-3 flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
+                <div>
+                  <p className="font-black text-sky-100">แท็กที่ใช้งานจริง</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-400">
+                    ระบบดึงจาก media_tags โดยอัตโนมัติเมื่อบันทึกสื่อ ไม่ต้องสร้างแท็กซ้ำด้วยมือ
+                  </p>
+                </div>
+                <span className="rounded-xl bg-sky-300/10 px-3 py-1 text-sm font-black text-sky-200">
+                  {tagStats.length.toLocaleString('th-TH')} แท็ก
+                </span>
+              </div>
+              {tagStats.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-white/15 p-4 text-sm font-bold text-slate-400">
+                  ยังไม่มีแท็ก เพิ่มแท็กจากฟอร์มสื่อ เช่น AI, อบรม, โรงเรียน
+                </div>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {tagStats.map(([tag, count]) => (
+                    <span
+                      className="inline-flex items-center gap-2 rounded-full border border-sky-300/20 bg-sky-300/10 px-3 py-2 text-sm font-black text-sky-100"
+                      key={tag}
+                    >
+                      #{tag}
+                      <span className="rounded-full bg-black/30 px-2 py-0.5 text-xs text-sky-200">
+                        {count.toLocaleString('th-TH')}
+                      </span>
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
           </section>
           )}
@@ -3575,7 +3659,7 @@ function AdminPanel({
                 <Archive size={20} />
                 ดาวน์โหลด JSON ทั้งระบบ
               </button>
-              {['media', 'media_links', 'categories', 'users', 'vip_requests', 'app_settings'].map((table) => (
+              {['media', 'media_links', 'tags', 'media_tags', 'categories', 'users', 'vip_requests', 'app_settings'].map((table) => (
                 <button
                   className="inline-flex min-h-16 items-center justify-center gap-2 rounded-2xl border border-white/10 bg-black/20 px-5 font-black text-white disabled:opacity-60"
                   disabled={loadingOps}
@@ -3649,6 +3733,8 @@ function AdminPanel({
                         ['หมวดหมู่', restorePreview.categories],
                         ['สื่อ', restorePreview.media],
                         ['ลิงก์สื่อ', restorePreview.mediaLinks],
+                        ['แท็ก', restorePreview.tags],
+                        ['แท็กของสื่อ', restorePreview.mediaTags],
                         ['ผู้ใช้', restorePreview.users],
                         ['คำขอ VIP', restorePreview.vipRequests],
                         ['Settings', restorePreview.settings],
@@ -3763,6 +3849,13 @@ function AdminPanel({
                 onChange={updateForm}
                 placeholder="https://..."
                 value={form.cover}
+              />
+              <AdminField
+                label="แท็ก"
+                name="tags"
+                onChange={updateForm}
+                placeholder="AI, อบรม, โรงเรียน"
+                value={form.tags}
               />
               <div className="md:col-span-2">
                 <div className="mb-3 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
@@ -3991,6 +4084,11 @@ function AdminPanel({
                       <td className="px-4 py-4">
                         <p className="truncate font-black text-white">{item.title}</p>
                         <p className="text-sm text-slate-400">{item.topic}</p>
+                        {item.tags && item.tags.length > 0 && (
+                          <p className="mt-1 truncate text-xs font-bold text-sky-200/80">
+                            {item.tags.map((tag) => `#${tag}`).join(' ')}
+                          </p>
+                        )}
                       </td>
                       <td className="px-4 py-4">{item.access}</td>
                       <td className="px-4 py-4">{item.status}</td>
@@ -4034,6 +4132,11 @@ function AdminPanel({
                   <p className="mt-1 text-sm text-slate-400">
                     {item.topic} · {item.access} · {item.status}
                   </p>
+                  {item.tags && item.tags.length > 0 && (
+                    <p className="mt-2 text-xs font-bold text-sky-200/80">
+                      {item.tags.map((tag) => `#${tag}`).join(' ')}
+                    </p>
+                  )}
                   <div className="mt-3 grid gap-2 sm:grid-cols-2">
                     <button
                       className="min-h-11 rounded-xl bg-cyan-300 px-4 font-black text-slate-950"

@@ -1,4 +1,4 @@
-import { getCurrentUser } from '../../_lib/auth'
+import { requireAdminPermission } from '../../_lib/admin'
 import { ensureSchema, getSql, type Env } from '../../_lib/db'
 
 const DEFAULT_COVER_URL =
@@ -21,6 +21,7 @@ type MediaPayload = {
     previewUrl?: string
     access?: string
   }>
+  tags?: string[] | string
   description?: string
 }
 
@@ -31,8 +32,8 @@ type Context = {
 }
 
 async function requireSuperAdmin(env: Env, request: Request) {
-  const currentUser = await getCurrentUser(env, request)
-  if (currentUser?.role !== 'superadmin') {
+  const currentUser = await requireAdminPermission(env, request, 'media:write')
+  if (!currentUser) {
     return { ok: false as const, response: Response.json({ ok: false, error: 'Unauthorized' }, { status: 401 }) }
   }
   return { ok: true as const, actor: currentUser.email }
@@ -69,6 +70,43 @@ function readLinks(body: MediaPayload, title: string) {
   return normalized
 }
 
+function readTags(body: MediaPayload) {
+  const raw = Array.isArray(body.tags)
+    ? body.tags
+    : String(body.tags ?? '')
+        .split(',')
+  return Array.from(new Set(raw.map((tag) => String(tag).trim()).filter(Boolean))).slice(0, 12)
+}
+
+function tagSlug(name: string) {
+  const base =
+    name
+      .toLowerCase()
+      .replace(/[^a-z0-9ก-๙]+/g, '-')
+      .replace(/^-|-$/g, '') || 'tag'
+  const hash = Array.from(name).reduce((sum, char) => (sum * 31 + char.charCodeAt(0)) >>> 0, 7)
+  return `${base}-${hash.toString(36)}`
+}
+
+async function saveTags(sql: ReturnType<typeof getSql>, mediaId: number, tags: string[]) {
+  await sql`delete from media_tags where media_id = ${mediaId}`
+  for (const name of tags) {
+    const [tag] = await sql`
+      insert into tags (name, slug)
+      values (${name}, ${tagSlug(name)})
+      on conflict (name) do update set name = excluded.name
+      returning id
+    `
+    if (tag?.id) {
+      await sql`
+        insert into media_tags (media_id, tag_id)
+        values (${mediaId}, ${tag.id})
+        on conflict do nothing
+      `
+    }
+  }
+}
+
 export const onRequestPut = async ({ env, request, params }: Context) => {
   const auth = await requireSuperAdmin(env, request)
   if (!auth.ok) return auth.response
@@ -88,7 +126,7 @@ export const onRequestPut = async ({ env, request, params }: Context) => {
       title = ${title},
       topic = ${body.topic ?? 'โรงเรียน'},
       access_level = ${body.access ?? 'สาธารณะ'},
-      status = ${body.status ?? 'แบบร่าง'},
+      status = ${body.status ?? 'ฉบับร่าง'},
       price = ${Number(body.price ?? 0)},
       cover_url = ${String(body.cover ?? '').trim() || DEFAULT_COVER_URL},
       source_type = ${body.source ?? 'Google Drive'},
@@ -115,10 +153,12 @@ export const onRequestPut = async ({ env, request, params }: Context) => {
       )
     `
   }
+  const tags = readTags(body)
+  await saveTags(sql, id, tags)
 
   await sql`
     insert into audit_logs (actor, action, target_type, target_id, detail)
-    values (${auth.actor}, 'update', 'media', ${String(id)}, ${JSON.stringify({ title })}::jsonb)
+    values (${auth.actor}, 'update', 'media', ${String(id)}, ${JSON.stringify({ title, tags })}::jsonb)
   `
 
   return Response.json({ ok: true })
