@@ -1,7 +1,7 @@
 import { requireSuperAdmin, writeAuditLog } from '../../_lib/admin'
 import { ensureSchema, getSql, type Env } from '../../_lib/db'
 
-const allowedTables = ['media', 'media_links', 'tags', 'media_tags', 'categories', 'users', 'vip_requests', 'app_settings'] as const
+const allowedTables = ['media', 'media_links', 'tags', 'media_tags', 'categories', 'users', 'vip_requests', 'notifications', 'app_settings'] as const
 type BackupTable = (typeof allowedTables)[number]
 
 function toCsv(rows: Record<string, unknown>[]) {
@@ -27,6 +27,8 @@ async function readTable(sql: ReturnType<typeof getSql>, table: BackupTable) {
       return sql`select id, name, email, role, access_level, status, created_at, updated_at from users order by id desc`
     case 'vip_requests':
       return sql`select * from vip_requests order by id desc`
+    case 'notifications':
+      return sql`select * from notifications order by created_at desc, id desc`
     case 'app_settings':
       return sql`select * from app_settings order by key asc`
   }
@@ -58,7 +60,7 @@ export const onRequestGet = async ({ env, request }: { env: Env; request: Reques
     })
   }
 
-  const [media, mediaLinks, tags, mediaTags, categories, users, vipRequests, settings] = await Promise.all([
+  const [media, mediaLinks, tags, mediaTags, categories, users, vipRequests, notifications, settings] = await Promise.all([
     readTable(sql, 'media'),
     readTable(sql, 'media_links'),
     readTable(sql, 'tags'),
@@ -66,6 +68,7 @@ export const onRequestGet = async ({ env, request }: { env: Env; request: Reques
     readTable(sql, 'categories'),
     readTable(sql, 'users'),
     readTable(sql, 'vip_requests'),
+    readTable(sql, 'notifications'),
     readTable(sql, 'app_settings'),
   ])
   await writeAuditLog(env, currentUser, 'backup_export', 'system', null, { format: 'json' })
@@ -81,6 +84,7 @@ export const onRequestGet = async ({ env, request }: { env: Env; request: Reques
       categories,
       users,
       vipRequests,
+      notifications,
       settings,
     },
   })

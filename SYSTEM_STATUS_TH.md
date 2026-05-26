@@ -101,10 +101,15 @@
 
 - มี Activity Log เก็บการกระทำสำคัญ เช่น สมัครสมาชิก แก้ setting อนุมัติ VIP แก้สิทธิ์สมาชิก backup และตรวจลิงก์
 - มี Error Log เก็บปัญหา เช่น login failed, bot check failed, register duplicate, API error และ Telegram send failed
+- มี Notification Center แบบเก็บลงฐานข้อมูลผ่านตาราง `notifications`
+  - แสดงสถานะอ่านแล้ว/ยังไม่อ่าน
+  - กดอ่านทีละรายการ หรืออ่านทั้งหมดแล้วได้
+  - สร้างแจ้งเตือนจากคำขอ VIP, สื่อรอตรวจ, error ล่าสุด, ลิงก์เสีย และ Maintenance Mode
 - มี System Health ดู Cloudflare, Neon, API, response time, last backup, error ล่าสุด และจำนวนข้อมูลสำคัญ
 - มี Broken Link Checker ตรวจลิงก์จาก media links และบันทึกผลลงฐานข้อมูล
 - มี Backup Export เป็น JSON ทั้งระบบ และ CSV แยกตาราง
 - Backup/Restore รองรับ `tags` และ `media_tags`
+- Backup/Restore รองรับ `notifications`
 - มี Restore Import แบบปลอดภัยจากไฟล์ JSON backup
   - Preview ข้อมูลก่อนนำเข้า
   - ยืนยันก่อน restore จริง
@@ -120,7 +125,7 @@
 - มีการ์ดสรุปจำนวนสมาชิก สื่อเผยแพร่ ยอดดาวน์โหลด และงานรอตรวจ
 - มีกราฟแท่งแบบเบา ๆ สำหรับสื่อยอดดาวน์โหลดสูงสุด
 - มีกราฟหมวดหมู่ที่มีสื่อมากสุด
-- มี Notification Center จากข้อมูลจริง เช่น VIP รอตรวจ, สื่อรอตรวจ, error, ลิงก์เสีย และ maintenance mode
+- มี Notification Center จากฐานข้อมูลจริง พร้อม unread/read
 
 ## สิ่งที่ยังขาดหรือควรทำต่อ
 
@@ -132,32 +137,27 @@
 
 ### ควรทำต่อเมื่อระบบหลักนิ่ง
 
-1. Notification Center แบบเก็บลงฐานข้อมูล
-   - ตอนนี้เป็น notification จากข้อมูลสด
-   - ควรมีตาราง notifications เพื่อ mark read/unread ได้
-
-2. Broken Link Checker แบบ background/รอบเวลา
+1. Broken Link Checker แบบ background/รอบเวลา
    - ตอนนี้กดตรวจจากหลังบ้าน
    - ถ้าต้องการอัตโนมัติควรใช้ Cron Trigger ของ Cloudflare
 
-3. Error Log รายละเอียดมากขึ้น
+2. Error Log รายละเอียดมากขึ้น
    - เพิ่ม filter ตาม date/severity
    - เพิ่มปุ่ม clear เฉพาะ superadmin
 
-4. Audit Log รายละเอียดมากขึ้น
+3. Audit Log รายละเอียดมากขึ้น
    - เพิ่ม filter date
    - เพิ่ม export เฉพาะ activity log แล้ว
 
-5. Telegram settings ผ่านหลังบ้าน
+4. Telegram settings ผ่านหลังบ้าน
    - ตอนนี้ใช้ env เพื่อความปลอดภัย
    - ถ้าจะตั้งผ่านหลังบ้าน ต้องออกแบบการเก็บ secret ให้รอบคอบ
 
 ## ลำดับงานแนะนำต่อไป
 
-1. ทำ notification table พร้อม read/unread
-2. ทำกราฟเชิงเวลาโดยเก็บ event/download log จริง
-3. ทำ Cron ตรวจลิงก์อัตโนมัติ
-4. ทำ Restore แบบ replace เฉพาะตารางที่เลือกได้ หากต้องการล้างข้อมูลเดิมก่อนนำเข้า
+1. ทำกราฟเชิงเวลาโดยเก็บ event/download log จริง
+2. ทำ Cron ตรวจลิงก์อัตโนมัติ
+3. ทำ Restore แบบ replace เฉพาะตารางที่เลือกได้ หากต้องการล้างข้อมูลเดิมก่อนนำเข้า
 
 ## ไฟล์หลักที่ควรดูเมื่อทำงานต่อ
 
@@ -165,6 +165,7 @@
 - `functions/_lib/db.ts`
 - `functions/_lib/admin.ts`
 - `functions/_lib/notify.ts`
+- `functions/_lib/notifications.ts`
 - `functions/api/media/index.ts`
 - `functions/api/media/[id].ts`
 - `functions/api/admin/users.ts`
@@ -174,10 +175,11 @@
 - `functions/api/admin/errors.ts`
 - `functions/api/admin/health.ts`
 - `functions/api/admin/link-checks.ts`
+- `functions/api/admin/notifications.ts`
 - `functions/api/settings.ts`
 
 ## สถานะตรวจล่าสุด
 
 - `npm run lint` ผ่าน
 - `npm run build` ผ่าน
-- ฟีเจอร์ที่เพิ่มล่าสุด: ระบบแท็กจริง `tags/media_tags`, Admin Permission รายเมนู, Restore Import แบบ preview/merge, Activity/Error Log filter + CSV export, Activity Log, Error Log, System Health, Backup Export, Broken Link Checker, Maintenance Mode, Notification Center, กราฟ dashboard เบื้องต้น, admin role toggle และ Telegram optional notification
+- ฟีเจอร์ที่เพิ่มล่าสุด: Notification Center แบบฐานข้อมูลพร้อม read/unread, ระบบแท็กจริง `tags/media_tags`, Admin Permission รายเมนู, Restore Import แบบ preview/merge, Activity/Error Log filter + CSV export, Activity Log, Error Log, System Health, Backup Export, Broken Link Checker, Maintenance Mode, กราฟ dashboard เบื้องต้น, admin role toggle และ Telegram optional notification

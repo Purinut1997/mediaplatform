@@ -6,8 +6,8 @@ type BackupPayload = {
   action?: 'preview' | 'commit'
   confirm?: boolean
   backup?: {
-    data?: Partial<Record<'media' | 'mediaLinks' | 'tags' | 'mediaTags' | 'categories' | 'users' | 'vipRequests' | 'settings', BackupRow[]>>
-  } & Partial<Record<'media' | 'mediaLinks' | 'tags' | 'mediaTags' | 'categories' | 'users' | 'vipRequests' | 'settings', BackupRow[]>>
+    data?: Partial<Record<'media' | 'mediaLinks' | 'tags' | 'mediaTags' | 'categories' | 'users' | 'vipRequests' | 'notifications' | 'settings', BackupRow[]>>
+  } & Partial<Record<'media' | 'mediaLinks' | 'tags' | 'mediaTags' | 'categories' | 'users' | 'vipRequests' | 'notifications' | 'settings', BackupRow[]>>
 }
 
 const text = (value: unknown, fallback = '') => String(value ?? fallback).trim()
@@ -33,6 +33,7 @@ function readData(payload: BackupPayload) {
     categories: Array.isArray(source.categories) ? source.categories : [],
     users: Array.isArray(source.users) ? source.users : [],
     vipRequests: Array.isArray(source.vipRequests) ? source.vipRequests : [],
+    notifications: Array.isArray(source.notifications) ? source.notifications : [],
     settings: Array.isArray(source.settings) ? source.settings : [],
   }
 }
@@ -46,6 +47,7 @@ function preview(data: ReturnType<typeof readData>) {
     mediaTags: data.mediaTags.length,
     users: data.users.length,
     vipRequests: data.vipRequests.length,
+    notifications: data.notifications.length,
     settings: data.settings.length,
     warnings: [
       'โหมด restore นี้เป็นแบบ merge และไม่ลบข้อมูลเดิม',
@@ -220,6 +222,36 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
         where not exists (
           select 1 from vip_requests where lower(email) = ${email} and created_at = ${createdAt}
         )
+      `
+    }
+
+    for (const notification of data.notifications) {
+      const title = text(notification.title)
+      const fingerprint = text(notification.fingerprint)
+      if (!title || !fingerprint) continue
+      await sql`
+        insert into notifications (
+          audience, type, title, detail, tone, target_type, target_id, fingerprint, read_at, created_at
+        )
+        values (
+          ${text(notification.audience, 'superadmin')},
+          ${text(notification.type, 'system')},
+          ${title},
+          ${text(notification.detail)},
+          ${text(notification.tone, 'sky')},
+          ${text(notification.target_type) || null},
+          ${text(notification.target_id) || null},
+          ${fingerprint},
+          ${text(notification.read_at) || null},
+          ${text(notification.created_at) || new Date().toISOString()}
+        )
+        on conflict (fingerprint) do update set
+          title = excluded.title,
+          detail = excluded.detail,
+          tone = excluded.tone,
+          target_type = excluded.target_type,
+          target_id = excluded.target_id,
+          read_at = excluded.read_at
       `
     }
 

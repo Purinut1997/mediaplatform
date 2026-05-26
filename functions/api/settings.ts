@@ -1,6 +1,7 @@
 import { getCurrentUser } from '../_lib/auth'
 import { writeAuditLog, writeErrorLog } from '../_lib/admin'
 import { ensureSchema, getSql, type Env } from '../_lib/db'
+import { writeNotification } from '../_lib/notifications'
 
 type SiteSettings = {
   heroEyebrow: string
@@ -119,6 +120,18 @@ export const onRequestPut = async ({ env, request }: { env: Env; request: Reques
       maintenanceEnabled: settings.maintenanceEnabled,
       vipRegistrationEnabled: settings.vipRegistrationEnabled,
     })
+    if (settings.maintenanceEnabled) {
+      await writeNotification(env, {
+        audience: 'superadmin',
+        type: 'maintenance',
+        title: 'Maintenance Mode เปิดอยู่',
+        detail: 'ผู้ใช้ทั่วไปจะเห็นหน้าปิดปรับปรุง',
+        tone: 'amber',
+        targetType: 'app_settings',
+        targetId: 'site',
+        fingerprint: 'system:maintenance',
+      })
+    }
 
     return Response.json({ ok: true, settings })
   } catch (error) {

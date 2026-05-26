@@ -1,6 +1,7 @@
 import { requireAdminPermission, writeAuditLog } from '../../_lib/admin'
 import { ensureSchema, getSql, type Env } from '../../_lib/db'
 import { notifyTelegram } from '../../_lib/notify'
+import { writeNotification } from '../../_lib/notifications'
 
 type LinkRow = {
   media_id: number
@@ -82,6 +83,15 @@ async function runChecks(env: Env, request: Request) {
   })
   const errorCount = results.filter((result) => result.status === 'error').length
   if (errorCount > 0) {
+    await writeNotification(env, {
+      audience: 'admin',
+      type: 'broken_links',
+      title: 'พบลิงก์มีปัญหา',
+      detail: `${errorCount} รายการจากการตรวจล่าสุด`,
+      tone: 'red',
+      targetType: 'media_links',
+      fingerprint: `link_check:${new Date().toISOString().slice(0, 10)}:${errorCount}`,
+    })
     await notifyTelegram(env, `MIKPURINUT Media Platform\nพบลิงก์มีปัญหา ${errorCount} รายการจากการตรวจล่าสุด`)
   }
 

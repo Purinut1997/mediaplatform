@@ -130,6 +130,22 @@ export async function ensureSchema(env: Env) {
   `
 
   await sql`
+    create table if not exists notifications (
+      id serial primary key,
+      audience text not null default 'superadmin',
+      type text not null,
+      title text not null,
+      detail text not null,
+      tone text not null default 'sky',
+      target_type text,
+      target_id text,
+      fingerprint text not null unique,
+      read_at timestamptz,
+      created_at timestamptz not null default now()
+    )
+  `
+
+  await sql`
     create table if not exists users (
       id serial primary key,
       name text not null,
@@ -226,6 +242,10 @@ export async function ensureSchema(env: Env) {
 
   await sql`
     create index if not exists media_tags_tag_idx on media_tags(tag_id, media_id)
+  `
+
+  await sql`
+    create index if not exists notifications_inbox_idx on notifications(audience, read_at, created_at desc)
   `
 
   await seedInitialData(env)

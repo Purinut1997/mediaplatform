@@ -2,6 +2,7 @@ import { getCurrentUser } from '../../_lib/auth'
 import { writeAuditLog } from '../../_lib/admin'
 import { ensureSchema, getSql, type Env } from '../../_lib/db'
 import { notifyTelegram } from '../../_lib/notify'
+import { writeNotification } from '../../_lib/notifications'
 
 type AdminAction = {
   action?: 'approve-vip' | 'reject-vip' | 'set-access' | 'set-status' | 'set-role'
@@ -86,6 +87,16 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
       `
     }
     await writeAuditLog(env, currentUser, 'approve_vip', 'vip_request', body.requestId)
+    await writeNotification(env, {
+      audience: 'superadmin',
+      type: 'vip_resolved',
+      title: 'อนุมัติคำขอ VIP แล้ว',
+      detail: `Request ID ${body.requestId} ถูกอนุมัติ`,
+      tone: 'emerald',
+      targetType: 'vip_request',
+      targetId: body.requestId,
+      fingerprint: `vip_request:${body.requestId}:approved`,
+    })
     await notifyTelegram(env, `MIKPURINUT Media Platform\nอนุมัติคำขอ VIP แล้ว\nRequest ID: ${body.requestId}`)
   } else if (body.action === 'reject-vip' && body.requestId) {
     await sql`
@@ -94,6 +105,16 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
       where id = ${body.requestId}
     `
     await writeAuditLog(env, currentUser, 'reject_vip', 'vip_request', body.requestId)
+    await writeNotification(env, {
+      audience: 'superadmin',
+      type: 'vip_resolved',
+      title: 'ปฏิเสธคำขอ VIP แล้ว',
+      detail: `Request ID ${body.requestId} ถูกปฏิเสธ`,
+      tone: 'red',
+      targetType: 'vip_request',
+      targetId: body.requestId,
+      fingerprint: `vip_request:${body.requestId}:rejected`,
+    })
     await notifyTelegram(env, `MIKPURINUT Media Platform\nปฏิเสธคำขอ VIP\nRequest ID: ${body.requestId}`)
   } else if (body.action === 'set-access' && body.userId && body.access) {
     await sql`

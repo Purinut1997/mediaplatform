@@ -157,7 +157,21 @@ type SystemHealth = {
     pendingVip: number
     links: number
     errors24h: number
+    unreadNotifications?: number
   }
+}
+
+type AdminNotification = {
+  id: number
+  audience: 'superadmin' | 'admin' | 'all'
+  type: string
+  title: string
+  detail: string
+  tone: 'sky' | 'amber' | 'red' | 'emerald'
+  targetType: string | null
+  targetId: string | null
+  readAt: string | null
+  createdAt: string
 }
 
 type LinkCheckResult = {
@@ -180,6 +194,7 @@ type RestorePreview = {
   mediaTags: number
   users: number
   vipRequests: number
+  notifications: number
   settings: number
   skippedUsers?: number
   warnings: string[]
@@ -2140,6 +2155,7 @@ function AdminPanel({
   const [vipRequests, setVipRequests] = useState<VipRequest[]>([])
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([])
   const [errorLogs, setErrorLogs] = useState<ErrorLog[]>([])
+  const [notifications, setNotifications] = useState<AdminNotification[]>([])
   const [systemHealth, setSystemHealth] = useState<SystemHealth | null>(null)
   const [linkChecks, setLinkChecks] = useState<LinkCheckResult[]>([])
   const [restoreText, setRestoreText] = useState('')
@@ -2158,7 +2174,6 @@ function AdminPanel({
   const pendingVipRequests = vipRequests.filter((request) => request.status === 'pending')
   const linkedMedia = mediaItems.filter((item) => item.resourceUrl || item.previewUrl || item.links?.some((link) => link.url || link.previewUrl))
   const publishedMediaCount = mediaItems.filter((item) => normalizeMediaStatus(item.status) === 'เผยแพร่แล้ว').length
-  const pendingMediaCount = mediaItems.filter((item) => normalizeMediaStatus(item.status) === 'รอตรวจสอบ').length
   const tagStats = Array.from(
     mediaItems.reduce((map, item) => {
       item.tags?.forEach((tag) => map.set(tag, (map.get(tag) ?? 0) + 1))
@@ -2201,43 +2216,7 @@ function AdminPanel({
     .slice(0, 5)
   const maxDownloads = Math.max(1, ...topDownloadedMedia.map((item) => item.downloads))
   const maxCategoryCount = Math.max(1, ...categoryStats.map((item) => item.count))
-  const adminNotifications = [
-    isSuperAdmin && pendingVipRequests.length > 0 && {
-      title: 'มีคำขอ VIP รอตรวจ',
-      detail: `${pendingVipRequests.length} รายการต้องตรวจสอบ`,
-      tone: 'amber',
-      action: () => setAdminSection('members'),
-    },
-    pendingMediaCount > 0 && {
-      title: 'มีสื่อรอตรวจสอบ',
-      detail: `${pendingMediaCount} รายการควรตรวจก่อนเผยแพร่`,
-      tone: 'sky',
-      action: () => setAdminSection('media'),
-    },
-    isSuperAdmin && errorLogs.length > 0 && {
-      title: 'พบ Error ล่าสุด',
-      detail: `${errorLogs.length} รายการใน log`,
-      tone: 'red',
-      action: () => setAdminSection('errors'),
-    },
-    linkChecks.some((item) => item.status === 'error') && {
-      title: 'มีลิงก์ที่ควรแก้',
-      detail: `${linkChecks.filter((item) => item.status === 'error').length} ลิงก์มีปัญหา`,
-      tone: 'red',
-      action: () => setAdminSection('links'),
-    },
-    isSuperAdmin && settings.maintenanceEnabled && {
-      title: 'Maintenance Mode เปิดอยู่',
-      detail: 'ผู้ใช้ทั่วไปจะเห็นหน้าปิดปรับปรุง',
-      tone: 'amber',
-      action: () => setAdminSection('settings'),
-    },
-  ].filter(Boolean) as Array<{
-    title: string
-    detail: string
-    tone: 'amber' | 'sky' | 'red'
-    action: () => void
-  }>
+  const unreadNotifications = notifications.filter((notice) => !notice.readAt).length
   const filteredAuditLogs = auditLogs.filter((log) => {
     const query = activityQuery.trim().toLowerCase()
     if (!query) return true
@@ -2269,7 +2248,7 @@ function AdminPanel({
       value: mediaItems.reduce((sum, item) => sum + item.downloads, 0).toLocaleString('th-TH'),
       icon: Download,
     },
-    { label: 'รอตรวจทั้งหมด', value: (pendingVipRequests.length + pendingMediaCount).toLocaleString('th-TH'), icon: AlertCircle },
+    { label: 'แจ้งเตือนใหม่', value: unreadNotifications.toLocaleString('th-TH'), icon: AlertCircle },
   ]
 
   const loadMembers = async () => {
@@ -2303,11 +2282,21 @@ function AdminPanel({
         }).format(new Date(value))
       : '-'
 
+  const loadNotifications = async () => {
+    const response = await fetch('/api/admin/notifications', { credentials: 'include' })
+    const result = await readJson<{ notifications?: AdminNotification[]; error?: string }>(response)
+    if (!response.ok) throw new Error(result.error ?? 'โหลด Notification Center ไม่สำเร็จ')
+    setNotifications(result.notifications ?? [])
+  }
+
   const loadOpsData = async () => {
     setLoadingOps(true)
     setOpsError('')
     try {
-      const healthResponse = await fetch('/api/admin/health', { credentials: 'include' })
+      const [healthResponse] = await Promise.all([
+        fetch('/api/admin/health', { credentials: 'include' }),
+        loadNotifications(),
+      ])
       const health = await readJson<{ health?: SystemHealth; error?: string }>(healthResponse)
       if (!healthResponse.ok) throw new Error(health.error ?? 'โหลด System Health ไม่สำเร็จ')
 
@@ -2333,6 +2322,31 @@ function AdminPanel({
       setOpsError(opsLoadError instanceof Error ? opsLoadError.message : 'โหลดข้อมูลหลังบ้านไม่สำเร็จ')
     } finally {
       setLoadingOps(false)
+    }
+  }
+
+  const jumpFromNotification = (notice: AdminNotification) => {
+    if (notice.targetType === 'vip_request' && isSuperAdmin) setAdminSection('members')
+    else if (notice.targetType === 'media') setAdminSection('media')
+    else if (notice.targetType === 'media_links') setAdminSection('links')
+    else if (notice.targetType === 'error_logs' && isSuperAdmin) setAdminSection('errors')
+    else if (notice.targetType === 'app_settings' && isSuperAdmin) setAdminSection('settings')
+  }
+
+  const submitNotificationAction = async (payload: { action: 'mark-read' | 'mark-unread' | 'mark-all-read'; id?: number }) => {
+    setOpsError('')
+    try {
+      const response = await fetch('/api/admin/notifications', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(payload),
+      })
+      const result = await readJson<{ error?: string }>(response)
+      if (!response.ok) throw new Error(result.error ?? 'อัปเดตแจ้งเตือนไม่สำเร็จ')
+      await loadNotifications()
+    } catch (notificationError) {
+      setOpsError(notificationError instanceof Error ? notificationError.message : 'อัปเดตแจ้งเตือนไม่สำเร็จ')
     }
   }
 
@@ -2866,29 +2880,70 @@ function AdminPanel({
                 </div>
 
                 <div className="rounded-2xl border border-white/10 bg-black/20 p-5">
-                  <p className="mb-4 font-black text-white">Notification Center</p>
+                  <div className="mb-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+                    <div>
+                      <p className="font-black text-white">Notification Center</p>
+                      <p className="mt-1 text-xs font-bold text-slate-500">
+                        {unreadNotifications.toLocaleString('th-TH')} รายการยังไม่อ่าน
+                      </p>
+                    </div>
+                    <button
+                      className="min-h-10 rounded-xl bg-white/10 px-3 text-xs font-black text-cyan-100 disabled:opacity-40"
+                      disabled={unreadNotifications === 0}
+                      onClick={() => void submitNotificationAction({ action: 'mark-all-read' })}
+                      type="button"
+                    >
+                      อ่านทั้งหมดแล้ว
+                    </button>
+                  </div>
                   <div className="grid gap-3">
-                    {adminNotifications.length === 0 && (
+                    {notifications.length === 0 && (
                       <div className="rounded-2xl border border-dashed border-white/15 p-4 text-sm font-bold text-slate-400">
                         ตอนนี้ไม่มีแจ้งเตือนสำคัญ
                       </div>
                     )}
-                    {adminNotifications.map((notice) => (
-                      <button
-                        className={`rounded-2xl p-4 text-left transition hover:-translate-y-0.5 ${
+                    {notifications.slice(0, 8).map((notice) => (
+                      <article
+                        className={`rounded-2xl border p-4 transition hover:-translate-y-0.5 ${
+                          notice.readAt ? 'opacity-55' : ''
+                        } ${
                           notice.tone === 'red'
-                            ? 'bg-red-400/10 text-red-100'
+                            ? 'border-red-300/15 bg-red-400/10 text-red-100'
                             : notice.tone === 'amber'
-                              ? 'bg-amber-300/10 text-amber-100'
-                              : 'bg-sky-300/10 text-sky-100'
+                              ? 'border-amber-300/15 bg-amber-300/10 text-amber-100'
+                              : notice.tone === 'emerald'
+                                ? 'border-emerald-300/15 bg-emerald-300/10 text-emerald-100'
+                                : 'border-sky-300/15 bg-sky-300/10 text-sky-100'
                         }`}
-                        key={notice.title}
-                        onClick={notice.action}
-                        type="button"
+                        key={notice.id}
                       >
-                        <span className="block font-black">{notice.title}</span>
-                        <span className="mt-1 block text-sm font-semibold opacity-75">{notice.detail}</span>
-                      </button>
+                        <button
+                          className="block w-full text-left"
+                          onClick={() => jumpFromNotification(notice)}
+                          type="button"
+                        >
+                          <span className="flex items-start justify-between gap-3">
+                            <span className="font-black">{notice.title}</span>
+                            {!notice.readAt && <span className="mt-1 h-2.5 w-2.5 rounded-full bg-cyan-300" />}
+                          </span>
+                          <span className="mt-1 block text-sm font-semibold opacity-75">{notice.detail}</span>
+                          <span className="mt-2 block text-xs font-bold opacity-55">{formatAdminDate(notice.createdAt)}</span>
+                        </button>
+                        <div className="mt-3 flex justify-end">
+                          <button
+                            className="rounded-lg bg-black/20 px-3 py-2 text-xs font-black"
+                            onClick={() =>
+                              void submitNotificationAction({
+                                action: notice.readAt ? 'mark-unread' : 'mark-read',
+                                id: notice.id,
+                              })
+                            }
+                            type="button"
+                          >
+                            {notice.readAt ? 'ทำเป็นยังไม่อ่าน' : 'อ่านแล้ว'}
+                          </button>
+                        </div>
+                      </article>
                     ))}
                   </div>
                 </div>
@@ -3505,6 +3560,7 @@ function AdminPanel({
                   ['Last Backup', formatAdminDate(systemHealth.lastBackupAt)],
                   ['สื่อทั้งหมด', systemHealth.counts.media.toLocaleString('th-TH')],
                   ['Error 24 ชม.', systemHealth.counts.errors24h.toLocaleString('th-TH')],
+                  ['แจ้งเตือนยังไม่อ่าน', (systemHealth.counts.unreadNotifications ?? unreadNotifications).toLocaleString('th-TH')],
                 ].map(([label, value]) => (
                   <article className="rounded-2xl border border-white/10 bg-black/20 p-4" key={label}>
                     <p className="text-sm font-bold text-slate-400">{label}</p>
@@ -3659,7 +3715,7 @@ function AdminPanel({
                 <Archive size={20} />
                 ดาวน์โหลด JSON ทั้งระบบ
               </button>
-              {['media', 'media_links', 'tags', 'media_tags', 'categories', 'users', 'vip_requests', 'app_settings'].map((table) => (
+              {['media', 'media_links', 'tags', 'media_tags', 'categories', 'users', 'vip_requests', 'notifications', 'app_settings'].map((table) => (
                 <button
                   className="inline-flex min-h-16 items-center justify-center gap-2 rounded-2xl border border-white/10 bg-black/20 px-5 font-black text-white disabled:opacity-60"
                   disabled={loadingOps}
@@ -3737,6 +3793,7 @@ function AdminPanel({
                         ['แท็กของสื่อ', restorePreview.mediaTags],
                         ['ผู้ใช้', restorePreview.users],
                         ['คำขอ VIP', restorePreview.vipRequests],
+                        ['แจ้งเตือน', restorePreview.notifications],
                         ['Settings', restorePreview.settings],
                       ].map(([label, value]) => (
                         <div className="rounded-xl bg-black/20 p-3" key={label}>

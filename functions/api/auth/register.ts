@@ -3,6 +3,7 @@ import { writeAuditLog, writeErrorLog } from '../../_lib/admin'
 import { validateBotCheck, type BotCheckPayload } from '../../_lib/bot'
 import { ensureSchema, getSql, hashPassword, type Env } from '../../_lib/db'
 import { notifyTelegram } from '../../_lib/notify'
+import { writeNotification } from '../../_lib/notifications'
 
 type RegisterPayload = BotCheckPayload & {
   name?: string
@@ -56,10 +57,21 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
   `) as Array<{ id: number }>
 
   if (membership === 'vip') {
-    await sql`
+    const [vipRequest] = await sql`
       insert into vip_requests (user_id, name, email, phone, slip_name)
       values (${user.id}, ${name}, ${email}, ${phone || null}, ${body.slipName ?? null})
+      returning id
     `
+    await writeNotification(env, {
+      audience: 'superadmin',
+      type: 'vip_pending',
+      title: 'มีคำขอ VIP ใหม่',
+      detail: `${name} (${email}) รอการตรวจสอบ`,
+      tone: 'amber',
+      targetType: 'vip_request',
+      targetId: vipRequest?.id,
+      fingerprint: `vip_request:${vipRequest?.id ?? email}`,
+    })
     await notifyTelegram(env, `MIKPURINUT Media Platform\nมีคำขอ VIP ใหม่\nชื่อ: ${name}\nอีเมล: ${email}`)
   }
   await writeAuditLog(env, email, 'register_user', 'user', user.id, { membership })
