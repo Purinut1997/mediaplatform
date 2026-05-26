@@ -94,6 +94,16 @@ export async function ensureSchema(env: Env) {
   `
 
   await sql`
+    create table if not exists media_events (
+      id serial primary key,
+      media_id integer references media(id) on delete cascade,
+      user_email text,
+      event_type text not null check (event_type in ('view', 'download')),
+      created_at timestamptz not null default now()
+    )
+  `
+
+  await sql`
     create table if not exists audit_logs (
       id serial primary key,
       actor text not null default 'system',
@@ -242,6 +252,14 @@ export async function ensureSchema(env: Env) {
 
   await sql`
     create index if not exists media_tags_tag_idx on media_tags(tag_id, media_id)
+  `
+
+  await sql`
+    create index if not exists media_events_type_created_idx on media_events(event_type, created_at desc)
+  `
+
+  await sql`
+    create index if not exists media_events_media_created_idx on media_events(media_id, created_at desc)
   `
 
   await sql`

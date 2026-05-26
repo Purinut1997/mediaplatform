@@ -26,6 +26,7 @@
 - รองรับ Light Mode และ Dark Mode
 - มีภาพแบรนด์, particle/grid background และเครดิต `Created by MIKPURINUT`
 - แสดงสื่อแบบการ์ดและหน้ารายละเอียดสื่อ
+- เก็บ event การเข้าชมและดาวน์โหลดจริงผ่านตาราง `media_events`
 - แยกสิทธิ์ Public / Member / VIP / ซื้อแยก
 - รองรับลิงก์สื่อหลายรายการต่อการ์ด เช่น Google Drive, Google Sheet, YouTube และ External Link
 - รองรับแท็กจริงต่อสื่อผ่านตาราง `tags` และ `media_tags`
@@ -110,6 +111,7 @@
 - มี Backup Export เป็น JSON ทั้งระบบ และ CSV แยกตาราง
 - Backup/Restore รองรับ `tags` และ `media_tags`
 - Backup/Restore รองรับ `notifications`
+- Backup/Restore รองรับ `media_events`
 - มี Restore Import แบบปลอดภัยจากไฟล์ JSON backup
   - Preview ข้อมูลก่อนนำเข้า
   - ยืนยันก่อน restore จริง
@@ -126,38 +128,40 @@
 - มีกราฟแท่งแบบเบา ๆ สำหรับสื่อยอดดาวน์โหลดสูงสุด
 - มีกราฟหมวดหมู่ที่มีสื่อมากสุด
 - มี Notification Center จากฐานข้อมูลจริง พร้อม unread/read
+- มีกราฟเชิงเวลาจริงจาก event/database:
+  - ดาวน์โหลดรายวัน 14 วัน
+  - การเข้าชมรายวัน 14 วัน
+  - สมาชิกใหม่รายเดือน
+  - คำขอ VIP รายสัปดาห์
+  - สื่อยอดดาวน์โหลดจริง 10 อันดับ
 
 ## สิ่งที่ยังขาดหรือควรทำต่อ
 
 ### สำคัญมาก
 
-1. Graph เชิงเวลาจริง
-   - ตอนนี้ dashboard มีกราฟจากข้อมูลปัจจุบัน
-   - ยังไม่มี daily download, monthly new members, weekly VIP requests จาก event table จริง
+1. Cron ตรวจลิงก์อัตโนมัติ
+   - ตอนนี้กดตรวจจากหลังบ้าน
+   - ควรใช้ Cloudflare Cron Trigger ถ้าต้องการให้ระบบตรวจเองทุกวัน
 
 ### ควรทำต่อเมื่อระบบหลักนิ่ง
 
-1. Broken Link Checker แบบ background/รอบเวลา
-   - ตอนนี้กดตรวจจากหลังบ้าน
-   - ถ้าต้องการอัตโนมัติควรใช้ Cron Trigger ของ Cloudflare
-
-2. Error Log รายละเอียดมากขึ้น
+1. Error Log รายละเอียดมากขึ้น
    - เพิ่ม filter ตาม date/severity
    - เพิ่มปุ่ม clear เฉพาะ superadmin
 
-3. Audit Log รายละเอียดมากขึ้น
+2. Audit Log รายละเอียดมากขึ้น
    - เพิ่ม filter date
    - เพิ่ม export เฉพาะ activity log แล้ว
 
-4. Telegram settings ผ่านหลังบ้าน
+3. Telegram settings ผ่านหลังบ้าน
    - ตอนนี้ใช้ env เพื่อความปลอดภัย
    - ถ้าจะตั้งผ่านหลังบ้าน ต้องออกแบบการเก็บ secret ให้รอบคอบ
 
 ## ลำดับงานแนะนำต่อไป
 
-1. ทำกราฟเชิงเวลาโดยเก็บ event/download log จริง
-2. ทำ Cron ตรวจลิงก์อัตโนมัติ
-3. ทำ Restore แบบ replace เฉพาะตารางที่เลือกได้ หากต้องการล้างข้อมูลเดิมก่อนนำเข้า
+1. ทำ Cron ตรวจลิงก์อัตโนมัติ
+2. ทำ Restore แบบ replace เฉพาะตารางที่เลือกได้ หากต้องการล้างข้อมูลเดิมก่อนนำเข้า
+3. เพิ่ม filter date/severity ให้ Error Log และ Activity Log
 
 ## ไฟล์หลักที่ควรดูเมื่อทำงานต่อ
 
@@ -168,6 +172,8 @@
 - `functions/_lib/notifications.ts`
 - `functions/api/media/index.ts`
 - `functions/api/media/[id].ts`
+- `functions/api/media/track.ts`
+- `functions/api/admin/analytics.ts`
 - `functions/api/admin/users.ts`
 - `functions/api/admin/activity.ts`
 - `functions/api/admin/backup.ts`
@@ -182,4 +188,4 @@
 
 - `npm run lint` ผ่าน
 - `npm run build` ผ่าน
-- ฟีเจอร์ที่เพิ่มล่าสุด: Notification Center แบบฐานข้อมูลพร้อม read/unread, ระบบแท็กจริง `tags/media_tags`, Admin Permission รายเมนู, Restore Import แบบ preview/merge, Activity/Error Log filter + CSV export, Activity Log, Error Log, System Health, Backup Export, Broken Link Checker, Maintenance Mode, กราฟ dashboard เบื้องต้น, admin role toggle และ Telegram optional notification
+- ฟีเจอร์ที่เพิ่มล่าสุด: Analytics เชิงเวลาจริงด้วย `media_events`, Notification Center แบบฐานข้อมูลพร้อม read/unread, ระบบแท็กจริง `tags/media_tags`, Admin Permission รายเมนู, Restore Import แบบ preview/merge, Activity/Error Log filter + CSV export, Activity Log, Error Log, System Health, Backup Export, Broken Link Checker, Maintenance Mode, admin role toggle และ Telegram optional notification

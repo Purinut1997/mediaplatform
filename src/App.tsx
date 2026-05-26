@@ -174,6 +174,19 @@ type AdminNotification = {
   createdAt: string
 }
 
+type AnalyticsPoint = {
+  label: string
+  value: number
+}
+
+type AdminAnalytics = {
+  downloadsDaily: AnalyticsPoint[]
+  viewsDaily: AnalyticsPoint[]
+  membersMonthly: AnalyticsPoint[]
+  vipWeekly: AnalyticsPoint[]
+  topDownloads: AnalyticsPoint[]
+}
+
 type LinkCheckResult = {
   mediaId: number
   mediaTitle: string
@@ -190,6 +203,7 @@ type RestorePreview = {
   categories: number
   media: number
   mediaLinks: number
+  mediaEvents: number
   tags: number
   mediaTags: number
   users: number
@@ -393,6 +407,15 @@ function canAccessAdmin(user: CurrentUser | null) {
   return user?.role === 'superadmin' || user?.role === 'admin'
 }
 
+function trackMediaEvent(mediaId: number, eventType: 'view' | 'download') {
+  void fetch('/api/media/track', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ mediaId, eventType }),
+  }).catch(() => undefined)
+}
+
 function getPreviewUrl(item: MediaItem) {
   const primaryLink = item.links?.[0]
   const link = primaryLink?.previewUrl || primaryLink?.url || item.previewUrl || item.resourceUrl || ''
@@ -578,6 +601,7 @@ function App() {
   const openDetail = (item: MediaItem) => {
     setSelected(item)
     setView('detail')
+    trackMediaEvent(item.id, 'view')
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
@@ -1367,6 +1391,7 @@ function MediaDetail({
       window.open(item.resourceUrl, '_blank', 'noopener,noreferrer')
     }
 
+    trackMediaEvent(item.id, 'download')
     onSuccess()
   }
 
@@ -2156,6 +2181,7 @@ function AdminPanel({
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([])
   const [errorLogs, setErrorLogs] = useState<ErrorLog[]>([])
   const [notifications, setNotifications] = useState<AdminNotification[]>([])
+  const [analytics, setAnalytics] = useState<AdminAnalytics | null>(null)
   const [systemHealth, setSystemHealth] = useState<SystemHealth | null>(null)
   const [linkChecks, setLinkChecks] = useState<LinkCheckResult[]>([])
   const [restoreText, setRestoreText] = useState('')
@@ -2214,7 +2240,7 @@ function AdminPanel({
     .filter((item) => item.count > 0)
     .sort((a, b) => b.count - a.count)
     .slice(0, 5)
-  const maxDownloads = Math.max(1, ...topDownloadedMedia.map((item) => item.downloads))
+  const maxDownloads = Math.max(1, ...(analytics?.topDownloads.length ? analytics.topDownloads.map((item) => item.value) : topDownloadedMedia.map((item) => item.downloads)))
   const maxCategoryCount = Math.max(1, ...categoryStats.map((item) => item.count))
   const unreadNotifications = notifications.filter((notice) => !notice.readAt).length
   const filteredAuditLogs = auditLogs.filter((log) => {
@@ -2289,6 +2315,13 @@ function AdminPanel({
     setNotifications(result.notifications ?? [])
   }
 
+  const loadAnalytics = async () => {
+    const response = await fetch('/api/admin/analytics', { credentials: 'include' })
+    const result = await readJson<{ analytics?: AdminAnalytics; error?: string }>(response)
+    if (!response.ok) throw new Error(result.error ?? 'โหลด Analytics ไม่สำเร็จ')
+    setAnalytics(result.analytics ?? null)
+  }
+
   const loadOpsData = async () => {
     setLoadingOps(true)
     setOpsError('')
@@ -2296,6 +2329,7 @@ function AdminPanel({
       const [healthResponse] = await Promise.all([
         fetch('/api/admin/health', { credentials: 'include' }),
         loadNotifications(),
+        loadAnalytics(),
       ])
       const health = await readJson<{ health?: SystemHealth; error?: string }>(healthResponse)
       if (!healthResponse.ok) throw new Error(health.error ?? 'โหลด System Health ไม่สำเร็จ')
@@ -2835,20 +2869,43 @@ function AdminPanel({
                 </div>
               </div>
 
+              <div className="mt-4 grid gap-4 xl:grid-cols-2">
+                <AnalyticsBars
+                  color="cyan"
+                  points={analytics?.downloadsDaily ?? []}
+                  title="ดาวน์โหลดรายวัน 14 วัน"
+                />
+                <AnalyticsBars
+                  color="sky"
+                  points={analytics?.viewsDaily ?? []}
+                  title="การเข้าชมรายวัน 14 วัน"
+                />
+                <AnalyticsBars
+                  color="emerald"
+                  points={analytics?.membersMonthly ?? []}
+                  title="สมาชิกใหม่รายเดือน"
+                />
+                <AnalyticsBars
+                  color="amber"
+                  points={analytics?.vipWeekly ?? []}
+                  title="คำขอ VIP รายสัปดาห์"
+                />
+              </div>
+
               <div className="mt-4 grid gap-4 xl:grid-cols-[1fr_1fr_0.9fr]">
                 <div className="rounded-2xl border border-white/10 bg-black/20 p-5">
-                  <p className="mb-4 font-black text-white">สื่อยอดดาวน์โหลดสูงสุด</p>
+                  <p className="mb-4 font-black text-white">สื่อยอดดาวน์โหลดจริง 10 อันดับ</p>
                   <div className="grid gap-3">
-                    {topDownloadedMedia.map((item) => (
-                      <div key={item.id}>
+                    {(analytics?.topDownloads.length ? analytics.topDownloads : topDownloadedMedia.map((item) => ({ label: item.title, value: item.downloads }))).map((item) => (
+                      <div key={item.label}>
                         <div className="mb-1 flex items-center justify-between gap-3 text-sm">
-                          <span className="truncate font-bold text-slate-200">{item.title}</span>
-                          <span className="font-black text-cyan-200">{item.downloads}</span>
+                          <span className="truncate font-bold text-slate-200">{item.label}</span>
+                          <span className="font-black text-cyan-200">{item.value}</span>
                         </div>
                         <div className="h-2 overflow-hidden rounded-full bg-white/10">
                           <div
                             className="h-full rounded-full bg-gradient-to-r from-cyan-300 to-violet-400"
-                            style={{ width: `${Math.max(8, (item.downloads / maxDownloads) * 100)}%` }}
+                            style={{ width: `${Math.max(8, (item.value / maxDownloads) * 100)}%` }}
                           />
                         </div>
                       </div>
@@ -3715,7 +3772,7 @@ function AdminPanel({
                 <Archive size={20} />
                 ดาวน์โหลด JSON ทั้งระบบ
               </button>
-              {['media', 'media_links', 'tags', 'media_tags', 'categories', 'users', 'vip_requests', 'notifications', 'app_settings'].map((table) => (
+              {['media', 'media_links', 'media_events', 'tags', 'media_tags', 'categories', 'users', 'vip_requests', 'notifications', 'app_settings'].map((table) => (
                 <button
                   className="inline-flex min-h-16 items-center justify-center gap-2 rounded-2xl border border-white/10 bg-black/20 px-5 font-black text-white disabled:opacity-60"
                   disabled={loadingOps}
@@ -3789,6 +3846,7 @@ function AdminPanel({
                         ['หมวดหมู่', restorePreview.categories],
                         ['สื่อ', restorePreview.media],
                         ['ลิงก์สื่อ', restorePreview.mediaLinks],
+                        ['Event สื่อ', restorePreview.mediaEvents],
                         ['แท็ก', restorePreview.tags],
                         ['แท็กของสื่อ', restorePreview.mediaTags],
                         ['ผู้ใช้', restorePreview.users],
@@ -4281,6 +4339,58 @@ function AdminSelect<T extends string>({
         ))}
       </select>
     </label>
+  )
+}
+
+function AnalyticsBars({
+  color,
+  points,
+  title,
+}: {
+  color: 'cyan' | 'sky' | 'emerald' | 'amber'
+  points: AnalyticsPoint[]
+  title: string
+}) {
+  const max = Math.max(1, ...points.map((point) => point.value))
+  const fill = {
+    cyan: 'from-cyan-300 to-violet-400 text-cyan-200',
+    sky: 'from-sky-300 to-cyan-300 text-sky-200',
+    emerald: 'from-emerald-300 to-cyan-300 text-emerald-200',
+    amber: 'from-amber-300 to-orange-300 text-amber-200',
+  }[color]
+
+  return (
+    <article className="rounded-2xl border border-white/10 bg-black/20 p-5">
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <p className="font-black text-white">{title}</p>
+        <span className={`text-sm font-black ${fill.split(' ').at(-1)}`}>
+          {points.reduce((sum, point) => sum + point.value, 0).toLocaleString('th-TH')}
+        </span>
+      </div>
+      {points.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-white/15 p-4 text-sm font-bold text-slate-400">
+          ยังไม่มีข้อมูล analytics
+        </div>
+      ) : (
+        <div className="flex h-36 items-end gap-1.5">
+          {points.map((point) => (
+            <div className="flex min-w-0 flex-1 flex-col items-center gap-2" key={point.label}>
+              <div className="flex h-28 w-full items-end rounded-t-xl bg-white/5">
+                <div
+                  aria-label={`${point.label}: ${point.value}`}
+                  className={`w-full rounded-t-xl bg-gradient-to-t ${fill}`}
+                  style={{ height: `${Math.max(4, (point.value / max) * 100)}%` }}
+                  title={`${point.label}: ${point.value}`}
+                />
+              </div>
+              <span className="w-full truncate text-center text-[10px] font-bold text-slate-500">
+                {point.label}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </article>
   )
 }
 

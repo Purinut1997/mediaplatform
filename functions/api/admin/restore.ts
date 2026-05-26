@@ -6,8 +6,8 @@ type BackupPayload = {
   action?: 'preview' | 'commit'
   confirm?: boolean
   backup?: {
-    data?: Partial<Record<'media' | 'mediaLinks' | 'tags' | 'mediaTags' | 'categories' | 'users' | 'vipRequests' | 'notifications' | 'settings', BackupRow[]>>
-  } & Partial<Record<'media' | 'mediaLinks' | 'tags' | 'mediaTags' | 'categories' | 'users' | 'vipRequests' | 'notifications' | 'settings', BackupRow[]>>
+    data?: Partial<Record<'media' | 'mediaLinks' | 'mediaEvents' | 'tags' | 'mediaTags' | 'categories' | 'users' | 'vipRequests' | 'notifications' | 'settings', BackupRow[]>>
+  } & Partial<Record<'media' | 'mediaLinks' | 'mediaEvents' | 'tags' | 'mediaTags' | 'categories' | 'users' | 'vipRequests' | 'notifications' | 'settings', BackupRow[]>>
 }
 
 const text = (value: unknown, fallback = '') => String(value ?? fallback).trim()
@@ -28,6 +28,7 @@ function readData(payload: BackupPayload) {
   return {
     media: Array.isArray(source.media) ? source.media : [],
     mediaLinks: Array.isArray(source.mediaLinks) ? source.mediaLinks : [],
+    mediaEvents: Array.isArray(source.mediaEvents) ? source.mediaEvents : [],
     tags: Array.isArray(source.tags) ? source.tags : [],
     mediaTags: Array.isArray(source.mediaTags) ? source.mediaTags : [],
     categories: Array.isArray(source.categories) ? source.categories : [],
@@ -43,6 +44,7 @@ function preview(data: ReturnType<typeof readData>) {
     categories: data.categories.length,
     media: data.media.length,
     mediaLinks: data.mediaLinks.length,
+    mediaEvents: data.mediaEvents.length,
     tags: data.tags.length,
     mediaTags: data.mediaTags.length,
     users: data.users.length,
@@ -180,6 +182,21 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
           ${text(link.preview_url) || null},
           ${text(link.access_level, 'สาธารณะ')},
           ${int(link.sort_order)}
+        )
+      `
+    }
+
+    for (const eventRow of data.mediaEvents) {
+      const mediaId = mediaIdMap.get(Number(eventRow.media_id))
+      const eventType = text(eventRow.event_type)
+      if (!mediaId || !['view', 'download'].includes(eventType)) continue
+      await sql`
+        insert into media_events (media_id, user_email, event_type, created_at)
+        values (
+          ${mediaId},
+          ${text(eventRow.user_email) || null},
+          ${eventType},
+          ${text(eventRow.created_at) || new Date().toISOString()}
         )
       `
     }
