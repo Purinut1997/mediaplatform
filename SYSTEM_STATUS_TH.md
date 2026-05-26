@@ -101,7 +101,10 @@
 ### ระบบตรวจสอบและความปลอดภัย
 
 - มี Activity Log เก็บการกระทำสำคัญ เช่น สมัครสมาชิก แก้ setting อนุมัติ VIP แก้สิทธิ์สมาชิก backup และตรวจลิงก์
+  - ค้นหาและกรองตามช่วงเวลาได้
 - มี Error Log เก็บปัญหา เช่น login failed, bot check failed, register duplicate, API error และ Telegram send failed
+  - ค้นหา กรองช่วงเวลา กรองกลุ่ม Auth/Bot/API/Telegram ได้
+  - ลบ log เก่ากว่า 30 วันได้เฉพาะ superadmin
 - มี Notification Center แบบเก็บลงฐานข้อมูลผ่านตาราง `notifications`
   - แสดงสถานะอ่านแล้ว/ยังไม่อ่าน
   - กดอ่านทีละรายการ หรืออ่านทั้งหมดแล้วได้
@@ -145,15 +148,10 @@
 
 ### ควรทำต่อเมื่อระบบหลักนิ่ง
 
-1. Error Log รายละเอียดมากขึ้น
-   - เพิ่ม filter ตาม date/severity
-   - เพิ่มปุ่ม clear เฉพาะ superadmin
+1. Audit Log รายละเอียดมากขึ้น
+   - เพิ่ม dropdown ตาม action หรือ target type หากข้อมูล log เริ่มเยอะมาก
 
-2. Audit Log รายละเอียดมากขึ้น
-   - เพิ่ม filter date
-   - เพิ่ม export เฉพาะ activity log แล้ว
-
-3. Telegram settings ผ่านหลังบ้าน
+2. Telegram settings ผ่านหลังบ้าน
    - ตอนนี้ใช้ env เพื่อความปลอดภัย
    - ถ้าจะตั้งผ่านหลังบ้าน ต้องออกแบบการเก็บ secret ให้รอบคอบ
 
@@ -161,7 +159,7 @@
 
 1. ทำ Cron ตรวจลิงก์อัตโนมัติ
 2. ทำ Restore แบบ replace เฉพาะตารางที่เลือกได้ หากต้องการล้างข้อมูลเดิมก่อนนำเข้า
-3. เพิ่ม filter date/severity ให้ Error Log และ Activity Log
+3. เพิ่ม filter ขั้นสูงให้ Activity Log เช่น target type/action แบบ dropdown
 
 ## ไฟล์หลักที่ควรดูเมื่อทำงานต่อ
 
@@ -188,4 +186,4 @@
 
 - `npm run lint` ผ่าน
 - `npm run build` ผ่าน
-- ฟีเจอร์ที่เพิ่มล่าสุด: Analytics เชิงเวลาจริงด้วย `media_events`, Notification Center แบบฐานข้อมูลพร้อม read/unread, ระบบแท็กจริง `tags/media_tags`, Admin Permission รายเมนู, Restore Import แบบ preview/merge, Activity/Error Log filter + CSV export, Activity Log, Error Log, System Health, Backup Export, Broken Link Checker, Maintenance Mode, admin role toggle และ Telegram optional notification
+- ฟีเจอร์ที่เพิ่มล่าสุด: Analytics เชิงเวลาจริงด้วย `media_events`, filter/clear Error Log, filter Activity Log, Notification Center แบบฐานข้อมูลพร้อม read/unread, ระบบแท็กจริง `tags/media_tags`, Admin Permission รายเมนู, Restore Import แบบ preview/merge, Activity/Error Log CSV export, System Health, Backup Export, Broken Link Checker, Maintenance Mode, admin role toggle และ Telegram optional notification

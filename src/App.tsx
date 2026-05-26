@@ -2187,7 +2187,10 @@ function AdminPanel({
   const [restoreText, setRestoreText] = useState('')
   const [restorePreview, setRestorePreview] = useState<RestorePreview | null>(null)
   const [activityQuery, setActivityQuery] = useState('')
+  const [activityDate, setActivityDate] = useState<AdminDateFilter>('ทั้งหมด')
   const [errorQuery, setErrorQuery] = useState('')
+  const [errorDate, setErrorDate] = useState<AdminDateFilter>('ทั้งหมด')
+  const [errorSeverity, setErrorSeverity] = useState<'ทั้งหมด' | 'Auth' | 'Bot' | 'API' | 'Telegram'>('ทั้งหมด')
   const [loadingMembers, setLoadingMembers] = useState(false)
   const [loadingOps, setLoadingOps] = useState(false)
   const [error, setError] = useState('')
@@ -2245,13 +2248,36 @@ function AdminPanel({
   const unreadNotifications = notifications.filter((notice) => !notice.readAt).length
   const filteredAuditLogs = auditLogs.filter((log) => {
     const query = activityQuery.trim().toLowerCase()
-    if (!query) return true
-    return `${log.actor} ${log.action} ${log.targetType} ${log.targetId ?? ''}`.toLowerCase().includes(query)
+    const createdAt = Date.parse(log.createdAt)
+    const ageDays = Number.isFinite(createdAt) ? (filterNow - createdAt) / 86400000 : Number.POSITIVE_INFINITY
+    const matchDate =
+      activityDate === 'ทั้งหมด' ||
+      (activityDate === 'วันนี้' && ageDays <= 1) ||
+      (activityDate === '7 วัน' && ageDays <= 7) ||
+      (activityDate === '30 วัน' && ageDays <= 30)
+    const matchQuery =
+      !query ||
+      `${log.actor} ${log.action} ${log.targetType} ${log.targetId ?? ''}`.toLowerCase().includes(query)
+    return matchDate && matchQuery
   })
   const filteredErrorLogs = errorLogs.filter((log) => {
     const query = errorQuery.trim().toLowerCase()
-    if (!query) return true
-    return `${log.source} ${log.message}`.toLowerCase().includes(query)
+    const createdAt = Date.parse(log.createdAt)
+    const ageDays = Number.isFinite(createdAt) ? (filterNow - createdAt) / 86400000 : Number.POSITIVE_INFINITY
+    const text = `${log.source} ${log.message}`.toLowerCase()
+    const matchDate =
+      errorDate === 'ทั้งหมด' ||
+      (errorDate === 'วันนี้' && ageDays <= 1) ||
+      (errorDate === '7 วัน' && ageDays <= 7) ||
+      (errorDate === '30 วัน' && ageDays <= 30)
+    const matchSeverity =
+      errorSeverity === 'ทั้งหมด' ||
+      (errorSeverity === 'Auth' && text.includes('auth')) ||
+      (errorSeverity === 'Bot' && text.includes('bot')) ||
+      (errorSeverity === 'API' && (text.includes('api') || text.includes('database') || text.includes('media'))) ||
+      (errorSeverity === 'Telegram' && text.includes('telegram'))
+    const matchQuery = !query || text.includes(query)
+    return matchDate && matchSeverity && matchQuery
   })
   const allAdminMenu: Array<{ id: AdminSection; label: string; icon: typeof BarChart3; detail: string; ownerOnly?: boolean }> = [
     { id: 'dashboard', label: 'Dashboard', icon: BarChart3, detail: 'ภาพรวมระบบ' },
@@ -2381,6 +2407,22 @@ function AdminPanel({
       await loadNotifications()
     } catch (notificationError) {
       setOpsError(notificationError instanceof Error ? notificationError.message : 'อัปเดตแจ้งเตือนไม่สำเร็จ')
+    }
+  }
+
+  const clearOldErrors = async () => {
+    if (!window.confirm('ลบ Error Log ที่เก่ากว่า 30 วันใช่ไหม? ข้อมูลใหม่จะยังอยู่')) return
+    setOpsError('')
+    try {
+      const response = await fetch('/api/admin/errors?days=30', {
+        method: 'DELETE',
+        credentials: 'include',
+      })
+      const result = await readJson<{ deleted?: number; error?: string }>(response)
+      if (!response.ok) throw new Error(result.error ?? 'ลบ Error Log ไม่สำเร็จ')
+      await loadOpsData()
+    } catch (clearError) {
+      setOpsError(clearError instanceof Error ? clearError.message : 'ลบ Error Log ไม่สำเร็จ')
     }
   }
 
@@ -3663,15 +3705,26 @@ function AdminPanel({
                 </button>
               </div>
             </div>
-            <label className="relative mb-4 block">
-              <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
-              <input
-                className="min-h-12 w-full rounded-2xl border border-white/10 bg-black/24 pl-11 pr-4 text-base text-white outline-none placeholder:text-slate-500 focus:border-sky-300 focus:ring-4 focus:ring-sky-300/10"
-                onChange={(event) => setActivityQuery(event.target.value)}
-                placeholder="ค้นหา actor, action, target"
-                value={activityQuery}
-              />
-            </label>
+            <div className="mb-4 grid gap-3 md:grid-cols-[1fr_180px]">
+              <label className="relative block">
+                <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
+                <input
+                  className="min-h-12 w-full rounded-2xl border border-white/10 bg-black/24 pl-11 pr-4 text-base text-white outline-none placeholder:text-slate-500 focus:border-sky-300 focus:ring-4 focus:ring-sky-300/10"
+                  onChange={(event) => setActivityQuery(event.target.value)}
+                  placeholder="ค้นหา actor, action, target"
+                  value={activityQuery}
+                />
+              </label>
+              <select
+                className="min-h-12 rounded-2xl border border-white/10 bg-black/24 px-4 text-base font-bold text-white outline-none focus:border-sky-300 focus:ring-4 focus:ring-sky-300/10"
+                onChange={(event) => setActivityDate(event.target.value as AdminDateFilter)}
+                value={activityDate}
+              >
+                {(['ทั้งหมด', 'วันนี้', '7 วัน', '30 วัน'] as const).map((item) => (
+                  <option className="bg-slate-950" key={item}>{item}</option>
+                ))}
+              </select>
+            </div>
             <div className="grid gap-3">
               {filteredAuditLogs.length === 0 && (
                 <div className="rounded-2xl border border-dashed border-white/15 p-5 text-sm font-bold text-slate-400">
@@ -3711,20 +3764,43 @@ function AdminPanel({
                 <button className="min-h-11 rounded-2xl bg-white/10 px-4 font-black text-white" onClick={() => downloadCsv('error-log.csv', filteredErrorLogs)} type="button">
                   Export CSV
                 </button>
+                <button className="min-h-11 rounded-2xl bg-red-400/15 px-4 font-black text-red-100" onClick={clearOldErrors} type="button">
+                  ลบเก่ากว่า 30 วัน
+                </button>
                 <button className="min-h-11 rounded-2xl bg-red-300 px-4 font-black text-slate-950" onClick={loadOpsData} type="button">
                   รีเฟรช
                 </button>
               </div>
             </div>
-            <label className="relative mb-4 block">
-              <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
-              <input
-                className="min-h-12 w-full rounded-2xl border border-white/10 bg-black/24 pl-11 pr-4 text-base text-white outline-none placeholder:text-slate-500 focus:border-red-300 focus:ring-4 focus:ring-red-300/10"
-                onChange={(event) => setErrorQuery(event.target.value)}
-                placeholder="ค้นหา source หรือข้อความ error"
-                value={errorQuery}
-              />
-            </label>
+            <div className="mb-4 grid gap-3 md:grid-cols-[1fr_180px_180px]">
+              <label className="relative block">
+                <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
+                <input
+                  className="min-h-12 w-full rounded-2xl border border-white/10 bg-black/24 pl-11 pr-4 text-base text-white outline-none placeholder:text-slate-500 focus:border-red-300 focus:ring-4 focus:ring-red-300/10"
+                  onChange={(event) => setErrorQuery(event.target.value)}
+                  placeholder="ค้นหา source หรือข้อความ error"
+                  value={errorQuery}
+                />
+              </label>
+              <select
+                className="min-h-12 rounded-2xl border border-white/10 bg-black/24 px-4 text-base font-bold text-white outline-none focus:border-red-300 focus:ring-4 focus:ring-red-300/10"
+                onChange={(event) => setErrorDate(event.target.value as AdminDateFilter)}
+                value={errorDate}
+              >
+                {(['ทั้งหมด', 'วันนี้', '7 วัน', '30 วัน'] as const).map((item) => (
+                  <option className="bg-slate-950" key={item}>{item}</option>
+                ))}
+              </select>
+              <select
+                className="min-h-12 rounded-2xl border border-white/10 bg-black/24 px-4 text-base font-bold text-white outline-none focus:border-red-300 focus:ring-4 focus:ring-red-300/10"
+                onChange={(event) => setErrorSeverity(event.target.value as typeof errorSeverity)}
+                value={errorSeverity}
+              >
+                {(['ทั้งหมด', 'Auth', 'Bot', 'API', 'Telegram'] as const).map((item) => (
+                  <option className="bg-slate-950" key={item}>{item}</option>
+                ))}
+              </select>
+            </div>
             <div className="grid gap-3">
               {filteredErrorLogs.length === 0 && (
                 <div className="rounded-2xl border border-dashed border-white/15 p-5 text-sm font-bold text-slate-400">
