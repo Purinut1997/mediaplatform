@@ -123,6 +123,7 @@
   - Preview ข้อมูลก่อนนำเข้า
   - ยืนยันก่อน restore จริง
   - Restore แบบ merge ไม่ลบข้อมูลเดิม
+  - Restore แบบ replace เฉพาะตารางที่เลือกได้ โดยไม่ล้าง users เพื่อความปลอดภัย
   - ข้ามผู้ใช้ใหม่ที่ไม่มี password hash เพื่อความปลอดภัย
 - มี Telegram Notification แบบ optional ผ่าน env `TELEGRAM_BOT_TOKEN` และ `TELEGRAM_CHAT_ID`
   - แจ้งคำขอ VIP ใหม่
@@ -162,9 +163,9 @@
 
 ## ลำดับงานแนะนำต่อไป
 
-1. ทำ Restore แบบ replace เฉพาะตารางที่เลือกได้ หากต้องการล้างข้อมูลเดิมก่อนนำเข้า
-2. เพิ่ม filter ขั้นสูงให้ Activity Log เช่น target type/action แบบ dropdown
-3. ทำหน้าแนะนำการตั้งค่า Cloudflare Cron/secret ในหลังบ้าน ถ้าต้องการให้ผู้ใช้ตั้งเองง่ายขึ้น
+1. เพิ่ม filter ขั้นสูงให้ Activity Log เช่น target type/action แบบ dropdown
+2. ทำหน้าแนะนำการตั้งค่า Cloudflare Cron/secret ในหลังบ้าน ถ้าต้องการให้ผู้ใช้ตั้งเองง่ายขึ้น
+3. ออกแบบ Telegram settings ผ่านหลังบ้านแบบไม่เปิดเผย secret หากจำเป็น
 
 ## ไฟล์หลักที่ควรดูเมื่อทำงานต่อ
 
@@ -193,4 +194,4 @@
 
 - `npm run lint` ผ่าน
 - `npm run build` ผ่าน
-- ฟีเจอร์ที่เพิ่มล่าสุด: Cron endpoint สำหรับตรวจลิงก์อัตโนมัติ, Analytics เชิงเวลาจริงด้วย `media_events`, filter/clear Error Log, filter Activity Log, Notification Center แบบฐานข้อมูลพร้อม read/unread, ระบบแท็กจริง `tags/media_tags`, Admin Permission รายเมนู, Restore Import แบบ preview/merge, Activity/Error Log CSV export, System Health, Backup Export, Broken Link Checker, Maintenance Mode, admin role toggle และ Telegram optional notification
+- ฟีเจอร์ที่เพิ่มล่าสุด: Restore replace เฉพาะตารางที่เลือก, Cron endpoint สำหรับตรวจลิงก์อัตโนมัติ, Analytics เชิงเวลาจริงด้วย `media_events`, filter/clear Error Log, filter Activity Log, Notification Center แบบฐานข้อมูลพร้อม read/unread, ระบบแท็กจริง `tags/media_tags`, Admin Permission รายเมนู, Activity/Error Log CSV export, System Health, Backup Export, Broken Link Checker, Maintenance Mode, admin role toggle และ Telegram optional notification

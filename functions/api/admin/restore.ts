@@ -5,6 +5,8 @@ type BackupRow = Record<string, unknown>
 type BackupPayload = {
   action?: 'preview' | 'commit'
   confirm?: boolean
+  mode?: 'merge' | 'replace'
+  replaceTables?: string[]
   backup?: {
     data?: Partial<Record<'media' | 'mediaLinks' | 'mediaEvents' | 'tags' | 'mediaTags' | 'categories' | 'users' | 'vipRequests' | 'notifications' | 'settings', BackupRow[]>>
   } & Partial<Record<'media' | 'mediaLinks' | 'mediaEvents' | 'tags' | 'mediaTags' | 'categories' | 'users' | 'vipRequests' | 'notifications' | 'settings', BackupRow[]>>
@@ -12,6 +14,17 @@ type BackupPayload = {
 
 const text = (value: unknown, fallback = '') => String(value ?? fallback).trim()
 const int = (value: unknown, fallback = 0) => Number.isFinite(Number(value)) ? Number(value) : fallback
+const replaceableTables = new Set([
+  'media',
+  'mediaLinks',
+  'mediaEvents',
+  'tags',
+  'mediaTags',
+  'categories',
+  'vipRequests',
+  'notifications',
+  'settings',
+])
 
 function tagSlug(name: string) {
   const base =
@@ -39,7 +52,12 @@ function readData(payload: BackupPayload) {
   }
 }
 
-function preview(data: ReturnType<typeof readData>) {
+function readReplaceTables(payload: BackupPayload) {
+  if (payload.mode !== 'replace') return []
+  return Array.from(new Set(payload.replaceTables ?? [])).filter((table) => replaceableTables.has(table))
+}
+
+function preview(data: ReturnType<typeof readData>, replaceTables: string[] = []) {
   return {
     categories: data.categories.length,
     media: data.media.length,
@@ -51,12 +69,38 @@ function preview(data: ReturnType<typeof readData>) {
     vipRequests: data.vipRequests.length,
     notifications: data.notifications.length,
     settings: data.settings.length,
+    mode: replaceTables.length ? 'replace' : 'merge',
+    replaceTables,
     warnings: [
-      'โหมด restore นี้เป็นแบบ merge และไม่ลบข้อมูลเดิม',
+      replaceTables.length
+        ? `โหมด replace จะล้างเฉพาะตารางที่เลือก: ${replaceTables.join(', ')}`
+        : 'โหมด restore นี้เป็นแบบ merge และไม่ลบข้อมูลเดิม',
       'ผู้ใช้ใหม่จากไฟล์ backup ที่ไม่มี password_hash จะถูกข้ามเพื่อความปลอดภัย',
       'คำขอ VIP จะนำเข้าแบบกันซ้ำจาก email และ created_at',
     ],
   }
+}
+
+async function clearSelectedTables(sql: ReturnType<typeof getSql>, tables: string[]) {
+  const selected = new Set(tables)
+  if (!selected.size) return
+
+  if (selected.has('media')) {
+    await sql`delete from media`
+  } else {
+    if (selected.has('mediaEvents')) await sql`delete from media_events`
+    if (selected.has('mediaLinks')) await sql`delete from media_links`
+    if (selected.has('mediaTags')) await sql`delete from media_tags`
+  }
+
+  if (selected.has('tags')) {
+    await sql`delete from media_tags`
+    await sql`delete from tags`
+  }
+  if (selected.has('vipRequests')) await sql`delete from vip_requests`
+  if (selected.has('notifications')) await sql`delete from notifications`
+  if (selected.has('categories')) await sql`delete from categories`
+  if (selected.has('settings')) await sql`delete from app_settings`
 }
 
 export const onRequestPost = async ({ env, request }: { env: Env; request: Request }) => {
@@ -69,7 +113,8 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
     await ensureSchema(env)
     const payload = (await request.json().catch(() => ({}))) as BackupPayload
     const data = readData(payload)
-    const summary = preview(data)
+    const replaceTables = readReplaceTables(payload)
+    const summary = preview(data, replaceTables)
 
     if (payload.action !== 'commit') {
       return Response.json({ ok: true, preview: summary })
@@ -83,6 +128,7 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
     const mediaIdMap = new Map<number, number>()
     const tagIdMap = new Map<number, number>()
     let skippedUsers = 0
+    await clearSelectedTables(sql, replaceTables)
 
     for (const category of data.categories) {
       const name = text(category.name)

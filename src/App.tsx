@@ -211,6 +211,8 @@ type RestorePreview = {
   vipRequests: number
   notifications: number
   settings: number
+  mode?: 'merge' | 'replace'
+  replaceTables?: string[]
   skippedUsers?: number
   warnings: string[]
 }
@@ -2186,6 +2188,8 @@ function AdminPanel({
   const [systemHealth, setSystemHealth] = useState<SystemHealth | null>(null)
   const [linkChecks, setLinkChecks] = useState<LinkCheckResult[]>([])
   const [restoreText, setRestoreText] = useState('')
+  const [restoreMode, setRestoreMode] = useState<'merge' | 'replace'>('merge')
+  const [restoreReplaceTables, setRestoreReplaceTables] = useState<string[]>([])
   const [restorePreview, setRestorePreview] = useState<RestorePreview | null>(null)
   const [activityQuery, setActivityQuery] = useState('')
   const [activityDate, setActivityDate] = useState<AdminDateFilter>('ทั้งหมด')
@@ -2303,6 +2307,17 @@ function AdminPanel({
     },
     { label: 'แจ้งเตือนใหม่', value: unreadNotifications.toLocaleString('th-TH'), icon: AlertCircle },
   ]
+  const restoreTableOptions = [
+    ['media', 'สื่อ'],
+    ['mediaLinks', 'ลิงก์สื่อ'],
+    ['mediaEvents', 'Event สื่อ'],
+    ['tags', 'แท็ก'],
+    ['mediaTags', 'แท็กของสื่อ'],
+    ['categories', 'หมวดหมู่'],
+    ['vipRequests', 'คำขอ VIP'],
+    ['notifications', 'แจ้งเตือน'],
+    ['settings', 'Settings'],
+  ] as const
 
   const loadMembers = async () => {
     setLoadingMembers(true)
@@ -2505,7 +2520,12 @@ function AdminPanel({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ action: 'preview', backup }),
+        body: JSON.stringify({
+          action: 'preview',
+          backup,
+          mode: restoreMode,
+          replaceTables: restoreMode === 'replace' ? restoreReplaceTables : [],
+        }),
       })
       const result = await readJson<{ preview?: RestorePreview; error?: string }>(response)
       if (!response.ok || !result.preview) throw new Error(result.error ?? 'Preview restore ไม่สำเร็จ')
@@ -2523,7 +2543,15 @@ function AdminPanel({
       setOpsError('กรุณา preview ไฟล์ backup ก่อนนำเข้า')
       return
     }
-    if (!window.confirm('ยืนยันนำเข้า backup แบบ merge ใช่ไหม? ระบบจะไม่ลบข้อมูลเดิม')) return
+    if (restoreMode === 'replace' && restoreReplaceTables.length === 0) {
+      setOpsError('โหมด replace ต้องเลือกตารางที่ต้องการล้างก่อน')
+      return
+    }
+    const confirmText =
+      restoreMode === 'replace'
+        ? `ยืนยันนำเข้าแบบ replace ใช่ไหม? ระบบจะล้างเฉพาะ: ${restoreReplaceTables.join(', ')}`
+        : 'ยืนยันนำเข้า backup แบบ merge ใช่ไหม? ระบบจะไม่ลบข้อมูลเดิม'
+    if (!window.confirm(confirmText)) return
     setLoadingOps(true)
     setOpsError('')
     try {
@@ -2532,7 +2560,13 @@ function AdminPanel({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ action: 'commit', confirm: true, backup }),
+        body: JSON.stringify({
+          action: 'commit',
+          confirm: true,
+          backup,
+          mode: restoreMode,
+          replaceTables: restoreMode === 'replace' ? restoreReplaceTables : [],
+        }),
       })
       const result = await readJson<{ restored?: RestorePreview; error?: string }>(response)
       if (!response.ok || !result.restored) throw new Error(result.error ?? 'Restore ไม่สำเร็จ')
@@ -3896,6 +3930,57 @@ function AdminPanel({
                   placeholder="วาง JSON backup ที่ export จากระบบนี้"
                   value={restoreText}
                 />
+                <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+                  <p className="mb-3 font-black text-white">โหมดนำเข้า</p>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {(['merge', 'replace'] as const).map((mode) => (
+                      <button
+                        className={`min-h-12 rounded-2xl border px-4 font-black transition ${
+                          restoreMode === mode
+                            ? 'border-emerald-300 bg-emerald-300 text-slate-950'
+                            : 'border-white/10 bg-white/[0.04] text-slate-200'
+                        }`}
+                        key={mode}
+                        onClick={() => {
+                          setRestoreMode(mode)
+                          setRestorePreview(null)
+                        }}
+                        type="button"
+                      >
+                        {mode === 'merge' ? 'Merge ไม่ลบข้อมูลเดิม' : 'Replace เฉพาะตารางที่เลือก'}
+                      </button>
+                    ))}
+                  </div>
+                  {restoreMode === 'replace' && (
+                    <div className="mt-4">
+                      <p className="mb-2 text-sm font-bold text-amber-100">
+                        เลือกเฉพาะตารางที่จะล้างก่อนนำเข้า ผู้ใช้จะไม่ถูกล้างเพื่อความปลอดภัย
+                      </p>
+                      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                        {restoreTableOptions.map(([value, label]) => (
+                          <label
+                            className="flex min-h-11 items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 text-sm font-bold text-slate-200"
+                            key={value}
+                          >
+                            <input
+                              checked={restoreReplaceTables.includes(value)}
+                              onChange={(event) => {
+                                setRestorePreview(null)
+                                setRestoreReplaceTables((items) =>
+                                  event.target.checked
+                                    ? [...items, value]
+                                    : items.filter((item) => item !== value),
+                                )
+                              }}
+                              type="checkbox"
+                            />
+                            {label}
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
                 <div className="grid gap-2 sm:grid-cols-2">
                   <button
                     className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-emerald-300 px-5 font-black text-slate-950 disabled:opacity-60"
@@ -3919,6 +4004,9 @@ function AdminPanel({
                 {restorePreview && (
                   <div className="rounded-2xl border border-emerald-300/20 bg-emerald-300/10 p-4">
                     <p className="font-black text-emerald-100">Preview ล่าสุด</p>
+                    <p className="mt-1 text-sm font-bold text-emerald-100/75">
+                      โหมด: {restorePreview.mode === 'replace' ? `Replace (${restorePreview.replaceTables?.join(', ') || '-'})` : 'Merge'}
+                    </p>
                     <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
                       {[
                         ['หมวดหมู่', restorePreview.categories],
