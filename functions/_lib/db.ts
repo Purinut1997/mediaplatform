@@ -8,6 +8,7 @@ export type Env = {
   ADMIN_BOOTSTRAP_EMAIL?: string
   ADMIN_BOOTSTRAP_PASSWORD?: string
   ADMIN_BOOTSTRAP_NAME?: string
+  CRON_SECRET?: string
   TELEGRAM_BOT_TOKEN?: string
   TELEGRAM_CHAT_ID?: string
 }

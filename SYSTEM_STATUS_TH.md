@@ -111,6 +111,10 @@
   - สร้างแจ้งเตือนจากคำขอ VIP, สื่อรอตรวจ, error ล่าสุด, ลิงก์เสีย และ Maintenance Mode
 - มี System Health ดู Cloudflare, Neon, API, response time, last backup, error ล่าสุด และจำนวนข้อมูลสำคัญ
 - มี Broken Link Checker ตรวจลิงก์จาก media links และบันทึกผลลงฐานข้อมูล
+- มี Cron endpoint สำหรับตรวจลิงก์อัตโนมัติที่ `/api/cron/link-checks`
+  - ต้องตั้ง env `CRON_SECRET`
+  - เรียกด้วย header `Authorization: Bearer <CRON_SECRET>` หรือ `x-cron-secret`
+  - ใช้ logic เดียวกับปุ่มตรวจลิงก์หลังบ้าน และบันทึก audit action เป็น `cron_link_check`
 - มี Backup Export เป็น JSON ทั้งระบบ และ CSV แยกตาราง
 - Backup/Restore รองรับ `tags` และ `media_tags`
 - Backup/Restore รองรับ `notifications`
@@ -142,9 +146,10 @@
 
 ### สำคัญมาก
 
-1. Cron ตรวจลิงก์อัตโนมัติ
-   - ตอนนี้กดตรวจจากหลังบ้าน
-   - ควรใช้ Cloudflare Cron Trigger ถ้าต้องการให้ระบบตรวจเองทุกวัน
+1. ตั้ง scheduler จริงให้เรียก Cron endpoint
+   - Pages Functions มี endpoint cron แล้ว
+   - เหลือตั้ง Cloudflare Worker Cron หรือ scheduler ที่เชื่อถือได้ให้เรียก `/api/cron/link-checks`
+   - ต้องใส่ `CRON_SECRET` ใน Cloudflare Variables and Secrets ก่อนใช้งาน
 
 ### ควรทำต่อเมื่อระบบหลักนิ่ง
 
@@ -157,9 +162,9 @@
 
 ## ลำดับงานแนะนำต่อไป
 
-1. ทำ Cron ตรวจลิงก์อัตโนมัติ
-2. ทำ Restore แบบ replace เฉพาะตารางที่เลือกได้ หากต้องการล้างข้อมูลเดิมก่อนนำเข้า
-3. เพิ่ม filter ขั้นสูงให้ Activity Log เช่น target type/action แบบ dropdown
+1. ทำ Restore แบบ replace เฉพาะตารางที่เลือกได้ หากต้องการล้างข้อมูลเดิมก่อนนำเข้า
+2. เพิ่ม filter ขั้นสูงให้ Activity Log เช่น target type/action แบบ dropdown
+3. ทำหน้าแนะนำการตั้งค่า Cloudflare Cron/secret ในหลังบ้าน ถ้าต้องการให้ผู้ใช้ตั้งเองง่ายขึ้น
 
 ## ไฟล์หลักที่ควรดูเมื่อทำงานต่อ
 
@@ -180,10 +185,12 @@
 - `functions/api/admin/health.ts`
 - `functions/api/admin/link-checks.ts`
 - `functions/api/admin/notifications.ts`
+- `functions/api/cron/link-checks.ts`
+- `functions/_lib/link-checker.ts`
 - `functions/api/settings.ts`
 
 ## สถานะตรวจล่าสุด
 
 - `npm run lint` ผ่าน
 - `npm run build` ผ่าน
-- ฟีเจอร์ที่เพิ่มล่าสุด: Analytics เชิงเวลาจริงด้วย `media_events`, filter/clear Error Log, filter Activity Log, Notification Center แบบฐานข้อมูลพร้อม read/unread, ระบบแท็กจริง `tags/media_tags`, Admin Permission รายเมนู, Restore Import แบบ preview/merge, Activity/Error Log CSV export, System Health, Backup Export, Broken Link Checker, Maintenance Mode, admin role toggle และ Telegram optional notification
+- ฟีเจอร์ที่เพิ่มล่าสุด: Cron endpoint สำหรับตรวจลิงก์อัตโนมัติ, Analytics เชิงเวลาจริงด้วย `media_events`, filter/clear Error Log, filter Activity Log, Notification Center แบบฐานข้อมูลพร้อม read/unread, ระบบแท็กจริง `tags/media_tags`, Admin Permission รายเมนู, Restore Import แบบ preview/merge, Activity/Error Log CSV export, System Health, Backup Export, Broken Link Checker, Maintenance Mode, admin role toggle และ Telegram optional notification

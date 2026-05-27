@@ -150,6 +150,7 @@ type SystemHealth = {
   storage: string
   responseTimeMs: number
   lastBackupAt: string | null
+  lastLinkCheckAt?: string | null
   lastError: { source: string; message: string; createdAt: string } | null
   counts: {
     media: number
@@ -3657,6 +3658,7 @@ function AdminPanel({
                   ['Storage', systemHealth.storage],
                   ['Response Time', `${systemHealth.responseTimeMs} ms`],
                   ['Last Backup', formatAdminDate(systemHealth.lastBackupAt)],
+                  ['Last Link Check', formatAdminDate(systemHealth.lastLinkCheckAt)],
                   ['สื่อทั้งหมด', systemHealth.counts.media.toLocaleString('th-TH')],
                   ['Error 24 ชม.', systemHealth.counts.errors24h.toLocaleString('th-TH')],
                   ['แจ้งเตือนยังไม่อ่าน', (systemHealth.counts.unreadNotifications ?? unreadNotifications).toLocaleString('th-TH')],

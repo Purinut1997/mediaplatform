@@ -32,6 +32,13 @@ export const onRequestGet = async ({ env, request }: { env: Env; request: Reques
     order by created_at desc
     limit 1
   `
+  const [lastLinkCheck] = await sql`
+    select created_at
+    from audit_logs
+    where action in ('link_check', 'cron_link_check')
+    order by created_at desc
+    limit 1
+  `
 
   return Response.json({
     ok: true,
@@ -43,6 +50,7 @@ export const onRequestGet = async ({ env, request }: { env: Env; request: Reques
       databaseTime: dbNow?.now,
       responseTimeMs: Date.now() - startedAt,
       lastBackupAt: lastBackup?.created_at ?? null,
+      lastLinkCheckAt: lastLinkCheck?.created_at ?? null,
       lastError: lastError
         ? {
             source: lastError.source,
