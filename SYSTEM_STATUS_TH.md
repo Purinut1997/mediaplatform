@@ -117,6 +117,10 @@
   - ต้องตั้ง env `CRON_SECRET`
   - เรียกด้วย header `Authorization: Bearer <CRON_SECRET>` หรือ `x-cron-secret`
   - ใช้ logic เดียวกับปุ่มตรวจลิงก์หลังบ้าน และบันทึก audit action เป็น `cron_link_check`
+- มี Cloudflare Worker Cron แยกใน `workers/link-check-cron`
+  - ใช้เรียก `/api/cron/link-checks` ทุก 6 ชั่วโมงตามค่าเริ่มต้น
+  - มีคำสั่ง `npm run cron:secret`, `npm run cron:deploy` และ `npm run cron:tail`
+  - ไม่เก็บค่า `CRON_SECRET` จริงใน GitHub
 - มี Backup Export เป็น JSON ทั้งระบบ และ CSV แยกตาราง
 - Backup/Restore รองรับ `tags` และ `media_tags`
 - Backup/Restore รองรับ `notifications`
@@ -152,8 +156,8 @@
 1. ตั้ง scheduler จริงให้เรียก Cron endpoint
    - Pages Functions มี endpoint cron แล้ว
    - หลังบ้านมีคู่มือ endpoint/header/env ให้ดูจากหน้า System Health แล้ว
-   - เหลือตั้ง Cloudflare Worker Cron หรือ scheduler ที่เชื่อถือได้ให้เรียก `/api/cron/link-checks`
-   - ต้องใส่ `CRON_SECRET` ใน Cloudflare Variables and Secrets ก่อนใช้งาน
+   - มี Worker Cron แยกใน `workers/link-check-cron` แล้ว
+   - เหลือ deploy Worker และใส่ `CRON_SECRET` จริงใน Cloudflare Variables and Secrets ก่อนใช้งานจริง
 
 ### ควรทำต่อเมื่อระบบหลักนิ่ง
 
@@ -163,7 +167,7 @@
 
 ## ลำดับงานแนะนำต่อไป
 
-1. ตั้ง Cloudflare Worker Cron หรือ scheduler จริงให้เรียก `/api/cron/link-checks` ตามรอบที่ต้องการ
+1. ตั้งค่า `CRON_SECRET` ให้ตรงกันทั้ง Cloudflare Pages และ Worker แล้วรัน `npm run cron:secret` + `npm run cron:deploy`
 2. ออกแบบ Telegram settings ผ่านหลังบ้านแบบไม่เปิดเผย secret หากจำเป็น
 3. หลังจากระบบใช้งานจริงสักระยะ ค่อยเพิ่มรายงานเชิงลึกตามข้อมูล event ที่สะสมจริง
 
@@ -187,6 +191,8 @@
 - `functions/api/admin/link-checks.ts`
 - `functions/api/admin/notifications.ts`
 - `functions/api/cron/link-checks.ts`
+- `workers/link-check-cron/src/index.ts`
+- `workers/link-check-cron/wrangler.toml`
 - `functions/_lib/link-checker.ts`
 - `functions/api/settings.ts`
 
@@ -194,4 +200,4 @@
 
 - `npm run lint` ผ่าน
 - `npm run build` ผ่าน
-- ฟีเจอร์ที่เพิ่มล่าสุด: Activity Log filter แบบ action/target type dropdown, การ์ดคู่มือตั้งค่า Cron/Telegram ใน System Health, Restore replace เฉพาะตารางที่เลือก, Cron endpoint สำหรับตรวจลิงก์อัตโนมัติ, Analytics เชิงเวลาจริงด้วย `media_events`, filter/clear Error Log, Notification Center แบบฐานข้อมูลพร้อม read/unread, ระบบแท็กจริง `tags/media_tags`, Admin Permission รายเมนู, Activity/Error Log CSV export, System Health, Backup Export, Broken Link Checker, Maintenance Mode, admin role toggle และ Telegram optional notification
+- ฟีเจอร์ที่เพิ่มล่าสุด: Cloudflare Worker Cron แยกสำหรับเรียกตรวจลิงก์อัตโนมัติ, คำสั่ง npm สำหรับ deploy/ใส่ secret/ดู log ของ cron worker, Activity Log filter แบบ action/target type dropdown, การ์ดคู่มือตั้งค่า Cron/Telegram ใน System Health, Restore replace เฉพาะตารางที่เลือก, Cron endpoint สำหรับตรวจลิงก์อัตโนมัติ, Analytics เชิงเวลาจริงด้วย `media_events`, filter/clear Error Log, Notification Center แบบฐานข้อมูลพร้อม read/unread, ระบบแท็กจริง `tags/media_tags`, Admin Permission รายเมนู, Activity/Error Log CSV export, System Health, Backup Export, Broken Link Checker, Maintenance Mode, admin role toggle และ Telegram optional notification

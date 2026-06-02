@@ -17,6 +17,8 @@ Pages Functions, and Neon Postgres.
 npm install
 npm run dev
 npm run build
+npm run cron:secret
+npm run cron:deploy
 ```
 
 ## Cloudflare Pages Settings
@@ -60,6 +62,30 @@ ADMIN_BOOTSTRAP_NAME="MIKPURINUT Super Admin"
 ```
 
 The next API request will create or update that account in Neon.
+
+For automatic broken-link checks, add the same `CRON_SECRET` in both places:
+
+```text
+Cloudflare Pages > mediaplatform > Settings > Variables and Secrets
+Cloudflare Workers > mediaplatform-link-check-cron > Settings > Variables and Secrets
+```
+
+Then deploy the separate scheduler Worker:
+
+```bash
+npm run cron:secret
+npm run cron:deploy
+```
+
+The Worker config is in `workers/link-check-cron/wrangler.toml`. It calls
+`/api/cron/link-checks` every 6 hours without storing the secret in GitHub.
+
+Telegram notifications are optional. Add these as secrets only when needed:
+
+```text
+TELEGRAM_BOT_TOKEN
+TELEGRAM_CHAT_ID
+```
 
 ## First API Check
 

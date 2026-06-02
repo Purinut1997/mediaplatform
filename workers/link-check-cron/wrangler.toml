@@ -1,0 +1,10 @@
+name = "mediaplatform-link-check-cron"
+main = "src/index.ts"
+compatibility_date = "2026-06-02"
+workers_dev = true
+
+[triggers]
+crons = ["0 */6 * * *"]
+
+[vars]
+SITE_ORIGIN = "https://mediaplatform.pages.dev"
