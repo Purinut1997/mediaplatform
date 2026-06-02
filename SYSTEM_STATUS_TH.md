@@ -101,7 +101,7 @@
 ### ระบบตรวจสอบและความปลอดภัย
 
 - มี Activity Log เก็บการกระทำสำคัญ เช่น สมัครสมาชิก แก้ setting อนุมัติ VIP แก้สิทธิ์สมาชิก backup และตรวจลิงก์
-  - ค้นหาและกรองตามช่วงเวลาได้
+  - ค้นหา กรองตามช่วงเวลา กรองตาม action และกรองตาม target type ได้
 - มี Error Log เก็บปัญหา เช่น login failed, bot check failed, register duplicate, API error และ Telegram send failed
   - ค้นหา กรองช่วงเวลา กรองกลุ่ม Auth/Bot/API/Telegram ได้
   - ลบ log เก่ากว่า 30 วันได้เฉพาะ superadmin
@@ -110,6 +110,8 @@
   - กดอ่านทีละรายการ หรืออ่านทั้งหมดแล้วได้
   - สร้างแจ้งเตือนจากคำขอ VIP, สื่อรอตรวจ, error ล่าสุด, ลิงก์เสีย และ Maintenance Mode
 - มี System Health ดู Cloudflare, Neon, API, response time, last backup, error ล่าสุด และจำนวนข้อมูลสำคัญ
+  - มีการ์ดแนะนำการตั้งค่า Cron ตรวจลิงก์อัตโนมัติ โดยไม่แสดงค่า secret บนหน้าเว็บ
+  - มีการ์ดแนะนำ env สำหรับ Telegram notification โดยไม่แสดง token จริง
 - มี Broken Link Checker ตรวจลิงก์จาก media links และบันทึกผลลงฐานข้อมูล
 - มี Cron endpoint สำหรับตรวจลิงก์อัตโนมัติที่ `/api/cron/link-checks`
   - ต้องตั้ง env `CRON_SECRET`
@@ -149,23 +151,21 @@
 
 1. ตั้ง scheduler จริงให้เรียก Cron endpoint
    - Pages Functions มี endpoint cron แล้ว
+   - หลังบ้านมีคู่มือ endpoint/header/env ให้ดูจากหน้า System Health แล้ว
    - เหลือตั้ง Cloudflare Worker Cron หรือ scheduler ที่เชื่อถือได้ให้เรียก `/api/cron/link-checks`
    - ต้องใส่ `CRON_SECRET` ใน Cloudflare Variables and Secrets ก่อนใช้งาน
 
 ### ควรทำต่อเมื่อระบบหลักนิ่ง
 
-1. Audit Log รายละเอียดมากขึ้น
-   - เพิ่ม dropdown ตาม action หรือ target type หากข้อมูล log เริ่มเยอะมาก
-
-2. Telegram settings ผ่านหลังบ้าน
+1. Telegram settings ผ่านหลังบ้าน
    - ตอนนี้ใช้ env เพื่อความปลอดภัย
    - ถ้าจะตั้งผ่านหลังบ้าน ต้องออกแบบการเก็บ secret ให้รอบคอบ
 
 ## ลำดับงานแนะนำต่อไป
 
-1. เพิ่ม filter ขั้นสูงให้ Activity Log เช่น target type/action แบบ dropdown
-2. ทำหน้าแนะนำการตั้งค่า Cloudflare Cron/secret ในหลังบ้าน ถ้าต้องการให้ผู้ใช้ตั้งเองง่ายขึ้น
-3. ออกแบบ Telegram settings ผ่านหลังบ้านแบบไม่เปิดเผย secret หากจำเป็น
+1. ตั้ง Cloudflare Worker Cron หรือ scheduler จริงให้เรียก `/api/cron/link-checks` ตามรอบที่ต้องการ
+2. ออกแบบ Telegram settings ผ่านหลังบ้านแบบไม่เปิดเผย secret หากจำเป็น
+3. หลังจากระบบใช้งานจริงสักระยะ ค่อยเพิ่มรายงานเชิงลึกตามข้อมูล event ที่สะสมจริง
 
 ## ไฟล์หลักที่ควรดูเมื่อทำงานต่อ
 
@@ -194,4 +194,4 @@
 
 - `npm run lint` ผ่าน
 - `npm run build` ผ่าน
-- ฟีเจอร์ที่เพิ่มล่าสุด: Restore replace เฉพาะตารางที่เลือก, Cron endpoint สำหรับตรวจลิงก์อัตโนมัติ, Analytics เชิงเวลาจริงด้วย `media_events`, filter/clear Error Log, filter Activity Log, Notification Center แบบฐานข้อมูลพร้อม read/unread, ระบบแท็กจริง `tags/media_tags`, Admin Permission รายเมนู, Activity/Error Log CSV export, System Health, Backup Export, Broken Link Checker, Maintenance Mode, admin role toggle และ Telegram optional notification
+- ฟีเจอร์ที่เพิ่มล่าสุด: Activity Log filter แบบ action/target type dropdown, การ์ดคู่มือตั้งค่า Cron/Telegram ใน System Health, Restore replace เฉพาะตารางที่เลือก, Cron endpoint สำหรับตรวจลิงก์อัตโนมัติ, Analytics เชิงเวลาจริงด้วย `media_events`, filter/clear Error Log, Notification Center แบบฐานข้อมูลพร้อม read/unread, ระบบแท็กจริง `tags/media_tags`, Admin Permission รายเมนู, Activity/Error Log CSV export, System Health, Backup Export, Broken Link Checker, Maintenance Mode, admin role toggle และ Telegram optional notification

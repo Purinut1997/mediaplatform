@@ -2193,6 +2193,8 @@ function AdminPanel({
   const [restorePreview, setRestorePreview] = useState<RestorePreview | null>(null)
   const [activityQuery, setActivityQuery] = useState('')
   const [activityDate, setActivityDate] = useState<AdminDateFilter>('ทั้งหมด')
+  const [activityAction, setActivityAction] = useState('ทั้งหมด')
+  const [activityTarget, setActivityTarget] = useState('ทั้งหมด')
   const [errorQuery, setErrorQuery] = useState('')
   const [errorDate, setErrorDate] = useState<AdminDateFilter>('ทั้งหมด')
   const [errorSeverity, setErrorSeverity] = useState<'ทั้งหมด' | 'Auth' | 'Bot' | 'API' | 'Telegram'>('ทั้งหมด')
@@ -2251,6 +2253,8 @@ function AdminPanel({
   const maxDownloads = Math.max(1, ...(analytics?.topDownloads.length ? analytics.topDownloads.map((item) => item.value) : topDownloadedMedia.map((item) => item.downloads)))
   const maxCategoryCount = Math.max(1, ...categoryStats.map((item) => item.count))
   const unreadNotifications = notifications.filter((notice) => !notice.readAt).length
+  const activityActions = Array.from(new Set(auditLogs.map((log) => log.action).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'th'))
+  const activityTargets = Array.from(new Set(auditLogs.map((log) => log.targetType).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'th'))
   const filteredAuditLogs = auditLogs.filter((log) => {
     const query = activityQuery.trim().toLowerCase()
     const createdAt = Date.parse(log.createdAt)
@@ -2263,7 +2267,9 @@ function AdminPanel({
     const matchQuery =
       !query ||
       `${log.actor} ${log.action} ${log.targetType} ${log.targetId ?? ''}`.toLowerCase().includes(query)
-    return matchDate && matchQuery
+    const matchAction = activityAction === 'ทั้งหมด' || log.action === activityAction
+    const matchTarget = activityTarget === 'ทั้งหมด' || log.targetType === activityTarget
+    return matchDate && matchQuery && matchAction && matchTarget
   })
   const filteredErrorLogs = errorLogs.filter((log) => {
     const query = errorQuery.trim().toLowerCase()
@@ -3715,6 +3721,34 @@ function AdminPanel({
                     </p>
                   )}
                 </article>
+                <article className="rounded-2xl border border-cyan-300/20 bg-cyan-300/10 p-4 md:col-span-2">
+                  <p className="text-sm font-bold text-cyan-100">ตั้งค่า Cron ตรวจลิงก์อัตโนมัติ</p>
+                  <p className="mt-2 text-sm font-semibold leading-6 text-slate-300">
+                    ตั้ง `CRON_SECRET` ใน Cloudflare Variables and Secrets แล้วให้ scheduler เรียก endpoint นี้ตามรอบที่ต้องการ
+                  </p>
+                  <code className="mt-3 block overflow-x-auto rounded-2xl border border-white/10 bg-slate-950/70 p-3 text-xs font-bold text-cyan-100">
+                    POST /api/cron/link-checks
+                  </code>
+                  <p className="mt-3 text-xs font-bold leading-5 text-slate-400">
+                    ส่ง header เป็น `Authorization: Bearer ...` หรือ `x-cron-secret` ระบบจะไม่แสดงค่า secret บนหน้าเว็บ
+                  </p>
+                </article>
+                <article className="rounded-2xl border border-violet-300/20 bg-violet-300/10 p-4 md:col-span-2">
+                  <p className="text-sm font-bold text-violet-100">Telegram แจ้งเตือนแบบปลอดภัย</p>
+                  <p className="mt-2 text-sm font-semibold leading-6 text-slate-300">
+                    หากต้องการแจ้งเตือนคำขอ VIP หรือลิงก์เสีย ให้ตั้งค่า env ด้านล่างใน Cloudflare โดยไม่ต้องแก้โค้ด
+                  </p>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                    {['TELEGRAM_BOT_TOKEN', 'TELEGRAM_CHAT_ID'].map((name) => (
+                      <code className="rounded-2xl border border-white/10 bg-slate-950/70 p-3 text-xs font-bold text-violet-100" key={name}>
+                        {name}
+                      </code>
+                    ))}
+                  </div>
+                  <p className="mt-3 text-xs font-bold leading-5 text-slate-400">
+                    แนะนำให้เก็บ token เป็น Secret เสมอ และไม่วางค่าจริงไว้ในหน้าเว็บหรือ GitHub
+                  </p>
+                </article>
               </div>
             )}
           </section>
@@ -3741,7 +3775,7 @@ function AdminPanel({
                 </button>
               </div>
             </div>
-            <div className="mb-4 grid gap-3 md:grid-cols-[1fr_180px]">
+            <div className="mb-4 grid gap-3 md:grid-cols-[1fr_170px_180px_180px]">
               <label className="relative block">
                 <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
                 <input
@@ -3757,6 +3791,24 @@ function AdminPanel({
                 value={activityDate}
               >
                 {(['ทั้งหมด', 'วันนี้', '7 วัน', '30 วัน'] as const).map((item) => (
+                  <option className="bg-slate-950" key={item}>{item}</option>
+                ))}
+              </select>
+              <select
+                className="min-h-12 rounded-2xl border border-white/10 bg-black/24 px-4 text-base font-bold text-white outline-none focus:border-sky-300 focus:ring-4 focus:ring-sky-300/10"
+                onChange={(event) => setActivityAction(event.target.value)}
+                value={activityAction}
+              >
+                {['ทั้งหมด', ...activityActions].map((item) => (
+                  <option className="bg-slate-950" key={item}>{item}</option>
+                ))}
+              </select>
+              <select
+                className="min-h-12 rounded-2xl border border-white/10 bg-black/24 px-4 text-base font-bold text-white outline-none focus:border-sky-300 focus:ring-4 focus:ring-sky-300/10"
+                onChange={(event) => setActivityTarget(event.target.value)}
+                value={activityTarget}
+              >
+                {['ทั้งหมด', ...activityTargets].map((item) => (
                   <option className="bg-slate-950" key={item}>{item}</option>
                 ))}
               </select>
