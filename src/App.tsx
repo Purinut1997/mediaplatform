@@ -162,6 +162,12 @@ type SystemHealth = {
   }
 }
 
+type TelegramStatus = {
+  botTokenConfigured: boolean
+  chatIdConfigured: boolean
+  ready: boolean
+}
+
 type AdminNotification = {
   id: number
   audience: 'superadmin' | 'admin' | 'all'
@@ -2186,6 +2192,7 @@ function AdminPanel({
   const [notifications, setNotifications] = useState<AdminNotification[]>([])
   const [analytics, setAnalytics] = useState<AdminAnalytics | null>(null)
   const [systemHealth, setSystemHealth] = useState<SystemHealth | null>(null)
+  const [telegramStatus, setTelegramStatus] = useState<TelegramStatus | null>(null)
   const [linkChecks, setLinkChecks] = useState<LinkCheckResult[]>([])
   const [restoreText, setRestoreText] = useState('')
   const [restoreMode, setRestoreMode] = useState<'merge' | 'replace'>('merge')
@@ -2202,6 +2209,7 @@ function AdminPanel({
   const [loadingOps, setLoadingOps] = useState(false)
   const [error, setError] = useState('')
   const [settingsError, setSettingsError] = useState('')
+  const [settingsNotice, setSettingsNotice] = useState('')
   const [memberError, setMemberError] = useState('')
   const [categoryError, setCategoryError] = useState('')
   const [opsError, setOpsError] = useState('')
@@ -2383,21 +2391,26 @@ function AdminPanel({
       if (!healthResponse.ok) throw new Error(health.error ?? 'โหลด System Health ไม่สำเร็จ')
 
       if (isSuperAdmin) {
-        const [activityResponse, errorsResponse] = await Promise.all([
+        const [activityResponse, errorsResponse, telegramResponse] = await Promise.all([
           fetch('/api/admin/activity', { credentials: 'include' }),
           fetch('/api/admin/errors', { credentials: 'include' }),
+          fetch('/api/admin/telegram', { credentials: 'include' }),
         ])
-        const [activity, errors] = await Promise.all([
+        const [activity, errors, telegram] = await Promise.all([
           readJson<{ logs?: AuditLog[]; error?: string }>(activityResponse),
           readJson<{ logs?: ErrorLog[]; error?: string }>(errorsResponse),
+          readJson<{ telegram?: TelegramStatus; error?: string }>(telegramResponse),
         ])
         if (!activityResponse.ok) throw new Error(activity.error ?? 'โหลด Activity Log ไม่สำเร็จ')
         if (!errorsResponse.ok) throw new Error(errors.error ?? 'โหลด Error Log ไม่สำเร็จ')
+        if (!telegramResponse.ok) throw new Error(telegram.error ?? 'โหลดสถานะ Telegram ไม่สำเร็จ')
         setAuditLogs(activity.logs ?? [])
         setErrorLogs(errors.logs ?? [])
+        setTelegramStatus(telegram.telegram ?? null)
       } else {
         setAuditLogs([])
         setErrorLogs([])
+        setTelegramStatus(null)
       }
       setSystemHealth(health.health ?? null)
     } catch (opsLoadError) {
@@ -2808,6 +2821,7 @@ function AdminPanel({
   const submitSettings = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     setSettingsError('')
+    setSettingsNotice('')
     setSavingSettings(true)
 
     const nextSettings: SiteSettings = {
@@ -2832,12 +2846,36 @@ function AdminPanel({
       }
 
       onSettingsSaved(result.settings)
+      setSettingsNotice('บันทึกการตั้งค่าเรียบร้อยแล้ว')
     } catch (saveError) {
       setSettingsError(
         saveError instanceof Error ? saveError.message : 'บันทึกการตั้งค่าไม่สำเร็จ',
       )
     } finally {
       setSavingSettings(false)
+    }
+  }
+
+  const testTelegram = async () => {
+    setSettingsError('')
+    setSettingsNotice('')
+    setLoadingOps(true)
+    try {
+      const response = await fetch('/api/admin/telegram', {
+        method: 'POST',
+        credentials: 'include',
+      })
+      const result = await readJson<{ telegram?: TelegramStatus; error?: string }>(response)
+      if (!response.ok) throw new Error(result.error ?? 'ส่งข้อความทดสอบ Telegram ไม่สำเร็จ')
+      setTelegramStatus(result.telegram ?? null)
+      setSettingsNotice('ส่งข้อความทดสอบ Telegram สำเร็จแล้ว')
+      await loadOpsData()
+    } catch (telegramError) {
+      setSettingsError(
+        telegramError instanceof Error ? telegramError.message : 'ส่งข้อความทดสอบ Telegram ไม่สำเร็จ',
+      )
+    } finally {
+      setLoadingOps(false)
     }
   }
 
@@ -3463,6 +3501,68 @@ function AdminPanel({
               {savingSettings ? 'กำลังบันทึก...' : 'บันทึกตั้งค่า VIP'}
             </button>
           </form>
+
+          <section className="rounded-2xl border border-violet-300/20 bg-white/[0.07] p-4 ring-1 ring-white/[0.03]">
+            <div className="mb-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+              <div>
+                <h3 className="flex items-center gap-2 text-xl font-black">
+                  <Mail className="text-violet-300" size={22} />
+                  Telegram Notification
+                </h3>
+                <p className="mt-1 text-sm font-semibold text-slate-400">
+                  ตรวจสถานะและส่งข้อความทดสอบ โดยไม่แสดง token หรือ chat id จริงบนหน้าเว็บ
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-white/10 px-4 font-black text-white disabled:opacity-60"
+                  disabled={loadingOps}
+                  onClick={loadOpsData}
+                  type="button"
+                >
+                  {loadingOps ? <Loader2 className="animate-spin" size={18} /> : <Database size={18} />}
+                  รีเฟรช
+                </button>
+                <button
+                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-violet-300 px-4 font-black text-slate-950 disabled:opacity-60"
+                  disabled={loadingOps || !telegramStatus?.ready}
+                  onClick={testTelegram}
+                  type="button"
+                >
+                  {loadingOps ? <Loader2 className="animate-spin" size={18} /> : <Mail size={18} />}
+                  ส่งทดสอบ
+                </button>
+              </div>
+            </div>
+            <div className="grid gap-3 md:grid-cols-3">
+              {[
+                ['Bot Token', telegramStatus?.botTokenConfigured],
+                ['Chat ID', telegramStatus?.chatIdConfigured],
+                ['พร้อมแจ้งเตือน', telegramStatus?.ready],
+              ].map(([label, enabled]) => (
+                <article className="rounded-2xl border border-white/10 bg-black/20 p-4" key={label as string}>
+                  <p className="text-sm font-bold text-slate-400">{label as string}</p>
+                  <p className={`mt-2 text-lg font-black ${enabled ? 'text-emerald-200' : 'text-amber-200'}`}>
+                    {telegramStatus ? (enabled ? 'พร้อมใช้งาน' : 'ยังไม่ได้ตั้งค่า') : 'รอโหลดสถานะ'}
+                  </p>
+                </article>
+              ))}
+            </div>
+            <div className="mt-4 rounded-2xl border border-white/10 bg-black/20 p-4 text-sm font-semibold leading-6 text-slate-300">
+              ตั้งค่าใน Cloudflare เป็น Secret ชื่อ <code className="font-black text-violet-100">TELEGRAM_BOT_TOKEN</code> และ{' '}
+              <code className="font-black text-violet-100">TELEGRAM_CHAT_ID</code> แล้วกดรีเฟรช/ส่งทดสอบได้ทันที
+            </div>
+            {settingsNotice && (
+              <div className="mt-4 rounded-2xl border border-emerald-300/20 bg-emerald-300/10 p-3 text-sm font-bold text-emerald-100">
+                {settingsNotice}
+              </div>
+            )}
+            {settingsError && (
+              <div className="mt-4 rounded-2xl border border-red-400/20 bg-red-400/10 p-3 text-sm font-bold text-red-200">
+                {settingsError}
+              </div>
+            )}
+          </section>
           </>
           )}
 
