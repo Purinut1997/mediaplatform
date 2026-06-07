@@ -2,6 +2,7 @@ import { loginWithPassword, sessionCookie } from '../../_lib/auth'
 import { writeErrorLog } from '../../_lib/admin'
 import { validateBotCheck, type BotCheckPayload } from '../../_lib/bot'
 import type { Env } from '../../_lib/db'
+import { InputValidationError, normalizedEmail, passwordInput } from '../../_lib/input'
 import { enforceRateLimits, rateLimitResponse, requestIp } from '../../_lib/rate-limit'
 
 type LoginPayload = BotCheckPayload & {
@@ -9,10 +10,25 @@ type LoginPayload = BotCheckPayload & {
   password?: string
 }
 
+function readLoginInput(body: LoginPayload) {
+  return {
+    email: normalizedEmail(body.email),
+    password: passwordInput(body.password, 1),
+  }
+}
+
 export const onRequestPost = async ({ env, request }: { env: Env; request: Request }) => {
   const body = (await request.json().catch(() => ({}))) as LoginPayload
-  const email = String(body.email ?? '').trim()
-  const password = String(body.password ?? '')
+  let input: ReturnType<typeof readLoginInput>
+  try {
+    input = readLoginInput(body)
+  } catch (error) {
+    return Response.json(
+      { ok: false, error: error instanceof InputValidationError ? error.message : 'ข้อมูลเข้าสู่ระบบไม่ถูกต้อง' },
+      { status: 400 },
+    )
+  }
+  const { email, password } = input
   const ip = requestIp(request)
   const rateLimit = await enforceRateLimits(env, [
     { action: 'login:ip', identifier: ip, limit: 15, windowSeconds: 900, blockSeconds: 900 },
@@ -30,13 +46,6 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
   if (botError) {
     await writeErrorLog(env, 'auth.login.bot_check', botError, { email })
     return Response.json({ ok: false, error: botError }, { status: 400 })
-  }
-
-  if (!email || !password) {
-    return Response.json(
-      { ok: false, error: 'กรุณากรอกอีเมลและรหัสผ่าน' },
-      { status: 400 },
-    )
   }
 
   let result

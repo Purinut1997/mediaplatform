@@ -36,6 +36,8 @@
   - แต่ละปุ่มตรวจสิทธิ์ของลิงก์นั้นผ่าน backend ก่อนเปิดจริง
 - รองรับแท็กจริงต่อสื่อผ่านตาราง `tags` และ `media_tags`
 - มีหน้า Login และ Register พร้อม bot check แบบพื้นฐาน
+- API สมัครสมาชิกเคารพสวิตช์เปิด/ปิดรับ VIP จากหลังบ้านจริง ผู้ใช้เรียก API ตรงเพื่อส่งคำขอ VIP ขณะปิดไม่ได้
+- Login, Register, ลืมรหัสผ่าน, ตั้งรหัสผ่านใหม่ และบัญชีสมาชิกจำกัดรูปแบบ/ความยาวข้อมูลก่อนใช้ฐานข้อมูลหรือคำนวณรหัสผ่าน
 - มีหน้า Maintenance Mode สำหรับผู้ใช้ทั่วไป เมื่อเปิดจากหลังบ้าน
 - มีหน้า `คลังของฉัน` สำหรับสมาชิก
   - แสดงข้อมูลบัญชีและระดับสิทธิ์
@@ -251,6 +253,7 @@
 - `functions/_lib/rate-limit.ts`
 - `functions/_lib/media-events.ts`
 - `functions/_lib/media-validation.ts`
+- `functions/_lib/input.ts`
 - `functions/_lib/url.ts`
 - `functions/api/_middleware.ts`
 - `functions/api/media/index.ts`
@@ -283,4 +286,4 @@
 - `npm run lint` ผ่าน
 - `npm run build` ผ่าน
 - Functions TypeScript ผ่าน
-- ฟีเจอร์ที่เพิ่มล่าสุด: ปิดการอ่าน/นับยอดสื่อที่ยังไม่เผยแพร่ เพิ่มกฎตรวจข้อมูลสื่อกลาง และคืน `CHECK constraint` ระดับ Neon เพื่อกันข้อมูลผิดรูป
+- ฟีเจอร์ที่เพิ่มล่าสุด: คืน `CHECK constraint` ระดับ Neon, ทำ Restore ให้ปลอดภัยขึ้น, บังคับสวิตช์ปิดรับ VIP ที่ backend และตรวจความยาวข้อมูลบัญชีก่อนประมวลผล

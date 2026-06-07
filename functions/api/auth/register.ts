@@ -2,6 +2,7 @@ import { loginWithPassword, sessionCookie } from '../../_lib/auth'
 import { writeAuditLog, writeErrorLog } from '../../_lib/admin'
 import { validateBotCheck, type BotCheckPayload } from '../../_lib/bot'
 import { ensureSchema, getSql, hashPassword, type Env } from '../../_lib/db'
+import { boundedText, InputValidationError, normalizedEmail, passwordInput } from '../../_lib/input'
 import { notifyTelegram } from '../../_lib/notify'
 import { writeNotification } from '../../_lib/notifications'
 import { enforceRateLimits, rateLimitResponse, requestIp } from '../../_lib/rate-limit'
@@ -15,14 +16,30 @@ type RegisterPayload = BotCheckPayload & {
   slipName?: string
 }
 
+function readRegisterInput(body: RegisterPayload) {
+  return {
+    name: boundedText(body.name, 'ชื่อ', { min: 2, max: 120 }),
+    email: normalizedEmail(body.email),
+    password: passwordInput(body.password),
+    phone: boundedText(body.phone, 'เบอร์โทรศัพท์', { max: 30 }),
+    slipName: boundedText(body.slipName, 'ชื่อไฟล์สลิป', { max: 200 }),
+  }
+}
+
 export const onRequestPost = async ({ env, request }: { env: Env; request: Request }) => {
   await ensureSchema(env)
   const sql = getSql(env)
   const body = (await request.json().catch(() => ({}))) as RegisterPayload
-  const name = String(body.name ?? '').trim()
-  const email = String(body.email ?? '').trim().toLowerCase()
-  const password = String(body.password ?? '')
-  const phone = String(body.phone ?? '').trim()
+  let input: ReturnType<typeof readRegisterInput>
+  try {
+    input = readRegisterInput(body)
+  } catch (error) {
+    return Response.json(
+      { ok: false, error: error instanceof InputValidationError ? error.message : 'ข้อมูลสมัครสมาชิกไม่ถูกต้อง' },
+      { status: 400 },
+    )
+  }
+  const { name, email, password, phone, slipName } = input
   const membership = body.membership === 'vip' ? 'vip' : 'member'
   const rateLimit = await enforceRateLimits(env, [
     {
@@ -41,11 +58,16 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
     return Response.json({ ok: false, error: botError }, { status: 400 })
   }
 
-  if (!name || !email || password.length < 8) {
-    return Response.json(
-      { ok: false, error: 'กรุณากรอกชื่อ อีเมล และรหัสผ่านอย่างน้อย 8 ตัวอักษร' },
-      { status: 400 },
-    )
+  if (membership === 'vip') {
+    const [settings] = await sql`
+      select coalesce((value->>'vipRegistrationEnabled')::boolean, false) as enabled
+      from app_settings
+      where key = 'site'
+      limit 1
+    `
+    if (!settings?.enabled) {
+      return Response.json({ ok: false, error: 'ขณะนี้ระบบยังไม่เปิดรับสมัคร VIP' }, { status: 403 })
+    }
   }
 
   const [existing] = (await sql`
@@ -70,7 +92,7 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
   if (membership === 'vip') {
     const [vipRequest] = await sql`
       insert into vip_requests (user_id, name, email, phone, slip_name)
-      values (${user.id}, ${name}, ${email}, ${phone || null}, ${body.slipName ?? null})
+      values (${user.id}, ${name}, ${email}, ${phone || null}, ${slipName || null})
       returning id
     `
     await writeNotification(env, {

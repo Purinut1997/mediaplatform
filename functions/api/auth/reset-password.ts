@@ -1,6 +1,7 @@
 import { writeAuditLog, writeErrorLog } from '../../_lib/admin'
 import { ensureSchema, getSql, hashPassword, sha256Hex, type Env } from '../../_lib/db'
 import { enforceRateLimits, rateLimitResponse, requestIp } from '../../_lib/rate-limit'
+import { passwordInput } from '../../_lib/input'
 
 type Payload = { token?: string; password?: string }
 
@@ -9,7 +10,12 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
     await ensureSchema(env)
     const body = (await request.json().catch(() => ({}))) as Payload
     const token = String(body.token ?? '')
-    const password = String(body.password ?? '')
+    let password = ''
+    try {
+      password = passwordInput(body.password, 10)
+    } catch {
+      return Response.json({ ok: false, error: 'รหัสผ่านต้องมี 10-200 ตัวอักษร' }, { status: 400 })
+    }
     const ip = requestIp(request)
     const rateLimit = await enforceRateLimits(env, [
       { action: 'reset:ip', identifier: ip, limit: 10, windowSeconds: 3600, blockSeconds: 3600 },
@@ -22,8 +28,8 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
       },
     ])
     if (!rateLimit.allowed) return rateLimitResponse(rateLimit.retryAfter)
-    if (!token || password.length < 10) {
-      return Response.json({ ok: false, error: 'ลิงก์ไม่ถูกต้องหรือรหัสผ่านสั้นกว่า 10 ตัวอักษร' }, { status: 400 })
+    if (!token || token.length > 200) {
+      return Response.json({ ok: false, error: 'ลิงก์ตั้งรหัสผ่านไม่ถูกต้อง' }, { status: 400 })
     }
     const sql = getSql(env)
     const [reset] = await sql`

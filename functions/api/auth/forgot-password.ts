@@ -2,6 +2,7 @@ import { writeAuditLog, writeErrorLog } from '../../_lib/admin'
 import { validateBotCheck, type BotCheckPayload } from '../../_lib/bot'
 import { ensureSchema, getSql, randomHex, sha256Hex, type Env } from '../../_lib/db'
 import { sendEmail } from '../../_lib/email'
+import { normalizedEmail } from '../../_lib/input'
 import { enforceRateLimits, rateLimitResponse, requestIp } from '../../_lib/rate-limit'
 
 type Payload = BotCheckPayload & { email?: string }
@@ -10,7 +11,12 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
   try {
     await ensureSchema(env)
     const body = (await request.json().catch(() => ({}))) as Payload
-    const email = String(body.email ?? '').trim().toLowerCase()
+    let email = ''
+    try {
+      email = normalizedEmail(body.email)
+    } catch {
+      return Response.json({ ok: true, message: 'หากอีเมลนี้มีบัญชี ระบบจะส่งลิงก์ตั้งรหัสผ่านใหม่ให้' })
+    }
     const ip = requestIp(request)
     const rateLimit = await enforceRateLimits(env, [
       { action: 'forgot:ip', identifier: ip, limit: 8, windowSeconds: 3600, blockSeconds: 3600 },

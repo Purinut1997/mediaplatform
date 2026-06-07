@@ -1,6 +1,7 @@
 import { getCurrentUser, publicUser, type UserRow } from '../../_lib/auth'
 import { writeAuditLog, writeErrorLog } from '../../_lib/admin'
 import { ensureSchema, getSql, hashPassword, verifyPassword, type Env } from '../../_lib/db'
+import { boundedText, passwordInput } from '../../_lib/input'
 
 type AccountPayload = {
   action?: 'profile' | 'password' | 'logoutAll'
@@ -23,8 +24,12 @@ export const onRequestPatch = async ({ env, request }: { env: Env; request: Requ
     if (!user) return Response.json({ ok: false, error: 'ไม่พบบัญชีผู้ใช้' }, { status: 404 })
 
     if (body.action === 'profile') {
-      const name = String(body.name ?? '').trim()
-      if (name.length < 2) return Response.json({ ok: false, error: 'กรุณากรอกชื่ออย่างน้อย 2 ตัวอักษร' }, { status: 400 })
+      let name = ''
+      try {
+        name = boundedText(body.name, 'ชื่อ', { min: 2, max: 120 })
+      } catch (error) {
+        return Response.json({ ok: false, error: error instanceof Error ? error.message : 'ชื่อไม่ถูกต้อง' }, { status: 400 })
+      }
       const [updated] = (await sql`
         update users set name = ${name}, updated_at = now() where id = ${user.id}
         returning id, name, email, password_hash, role, access_level, status
@@ -34,13 +39,16 @@ export const onRequestPatch = async ({ env, request }: { env: Env; request: Requ
     }
 
     if (body.action === 'password') {
-      const currentPassword = String(body.currentPassword ?? '')
-      const newPassword = String(body.newPassword ?? '')
+      let currentPassword = ''
+      let newPassword = ''
+      try {
+        currentPassword = passwordInput(body.currentPassword, 1)
+        newPassword = passwordInput(body.newPassword, 10)
+      } catch {
+        return Response.json({ ok: false, error: 'รหัสผ่านใหม่ต้องมี 10-200 ตัวอักษร' }, { status: 400 })
+      }
       if (!(await verifyPassword(currentPassword, user.password_hash))) {
         return Response.json({ ok: false, error: 'รหัสผ่านปัจจุบันไม่ถูกต้อง' }, { status: 400 })
-      }
-      if (newPassword.length < 10) {
-        return Response.json({ ok: false, error: 'รหัสผ่านใหม่ต้องมีอย่างน้อย 10 ตัวอักษร' }, { status: 400 })
       }
       await sql`update users set password_hash = ${await hashPassword(newPassword)}, updated_at = now() where id = ${user.id}`
       await sql`delete from sessions where user_id = ${user.id}`
