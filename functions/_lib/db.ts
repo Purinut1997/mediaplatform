@@ -181,6 +181,15 @@ export async function ensureSchema(env: Env) {
   `
 
   await sql`
+    create table if not exists user_favorites (
+      user_id integer not null references users(id) on delete cascade,
+      media_id integer not null references media(id) on delete cascade,
+      created_at timestamptz not null default now(),
+      primary key (user_id, media_id)
+    )
+  `
+
+  await sql`
     create table if not exists vip_requests (
       id serial primary key,
       user_id integer references users(id) on delete set null,
@@ -265,6 +274,10 @@ export async function ensureSchema(env: Env) {
 
   await sql`
     create index if not exists notifications_inbox_idx on notifications(audience, read_at, created_at desc)
+  `
+
+  await sql`
+    create index if not exists user_favorites_user_created_idx on user_favorites(user_id, created_at desc)
   `
 
   await seedInitialData(env)

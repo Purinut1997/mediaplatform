@@ -32,6 +32,11 @@
 - รองรับแท็กจริงต่อสื่อผ่านตาราง `tags` และ `media_tags`
 - มีหน้า Login และ Register พร้อม bot check แบบพื้นฐาน
 - มีหน้า Maintenance Mode สำหรับผู้ใช้ทั่วไป เมื่อเปิดจากหลังบ้าน
+- มีหน้า `คลังของฉัน` สำหรับสมาชิก
+  - แสดงข้อมูลบัญชีและระดับสิทธิ์
+  - บันทึก/นำสื่อออกจากรายการโปรดจริงผ่านตาราง `user_favorites`
+  - แสดงประวัติดาวน์โหลดและจำนวนครั้งจาก `media_events` เดิม โดยไม่สร้างข้อมูลซ้ำ
+  - ปุ่มรายการโปรดในหน้ารายละเอียดสื่อเชื่อมกับ Neon จริง
 
 ### Super Admin
 
@@ -125,6 +130,7 @@
 - Backup/Restore รองรับ `tags` และ `media_tags`
 - Backup/Restore รองรับ `notifications`
 - Backup/Restore รองรับ `media_events`
+- Backup/Restore รองรับ `user_favorites`
 - มี Restore Import แบบปลอดภัยจากไฟล์ JSON backup
   - Preview ข้อมูลก่อนนำเข้า
   - ยืนยันก่อน restore จริง
@@ -187,6 +193,7 @@
 - `functions/api/media/index.ts`
 - `functions/api/media/[id].ts`
 - `functions/api/media/track.ts`
+- `functions/api/member/library.ts`
 - `functions/api/admin/analytics.ts`
 - `functions/api/admin/users.ts`
 - `functions/api/admin/activity.ts`
@@ -207,4 +214,5 @@
 
 - `npm run lint` ผ่าน
 - `npm run build` ผ่าน
-- ฟีเจอร์ที่เพิ่มล่าสุด: Dashboard รายงานเชิงลึกด้าน engagement/สิทธิ์สื่อ/workflow/แหล่งสื่อ, Telegram settings หลังบ้านแบบไม่เปิดเผย secret พร้อมปุ่มส่งข้อความทดสอบ, Cloudflare Worker Cron แยกสำหรับเรียกตรวจลิงก์อัตโนมัติ, คำสั่ง npm สำหรับ deploy/ใส่ secret/ดู log ของ cron worker, Activity Log filter แบบ action/target type dropdown, การ์ดคู่มือตั้งค่า Cron/Telegram ใน System Health, Restore replace เฉพาะตารางที่เลือก, Cron endpoint สำหรับตรวจลิงก์อัตโนมัติ, Analytics เชิงเวลาจริงด้วย `media_events`, filter/clear Error Log, Notification Center แบบฐานข้อมูลพร้อม read/unread, ระบบแท็กจริง `tags/media_tags`, Admin Permission รายเมนู, Activity/Error Log CSV export, System Health, Backup Export, Broken Link Checker, Maintenance Mode, admin role toggle และ Telegram optional notification
+- Functions TypeScript ผ่าน
+- ฟีเจอร์ที่เพิ่มล่าสุด: Member Library (`คลังของฉัน`) พร้อมรายการโปรดจริง ประวัติดาวน์โหลดจาก `media_events` ข้อมูลบัญชี ปุ่มหัวใจบนหน้ารายละเอียด และ Backup/Restore ตาราง `user_favorites`; Dashboard รายงานเชิงลึกด้าน engagement/สิทธิ์สื่อ/workflow/แหล่งสื่อ; Telegram settings หลังบ้านแบบไม่เปิดเผย secret; Cloudflare Worker Cron แยกสำหรับเรียกตรวจลิงก์อัตโนมัติ

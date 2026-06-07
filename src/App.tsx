@@ -4,10 +4,12 @@ import {
   Archive,
   ArrowLeft,
   BarChart3,
+  BookmarkCheck,
   BookOpen,
   BrainCircuit,
   CheckCircle2,
   ChevronRight,
+  Clock3,
   Crown,
   Database,
   Download,
@@ -23,6 +25,7 @@ import {
   ListFilter,
   Loader2,
   LockKeyhole,
+  LogOut,
   Mail,
   Menu,
   Moon,
@@ -37,6 +40,7 @@ import {
   Tag,
   Trash2,
   UserPlus,
+  UserCircle2,
   Users,
   X,
 } from 'lucide-react'
@@ -48,7 +52,7 @@ const BRAND_HERO_URL =
   'https://raw.githubusercontent.com/Purinut1997/web-images/c70597729a1ba58a7b7b672d2bcace2f673a5a49/bdbeb65d-b4f5-4f65-a388-e95d950eac84%20%281%29.png'
 
 type Theme = 'light' | 'dark'
-type View = 'home' | 'media' | 'detail' | 'admin' | 'login' | 'register'
+type View = 'home' | 'media' | 'detail' | 'account' | 'admin' | 'login' | 'register'
 type AdminSection =
   | 'dashboard'
   | 'media'
@@ -101,6 +105,12 @@ type CurrentUser = {
   email: string
   role: 'superadmin' | 'admin' | 'member'
   access: 'VIP' | 'สมาชิก'
+}
+
+type MemberLibrary = {
+  profile: CurrentUser & { createdAt: string }
+  favorites: Array<{ media: MediaItem; savedAt: string }>
+  history: Array<{ media: MediaItem; lastDownloadedAt: string; downloadCount: number }>
 }
 
 type AdminUser = {
@@ -220,6 +230,7 @@ type RestorePreview = {
   media: number
   mediaLinks: number
   mediaEvents: number
+  userFavorites: number
   tags: number
   mediaTags: number
   users: number
@@ -500,6 +511,9 @@ function App() {
   const [showError, setShowError] = useState(false)
   const [loading, setLoading] = useState(true)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [memberLibrary, setMemberLibrary] = useState<MemberLibrary | null>(null)
+  const [memberLibraryLoading, setMemberLibraryLoading] = useState(false)
+  const [memberLibraryRefresh, setMemberLibraryRefresh] = useState(0)
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', theme === 'dark')
@@ -600,6 +614,32 @@ function App() {
     }
   }, [currentUser?.role, refreshToken])
 
+  useEffect(() => {
+    let active = true
+    if (!currentUser) {
+      return
+    }
+
+    async function loadMemberLibrary() {
+      setMemberLibraryLoading(true)
+      try {
+        const response = await fetch('/api/member/library', { credentials: 'include' })
+        const result = await readJson<MemberLibrary & { ok?: boolean; error?: string }>(response)
+        if (!response.ok) throw new Error(result.error || 'โหลดคลังของฉันไม่สำเร็จ')
+        if (active) setMemberLibrary(result)
+      } catch {
+        if (active) setMemberLibrary(null)
+      } finally {
+        if (active) setMemberLibraryLoading(false)
+      }
+    }
+
+    void loadMemberLibrary()
+    return () => {
+      active = false
+    }
+  }, [currentUser, memberLibraryRefresh])
+
   const filteredMedia = useMemo(
     () =>
       mediaRecords.filter((item) => {
@@ -616,6 +656,11 @@ function App() {
     [currentUser, mediaRecords],
   )
 
+  const favoriteIds = useMemo(
+    () => new Set(memberLibrary?.favorites.map((item) => item.media.id) ?? []),
+    [memberLibrary],
+  )
+
   const openDetail = (item: MediaItem) => {
     setSelected(item)
     setView('detail')
@@ -628,6 +673,33 @@ function App() {
     setShowSuccess(true)
   }
 
+  const toggleFavorite = async (item: MediaItem) => {
+    if (!currentUser) {
+      setToast('กรุณาเข้าสู่ระบบก่อนบันทึกรายการโปรด')
+      setView('login')
+      return
+    }
+
+    const favorite = !favoriteIds.has(item.id)
+    setLoading(true)
+    try {
+      const response = await fetch('/api/member/library', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ mediaId: item.id, favorite }),
+      })
+      const result = await readJson<{ ok?: boolean; error?: string }>(response)
+      if (!response.ok) throw new Error(result.error || 'บันทึกรายการโปรดไม่สำเร็จ')
+      setMemberLibraryRefresh((value) => value + 1)
+      setToast(favorite ? 'เก็บสื่อไว้ในคลังของฉันแล้ว' : 'นำสื่อออกจากรายการโปรดแล้ว')
+    } catch (error) {
+      setToast(error instanceof Error ? error.message : 'บันทึกรายการโปรดไม่สำเร็จ')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const handleLogin = (user: CurrentUser) => {
     setCurrentUser(user)
     setToast(`เข้าสู่ระบบแล้ว: ${user.name}`)
@@ -637,6 +709,7 @@ function App() {
   const logout = () => {
     void fetch('/api/auth/logout', { method: 'POST', credentials: 'include' })
     setCurrentUser(null)
+    setMemberLibrary(null)
     setToast('ออกจากระบบแล้ว')
     setView('home')
   }
@@ -704,10 +777,30 @@ function App() {
             <MediaDetail
               item={selected}
               canDownload={canViewMedia(currentUser, selected)}
+              isFavorite={favoriteIds.has(selected.id)}
               onBack={() => setView('media')}
+              onFavorite={() => void toggleFavorite(selected)}
+              onDownloaded={() => {
+                setMemberLibraryRefresh((value) => value + 1)
+                setToast('เปิดลิงก์สื่อและบันทึกประวัติแล้ว')
+              }}
               onError={() => setShowError(true)}
-              onSuccess={() => notifySuccess('บันทึกรายการโปรดแล้ว')}
             />
+          )}
+          {view === 'account' && currentUser && (
+            <MemberLibraryPanel
+              currentUser={currentUser}
+              favoriteIds={favoriteIds}
+              library={memberLibrary}
+              loading={memberLibraryLoading}
+              onLogout={logout}
+              onOpenDetail={openDetail}
+              onToggleFavorite={(item) => void toggleFavorite(item)}
+              setView={setView}
+            />
+          )}
+          {view === 'account' && !currentUser && (
+            <LoginPanel onLogin={handleLogin} setView={setView} />
           )}
           {view === 'login' && (
             <LoginPanel onLogin={handleLogin} setView={setView} />
@@ -842,10 +935,12 @@ function Header({
     { label: 'หน้าหลัก', value: 'home' as View },
     { label: 'คลังสื่อ', value: 'media' as View },
   ]
-  const visibleNav =
-    canAccessAdmin(currentUser)
-      ? [...nav, { label: 'หลังบ้าน', value: 'admin' as View }]
-      : nav
+  const memberNav = currentUser
+    ? [...nav, { label: 'คลังของฉัน', value: 'account' as View }]
+    : nav
+  const visibleNav = canAccessAdmin(currentUser)
+    ? [...memberNav, { label: 'หลังบ้าน', value: 'admin' as View }]
+    : memberNav
 
   return (
     <header className="sticky top-0 z-40 border-b border-white/60 bg-white/72 shadow-sm shadow-slate-950/5 backdrop-blur-2xl dark:border-white/10 dark:bg-[#070b14]/80">
@@ -899,12 +994,11 @@ function Header({
           {currentUser ? (
             <button
               className="hidden min-h-11 rounded-xl bg-slate-950 px-5 text-sm font-black text-cyan-200 shadow-lg shadow-slate-900/15 transition hover:-translate-y-0.5 dark:bg-cyan-300 dark:text-slate-950 sm:inline-flex sm:items-center"
-              onClick={() =>
-                canAccessAdmin(currentUser) ? setView('admin') : onLogout()
-              }
+              onClick={() => setView('account')}
               type="button"
             >
-              {canAccessAdmin(currentUser) ? 'หลังบ้าน' : 'ออกจากระบบ'}
+              <UserCircle2 className="mr-2" size={18} />
+              {currentUser.name}
             </button>
           ) : (
             <>
@@ -1312,11 +1406,15 @@ function FilterRow<T extends string>({
 }
 
 function MediaCard({
+  isFavorite,
   item,
   openDetail,
+  onToggleFavorite,
 }: {
+  isFavorite?: boolean
   item: MediaItem
   openDetail: (item: MediaItem) => void
+  onToggleFavorite?: (item: MediaItem) => void
 }) {
   return (
     <article className="group grid overflow-hidden rounded-3xl border border-white/70 bg-white/76 shadow-lg shadow-slate-950/5 backdrop-blur-xl transition duration-300 hover:-translate-y-1 sm:grid-cols-[210px_1fr] dark:border-white/10 dark:bg-white/[0.06]">
@@ -1329,6 +1427,18 @@ function MediaCard({
         <span className="absolute left-3 top-3 rounded-xl bg-slate-950/86 px-3 py-1 text-xs font-black text-cyan-200 shadow">
           {item.access}
         </span>
+        {onToggleFavorite && (
+          <button
+            aria-label={isFavorite ? 'นำออกจากรายการโปรด' : 'เพิ่มในรายการโปรด'}
+            className={`absolute right-3 top-3 grid h-11 w-11 place-items-center rounded-xl border border-white/40 shadow-lg backdrop-blur transition hover:scale-105 ${
+              isFavorite ? 'bg-rose-500 text-white' : 'bg-white/85 text-slate-700'
+            }`}
+            onClick={() => onToggleFavorite(item)}
+            type="button"
+          >
+            <Heart className={isFavorite ? 'fill-current' : ''} size={19} />
+          </button>
+        )}
       </div>
       <div className="flex flex-col p-5">
         <div className="mb-3 flex flex-wrap items-center gap-2 text-sm font-bold">
@@ -1385,18 +1495,211 @@ function MediaCard({
   )
 }
 
+function MemberLibraryPanel({
+  currentUser,
+  favoriteIds,
+  library,
+  loading,
+  onLogout,
+  onOpenDetail,
+  onToggleFavorite,
+  setView,
+}: {
+  currentUser: CurrentUser
+  favoriteIds: Set<number>
+  library: MemberLibrary | null
+  loading: boolean
+  onLogout: () => void
+  onOpenDetail: (item: MediaItem) => void
+  onToggleFavorite: (item: MediaItem) => void
+  setView: (view: View) => void
+}) {
+  const formatDate = (value?: string) =>
+    value
+      ? new Intl.DateTimeFormat('th-TH', {
+          dateStyle: 'medium',
+          timeStyle: 'short',
+        }).format(new Date(value))
+      : '-'
+  const favorites = library?.favorites ?? []
+  const history = library?.history ?? []
+
+  return (
+    <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
+      <div className="overflow-hidden rounded-[2rem] border border-white/70 bg-white/78 shadow-2xl shadow-sky-900/10 backdrop-blur-2xl dark:border-white/10 dark:bg-white/[0.06]">
+        <div className="grid gap-6 bg-[linear-gradient(125deg,#081427,#0d2941_60%,#0e7490)] p-6 text-white sm:p-8 lg:grid-cols-[1fr_auto] lg:items-center">
+          <div>
+            <p className="inline-flex items-center gap-2 rounded-2xl border border-cyan-300/20 bg-cyan-300/10 px-4 py-2 text-sm font-black text-cyan-100">
+              <BookmarkCheck size={18} />
+              Member Library
+            </p>
+            <h1 className="mt-5 text-3xl font-black sm:text-4xl">คลังของฉัน</h1>
+            <p className="mt-3 max-w-2xl font-semibold leading-7 text-sky-100/75">
+              รวมสื่อที่บันทึกไว้และประวัติดาวน์โหลดของบัญชีเดียว ค้นของที่เคยใช้ต่อได้ทันที
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-3">
+            <button
+              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-cyan-300 px-5 font-black text-slate-950"
+              onClick={() => setView('media')}
+              type="button"
+            >
+              <Search size={19} />
+              เลือกดูสื่อเพิ่ม
+            </button>
+            <button
+              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-white/20 bg-white/10 px-5 font-black text-white"
+              onClick={onLogout}
+              type="button"
+            >
+              <LogOut size={19} />
+              ออกจากระบบ
+            </button>
+          </div>
+        </div>
+
+        <div className="grid gap-4 p-4 sm:p-6 lg:grid-cols-[1fr_1.4fr]">
+          <div className="rounded-3xl border border-slate-200/80 bg-white/75 p-5 dark:border-white/10 dark:bg-black/20">
+            <div className="flex items-center gap-4">
+              <div className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-slate-950 text-cyan-200 dark:bg-cyan-300 dark:text-slate-950">
+                <UserCircle2 size={30} />
+              </div>
+              <div className="min-w-0">
+                <p className="truncate text-xl font-black text-slate-950 dark:text-white">
+                  {library?.profile.name ?? currentUser.name}
+                </p>
+                <p className="truncate text-sm font-bold text-slate-500 dark:text-slate-400">
+                  {library?.profile.email ?? currentUser.email}
+                </p>
+              </div>
+            </div>
+            <div className="mt-5 grid gap-3 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
+              {[
+                ['สิทธิ์', currentUser.access],
+                ['รายการโปรด', `${favorites.length} รายการ`],
+                ['เคยดาวน์โหลด', `${history.length} สื่อ`],
+              ].map(([label, value]) => (
+                <div
+                  className="rounded-2xl bg-slate-100/80 p-4 dark:bg-white/[0.06]"
+                  key={label}
+                >
+                  <p className="text-xs font-black uppercase text-slate-400">{label}</p>
+                  <p className="mt-1 font-black text-slate-950 dark:text-white">{value}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-3xl border border-slate-200/80 bg-white/75 p-5 dark:border-white/10 dark:bg-black/20">
+            <h2 className="inline-flex items-center gap-2 text-xl font-black text-slate-950 dark:text-white">
+              <Clock3 className="text-cyan-600 dark:text-cyan-300" />
+              ดาวน์โหลดล่าสุด
+            </h2>
+            {loading ? (
+              <div className="mt-5 flex min-h-32 items-center justify-center gap-3 font-bold text-slate-500">
+                <Loader2 className="animate-spin" />
+                กำลังโหลดประวัติ
+              </div>
+            ) : history.length ? (
+              <div className="mt-4 space-y-3">
+                {history.slice(0, 4).map((entry) => (
+                  <button
+                    className="grid min-h-20 w-full grid-cols-[64px_1fr_auto] items-center gap-3 rounded-2xl border border-slate-200 bg-white/80 p-2 text-left transition hover:border-cyan-300 dark:border-white/10 dark:bg-white/[0.04]"
+                    key={entry.media.id}
+                    onClick={() => onOpenDetail(entry.media)}
+                    type="button"
+                  >
+                    <img
+                      alt=""
+                      className="h-16 w-16 rounded-xl object-cover"
+                      src={entry.media.cover}
+                    />
+                    <span className="min-w-0">
+                      <span className="line-clamp-2 font-black text-slate-950 dark:text-white">
+                        {entry.media.title}
+                      </span>
+                      <span className="mt-1 block text-xs font-bold text-slate-400">
+                        {formatDate(entry.lastDownloadedAt)}
+                      </span>
+                    </span>
+                    <span className="rounded-xl bg-cyan-50 px-3 py-2 text-xs font-black text-cyan-800 dark:bg-cyan-300/10 dark:text-cyan-200">
+                      {entry.downloadCount} ครั้ง
+                    </span>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="mt-5 grid min-h-32 place-items-center rounded-2xl border border-dashed border-slate-300 p-5 text-center font-bold text-slate-500 dark:border-white/10">
+                ยังไม่มีประวัติดาวน์โหลด
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-8 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="inline-flex items-center gap-2 text-sm font-black text-cyan-700 dark:text-cyan-200">
+            <Heart className="fill-current" size={17} />
+            SAVED MEDIA
+          </p>
+          <h2 className="mt-2 text-3xl font-black text-slate-950 dark:text-white">สื่อที่บันทึกไว้</h2>
+        </div>
+        <p className="text-sm font-bold text-slate-500 dark:text-slate-400">
+          กดหัวใจบนการ์ดเพื่อนำออกจากรายการโปรด
+        </p>
+      </div>
+
+      {loading ? (
+        <div className="mt-6 grid min-h-56 place-items-center rounded-3xl border border-white/70 bg-white/70 font-bold text-slate-500 dark:border-white/10 dark:bg-white/[0.05]">
+          <Loader2 className="mb-3 animate-spin text-cyan-500" size={28} />
+          กำลังโหลดคลังของฉัน
+        </div>
+      ) : favorites.length ? (
+        <div className="mt-6 grid gap-4 lg:grid-cols-2">
+          {favorites.map(({ media }) => (
+            <MediaCard
+              isFavorite={favoriteIds.has(media.id)}
+              item={media}
+              key={media.id}
+              onToggleFavorite={onToggleFavorite}
+              openDetail={onOpenDetail}
+            />
+          ))}
+        </div>
+      ) : (
+        <div className="mt-6 grid min-h-56 place-items-center rounded-3xl border border-dashed border-cyan-300 bg-white/65 p-6 text-center dark:border-cyan-300/20 dark:bg-white/[0.04]">
+          <div>
+            <Heart className="mx-auto text-cyan-500" size={36} />
+            <h3 className="mt-4 text-xl font-black text-slate-950 dark:text-white">
+              ยังไม่มีสื่อที่บันทึกไว้
+            </h3>
+            <p className="mt-2 font-semibold text-slate-500 dark:text-slate-400">
+              เปิดรายละเอียดสื่อแล้วกด “เก็บไว้ในคลังของฉัน”
+            </p>
+          </div>
+        </div>
+      )}
+    </section>
+  )
+}
+
 function MediaDetail({
   canDownload,
+  isFavorite,
   item,
   onBack,
+  onDownloaded,
   onError,
-  onSuccess,
+  onFavorite,
 }: {
   canDownload: boolean
+  isFavorite: boolean
   item: MediaItem
   onBack: () => void
+  onDownloaded: () => void
   onError: () => void
-  onSuccess: () => void
+  onFavorite: () => void
 }) {
   const previewUrl = getPreviewUrl(item)
   const openResource = () => {
@@ -1410,7 +1713,7 @@ function MediaDetail({
     }
 
     trackMediaEvent(item.id, 'download')
-    onSuccess()
+    onDownloaded()
   }
 
   return (
@@ -1472,12 +1775,16 @@ function MediaDetail({
               ดาวน์โหลด / เปิดลิงก์
             </button>
             <button
-              className="inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-2xl bg-slate-950 px-5 font-black text-cyan-200 shadow-lg shadow-slate-900/10 dark:bg-cyan-300 dark:text-slate-950"
-              onClick={onSuccess}
+              className={`inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-2xl px-5 font-black shadow-lg transition ${
+                isFavorite
+                  ? 'bg-rose-500 text-white shadow-rose-500/20'
+                  : 'bg-slate-950 text-cyan-200 shadow-slate-900/10 dark:bg-cyan-300 dark:text-slate-950'
+              }`}
+              onClick={onFavorite}
               type="button"
             >
-              <Heart size={20} />
-              เก็บไว้ภายหลัง
+              <Heart className={isFavorite ? 'fill-current' : ''} size={20} />
+              {isFavorite ? 'บันทึกในคลังของฉันแล้ว' : 'เก็บไว้ในคลังของฉัน'}
             </button>
           </div>
         </div>
@@ -2340,6 +2647,7 @@ function AdminPanel({
     ['media', 'สื่อ'],
     ['mediaLinks', 'ลิงก์สื่อ'],
     ['mediaEvents', 'Event สื่อ'],
+    ['userFavorites', 'รายการโปรดสมาชิก'],
     ['tags', 'แท็ก'],
     ['mediaTags', 'แท็กของสื่อ'],
     ['categories', 'หมวดหมู่'],
@@ -4073,7 +4381,7 @@ function AdminPanel({
                 <Archive size={20} />
                 ดาวน์โหลด JSON ทั้งระบบ
               </button>
-              {['media', 'media_links', 'media_events', 'tags', 'media_tags', 'categories', 'users', 'vip_requests', 'notifications', 'app_settings'].map((table) => (
+              {['media', 'media_links', 'media_events', 'user_favorites', 'tags', 'media_tags', 'categories', 'users', 'vip_requests', 'notifications', 'app_settings'].map((table) => (
                 <button
                   className="inline-flex min-h-16 items-center justify-center gap-2 rounded-2xl border border-white/10 bg-black/20 px-5 font-black text-white disabled:opacity-60"
                   disabled={loadingOps}
@@ -4202,6 +4510,7 @@ function AdminPanel({
                         ['สื่อ', restorePreview.media],
                         ['ลิงก์สื่อ', restorePreview.mediaLinks],
                         ['Event สื่อ', restorePreview.mediaEvents],
+                        ['รายการโปรดสมาชิก', restorePreview.userFavorites],
                         ['แท็ก', restorePreview.tags],
                         ['แท็กของสื่อ', restorePreview.mediaTags],
                         ['ผู้ใช้', restorePreview.users],

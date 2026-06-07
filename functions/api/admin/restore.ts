@@ -8,8 +8,8 @@ type BackupPayload = {
   mode?: 'merge' | 'replace'
   replaceTables?: string[]
   backup?: {
-    data?: Partial<Record<'media' | 'mediaLinks' | 'mediaEvents' | 'tags' | 'mediaTags' | 'categories' | 'users' | 'vipRequests' | 'notifications' | 'settings', BackupRow[]>>
-  } & Partial<Record<'media' | 'mediaLinks' | 'mediaEvents' | 'tags' | 'mediaTags' | 'categories' | 'users' | 'vipRequests' | 'notifications' | 'settings', BackupRow[]>>
+    data?: Partial<Record<'media' | 'mediaLinks' | 'mediaEvents' | 'userFavorites' | 'tags' | 'mediaTags' | 'categories' | 'users' | 'vipRequests' | 'notifications' | 'settings', BackupRow[]>>
+  } & Partial<Record<'media' | 'mediaLinks' | 'mediaEvents' | 'userFavorites' | 'tags' | 'mediaTags' | 'categories' | 'users' | 'vipRequests' | 'notifications' | 'settings', BackupRow[]>>
 }
 
 const text = (value: unknown, fallback = '') => String(value ?? fallback).trim()
@@ -18,6 +18,7 @@ const replaceableTables = new Set([
   'media',
   'mediaLinks',
   'mediaEvents',
+  'userFavorites',
   'tags',
   'mediaTags',
   'categories',
@@ -42,6 +43,7 @@ function readData(payload: BackupPayload) {
     media: Array.isArray(source.media) ? source.media : [],
     mediaLinks: Array.isArray(source.mediaLinks) ? source.mediaLinks : [],
     mediaEvents: Array.isArray(source.mediaEvents) ? source.mediaEvents : [],
+    userFavorites: Array.isArray(source.userFavorites) ? source.userFavorites : [],
     tags: Array.isArray(source.tags) ? source.tags : [],
     mediaTags: Array.isArray(source.mediaTags) ? source.mediaTags : [],
     categories: Array.isArray(source.categories) ? source.categories : [],
@@ -63,6 +65,7 @@ function preview(data: ReturnType<typeof readData>, replaceTables: string[] = []
     media: data.media.length,
     mediaLinks: data.mediaLinks.length,
     mediaEvents: data.mediaEvents.length,
+    userFavorites: data.userFavorites.length,
     tags: data.tags.length,
     mediaTags: data.mediaTags.length,
     users: data.users.length,
@@ -89,6 +92,7 @@ async function clearSelectedTables(sql: ReturnType<typeof getSql>, tables: strin
     await sql`delete from media`
   } else {
     if (selected.has('mediaEvents')) await sql`delete from media_events`
+    if (selected.has('userFavorites')) await sql`delete from user_favorites`
     if (selected.has('mediaLinks')) await sql`delete from media_links`
     if (selected.has('mediaTags')) await sql`delete from media_tags`
   }
@@ -127,6 +131,7 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
     const sql = getSql(env)
     const mediaIdMap = new Map<number, number>()
     const tagIdMap = new Map<number, number>()
+    const userIdMap = new Map<number, number>()
     let skippedUsers = 0
     await clearSelectedTables(sql, replaceTables)
 
@@ -258,12 +263,15 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
             set name = ${text(user.name, email)}, role = ${text(user.role, 'member')}, access_level = ${text(user.access_level, 'สมาชิก')}, status = ${text(user.status, 'active')}, updated_at = now()
             where lower(email) = ${email} and role <> 'superadmin'
           `
+          if (Number.isFinite(Number(user.id))) {
+            userIdMap.set(Number(user.id), Number(existing.id))
+          }
         } else {
           skippedUsers += 1
         }
         continue
       }
-      await sql`
+      const [restoredUser] = await sql`
         insert into users (name, email, password_hash, role, access_level, status)
         values (${text(user.name, email)}, ${email}, ${text(user.password_hash, await hashPassword(randomHex(16)))}, ${text(user.role, 'member')}, ${text(user.access_level, 'สมาชิก')}, ${text(user.status, 'disabled')})
         on conflict (email) do update set
@@ -272,6 +280,21 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
           access_level = excluded.access_level,
           status = excluded.status,
           updated_at = now()
+        returning id
+      `
+      if (restoredUser?.id && Number.isFinite(Number(user.id))) {
+        userIdMap.set(Number(user.id), Number(restoredUser.id))
+      }
+    }
+
+    for (const favorite of data.userFavorites) {
+      const userId = userIdMap.get(Number(favorite.user_id))
+      const mediaId = mediaIdMap.get(Number(favorite.media_id))
+      if (!userId || !mediaId) continue
+      await sql`
+        insert into user_favorites (user_id, media_id, created_at)
+        values (${userId}, ${mediaId}, ${text(favorite.created_at) || new Date().toISOString()})
+        on conflict (user_id, media_id) do update set created_at = excluded.created_at
       `
     }
 

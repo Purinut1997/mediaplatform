@@ -66,6 +66,13 @@ create table if not exists sessions (
   created_at timestamptz not null default now()
 );
 
+create table if not exists user_favorites (
+  user_id integer not null references users(id) on delete cascade,
+  media_id integer not null references media(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (user_id, media_id)
+);
+
 create table if not exists vip_requests (
   id serial primary key,
   user_id integer references users(id) on delete set null,
@@ -88,3 +95,4 @@ create index if not exists media_status_topic_idx on media(status, topic);
 create index if not exists media_access_idx on media(access_level);
 create index if not exists sessions_user_idx on sessions(user_id, expires_at);
 create index if not exists vip_requests_status_idx on vip_requests(status, created_at);
+create index if not exists user_favorites_user_created_idx on user_favorites(user_id, created_at desc);
