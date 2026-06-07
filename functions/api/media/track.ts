@@ -1,5 +1,6 @@
 import { getCurrentUser } from '../../_lib/auth'
 import { ensureSchema, getSql, type Env } from '../../_lib/db'
+import { canAccessLevel } from '../../_lib/media-access'
 
 type TrackPayload = {
   mediaId?: number
@@ -18,9 +19,12 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
 
   const user = await getCurrentUser(env, request)
   const sql = getSql(env)
-  const [media] = await sql`select id from media where id = ${mediaId} limit 1`
+  const [media] = await sql`select id, access_level from media where id = ${mediaId} limit 1`
   if (!media) {
     return Response.json({ ok: false, error: 'Media not found' }, { status: 404 })
+  }
+  if (eventType === 'download' && !canAccessLevel(user, String(media.access_level))) {
+    return Response.json({ ok: false, error: 'Unauthorized' }, { status: 403 })
   }
 
   await sql`

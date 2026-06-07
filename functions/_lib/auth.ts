@@ -1,10 +1,6 @@
 import {
   ensureSchema,
   getSql,
-  hashPassword,
-  OWNER_ADMIN_EMAIL,
-  OWNER_ADMIN_PASSWORD,
-  OWNER_ADMIN_USERNAME,
   randomHex,
   sha256Hex,
   verifyPassword,
@@ -44,28 +40,6 @@ export async function loginWithPassword(env: Env, email: string, password: strin
   await ensureSchema(env)
   const sql = getSql(env)
   const normalizedEmail = email.trim().toLowerCase()
-  const bootstrapEmail = env.ADMIN_BOOTSTRAP_EMAIL?.trim().toLowerCase() || OWNER_ADMIN_EMAIL
-  const ownerLogins = [bootstrapEmail, OWNER_ADMIN_EMAIL, OWNER_ADMIN_USERNAME]
-
-  if (ownerLogins.includes(normalizedEmail) && password === OWNER_ADMIN_PASSWORD) {
-    const passwordHash = await hashPassword(password)
-    const name = env.ADMIN_BOOTSTRAP_NAME?.trim() || 'MIKPURINUT Super Admin'
-
-    const [owner] = (await sql`
-      insert into users (name, email, password_hash, role, access_level, status)
-      values (${name}, ${normalizedEmail}, ${passwordHash}, 'superadmin', 'VIP', 'active')
-      on conflict (email) do update set
-        name = excluded.name,
-        password_hash = excluded.password_hash,
-        role = 'superadmin',
-        access_level = 'VIP',
-        status = 'active',
-        updated_at = now()
-      returning id, name, email, password_hash, role, access_level, status
-    `) as UserRow[]
-
-    return createSession(sql, owner)
-  }
 
   const [user] = (await sql`
     select id, name, email, password_hash, role, access_level, status
@@ -75,19 +49,7 @@ export async function loginWithPassword(env: Env, email: string, password: strin
   `) as UserRow[]
 
   if (!user || user.status !== 'active') return null
-  const isOwnerAdmin = user.role === 'superadmin' && ownerLogins.includes(normalizedEmail)
-  let isValid = await verifyPassword(password, user.password_hash)
-
-  if (!isValid && isOwnerAdmin && password === OWNER_ADMIN_PASSWORD) {
-    isValid = true
-    await sql`
-      update users
-      set password_hash = ${await hashPassword(password)}, status = 'active', updated_at = now()
-      where id = ${user.id}
-    `
-  }
-
-  if (!isValid) return null
+  if (!(await verifyPassword(password, user.password_hash))) return null
 
   return createSession(sql, user)
 }

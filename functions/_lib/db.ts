@@ -11,11 +11,12 @@ export type Env = {
   CRON_SECRET?: string
   TELEGRAM_BOT_TOKEN?: string
   TELEGRAM_CHAT_ID?: string
+  TURNSTILE_SECRET_KEY?: string
+  TURNSTILE_SITE_KEY?: string
+  RESEND_API_KEY?: string
+  EMAIL_FROM?: string
+  APP_URL?: string
 }
-
-export const OWNER_ADMIN_EMAIL = 'themikthemik4015@gmail.com'
-export const OWNER_ADMIN_USERNAME = 'admin'
-export const OWNER_ADMIN_PASSWORD = 'themik06'
 
 let schemaReady = false
 
@@ -190,6 +191,30 @@ export async function ensureSchema(env: Env) {
   `
 
   await sql`
+    create table if not exists password_reset_tokens (
+      id serial primary key,
+      user_id integer not null references users(id) on delete cascade,
+      token_hash text not null unique,
+      expires_at timestamptz not null,
+      used_at timestamptz,
+      created_at timestamptz not null default now()
+    )
+  `
+
+  await sql`
+    create table if not exists media_reviews (
+      id serial primary key,
+      media_id integer not null references media(id) on delete cascade,
+      user_id integer not null references users(id) on delete cascade,
+      rating integer not null check (rating between 1 and 5),
+      comment text not null default '',
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now(),
+      unique (media_id, user_id)
+    )
+  `
+
+  await sql`
     create table if not exists vip_requests (
       id serial primary key,
       user_id integer references users(id) on delete set null,
@@ -280,6 +305,14 @@ export async function ensureSchema(env: Env) {
     create index if not exists user_favorites_user_created_idx on user_favorites(user_id, created_at desc)
   `
 
+  await sql`
+    create index if not exists password_reset_tokens_user_idx on password_reset_tokens(user_id, expires_at desc)
+  `
+
+  await sql`
+    create index if not exists media_reviews_media_idx on media_reviews(media_id, updated_at desc)
+  `
+
   await seedInitialData(env)
   await seedSettings(env)
   try {
@@ -353,27 +386,23 @@ function timingSafeEqual(left: string, right: string) {
 }
 
 async function seedBootstrapAdmin(env: Env) {
-  const primaryEmail = env.ADMIN_BOOTSTRAP_EMAIL?.trim().toLowerCase() || OWNER_ADMIN_EMAIL
-  const password = env.ADMIN_BOOTSTRAP_PASSWORD?.trim() || OWNER_ADMIN_PASSWORD
+  const primaryEmail = env.ADMIN_BOOTSTRAP_EMAIL?.trim().toLowerCase()
+  const password = env.ADMIN_BOOTSTRAP_PASSWORD?.trim()
+  if (!primaryEmail || !password) return
 
   const sql = getSql(env)
   const passwordHash = await hashPassword(password)
   const name = env.ADMIN_BOOTSTRAP_NAME?.trim() || 'MIKPURINUT Super Admin'
-  const adminLogins = Array.from(new Set([primaryEmail, OWNER_ADMIN_USERNAME]))
-
-  for (const login of adminLogins) {
-    await sql`
-      insert into users (name, email, password_hash, role, access_level, status)
-      values (${name}, ${login}, ${passwordHash}, 'superadmin', 'VIP', 'active')
-      on conflict (email) do update set
-        name = excluded.name,
-        password_hash = excluded.password_hash,
-        role = 'superadmin',
-        access_level = 'VIP',
-        status = 'active',
-        updated_at = now()
-    `
-  }
+  await sql`
+    insert into users (name, email, password_hash, role, access_level, status)
+    values (${name}, ${primaryEmail}, ${passwordHash}, 'superadmin', 'VIP', 'active')
+    on conflict (email) do update set
+      name = excluded.name,
+      role = 'superadmin',
+      access_level = 'VIP',
+      status = 'active',
+      updated_at = now()
+  `
 }
 
 async function seedSettings(env: Env) {

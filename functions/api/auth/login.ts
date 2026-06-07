@@ -12,7 +12,7 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
   const body = (await request.json().catch(() => ({}))) as LoginPayload
   const email = String(body.email ?? '').trim()
   const password = String(body.password ?? '')
-  const botError = validateBotCheck(body)
+  const botError = await validateBotCheck(body, env.TURNSTILE_SECRET_KEY, request.headers.get('CF-Connecting-IP'))
 
   if (botError) {
     await writeErrorLog(env, 'auth.login.bot_check', botError, { email })

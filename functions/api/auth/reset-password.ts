@@ -1,0 +1,32 @@
+import { writeAuditLog, writeErrorLog } from '../../_lib/admin'
+import { ensureSchema, getSql, hashPassword, sha256Hex, type Env } from '../../_lib/db'
+
+type Payload = { token?: string; password?: string }
+
+export const onRequestPost = async ({ env, request }: { env: Env; request: Request }) => {
+  try {
+    await ensureSchema(env)
+    const body = (await request.json().catch(() => ({}))) as Payload
+    const token = String(body.token ?? '')
+    const password = String(body.password ?? '')
+    if (!token || password.length < 10) {
+      return Response.json({ ok: false, error: 'ลิงก์ไม่ถูกต้องหรือรหัสผ่านสั้นกว่า 10 ตัวอักษร' }, { status: 400 })
+    }
+    const sql = getSql(env)
+    const [reset] = await sql`
+      select password_reset_tokens.id, password_reset_tokens.user_id, users.email
+      from password_reset_tokens join users on users.id = password_reset_tokens.user_id
+      where token_hash = ${await sha256Hex(token)} and used_at is null and expires_at > now()
+      limit 1
+    `
+    if (!reset) return Response.json({ ok: false, error: 'ลิงก์หมดอายุหรือถูกใช้งานแล้ว' }, { status: 400 })
+    await sql`update users set password_hash = ${await hashPassword(password)}, updated_at = now() where id = ${reset.user_id}`
+    await sql`update password_reset_tokens set used_at = now() where id = ${reset.id}`
+    await sql`delete from sessions where user_id = ${reset.user_id}`
+    await writeAuditLog(env, String(reset.email), 'reset_password', 'user', reset.user_id)
+    return Response.json({ ok: true })
+  } catch (error) {
+    await writeErrorLog(env, 'auth.reset_password', error)
+    return Response.json({ ok: false, error: 'ตั้งรหัสผ่านใหม่ไม่สำเร็จ' }, { status: 500 })
+  }
+}

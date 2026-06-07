@@ -66,6 +66,26 @@ create table if not exists sessions (
   created_at timestamptz not null default now()
 );
 
+create table if not exists password_reset_tokens (
+  id serial primary key,
+  user_id integer not null references users(id) on delete cascade,
+  token_hash text not null unique,
+  expires_at timestamptz not null,
+  used_at timestamptz,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists media_reviews (
+  id serial primary key,
+  media_id integer not null references media(id) on delete cascade,
+  user_id integer not null references users(id) on delete cascade,
+  rating integer not null check (rating between 1 and 5),
+  comment text not null default '',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (media_id, user_id)
+);
+
 create table if not exists user_favorites (
   user_id integer not null references users(id) on delete cascade,
   media_id integer not null references media(id) on delete cascade,
@@ -96,3 +116,5 @@ create index if not exists media_access_idx on media(access_level);
 create index if not exists sessions_user_idx on sessions(user_id, expires_at);
 create index if not exists vip_requests_status_idx on vip_requests(status, created_at);
 create index if not exists user_favorites_user_created_idx on user_favorites(user_id, created_at desc);
+create index if not exists password_reset_tokens_user_idx on password_reset_tokens(user_id, expires_at desc);
+create index if not exists media_reviews_media_idx on media_reviews(media_id, updated_at desc);

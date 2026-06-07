@@ -1,6 +1,7 @@
 import { getCurrentUser } from '../../_lib/auth'
 import { requireAdminPermission, writeErrorLog } from '../../_lib/admin'
 import { ensureSchema, getSql, type Env } from '../../_lib/db'
+import { hideProtectedLinks } from '../../_lib/media-access'
 
 const DEFAULT_COVER_URL =
   'https://raw.githubusercontent.com/Purinut1997/web-images/ab67fea68788dc5db9514475e8f2b8cb1c32d8b3/ChatGPT%20Image%2023%20%E0%B8%9E.%E0%B8%84.%202569%2008_05_56.png'
@@ -22,6 +23,7 @@ type MediaRow = {
   resource_url?: string | null
   preview_url?: string | null
   links?: Array<{
+    id?: number
     label: string
     type: string
     url: string
@@ -135,6 +137,7 @@ function toMedia(row: MediaRow) {
     previewUrl: row.preview_url ?? '',
     links: Array.isArray(row.links)
       ? row.links.map((link) => ({
+          id: link.id,
           label: link.label,
           type: link.type,
           url: link.url,
@@ -155,6 +158,7 @@ export const onRequestGet = async ({ env, request }: { env: Env; request: Reques
   const topic = url.searchParams.get('topic')
   const requestedStatus = url.searchParams.get('status')
   const canReadAll = await requireAdminPermission(env, request, 'media:read')
+  const currentUser = await getCurrentUser(env, request)
   const status = requestedStatus === 'all' && canReadAll ? 'all' : requestedStatus ?? 'เผยแพร่แล้ว'
   const isAllStatus = status === 'all'
   const statusList = status === 'เผยแพร่แล้ว' ? ['เผยแพร่แล้ว', 'เผยแพร่'] : [status]
@@ -171,6 +175,7 @@ export const onRequestGet = async ({ env, request }: { env: Env; request: Reques
               jsonb_agg(
                 jsonb_build_object(
                   'label', label,
+                  'id', id,
                   'type', type,
                   'url', url,
                   'previewUrl', preview_url,
@@ -200,6 +205,7 @@ export const onRequestGet = async ({ env, request }: { env: Env; request: Reques
               jsonb_agg(
                 jsonb_build_object(
                   'label', label,
+                  'id', id,
                   'type', type,
                   'url', url,
                   'previewUrl', preview_url,
@@ -222,7 +228,10 @@ export const onRequestGet = async ({ env, request }: { env: Env; request: Reques
 
   return Response.json({
     ok: true,
-    media: (rows as MediaRow[]).map(toMedia),
+    media: (rows as MediaRow[]).map((row) => {
+      const media = toMedia(row)
+      return canReadAll ? media : hideProtectedLinks(media, currentUser)
+    }),
   })
 }
 

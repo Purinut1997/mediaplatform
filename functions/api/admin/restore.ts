@@ -8,8 +8,8 @@ type BackupPayload = {
   mode?: 'merge' | 'replace'
   replaceTables?: string[]
   backup?: {
-    data?: Partial<Record<'media' | 'mediaLinks' | 'mediaEvents' | 'userFavorites' | 'tags' | 'mediaTags' | 'categories' | 'users' | 'vipRequests' | 'notifications' | 'settings', BackupRow[]>>
-  } & Partial<Record<'media' | 'mediaLinks' | 'mediaEvents' | 'userFavorites' | 'tags' | 'mediaTags' | 'categories' | 'users' | 'vipRequests' | 'notifications' | 'settings', BackupRow[]>>
+    data?: Partial<Record<'media' | 'mediaLinks' | 'mediaEvents' | 'mediaReviews' | 'userFavorites' | 'tags' | 'mediaTags' | 'categories' | 'users' | 'vipRequests' | 'notifications' | 'settings', BackupRow[]>>
+  } & Partial<Record<'media' | 'mediaLinks' | 'mediaEvents' | 'mediaReviews' | 'userFavorites' | 'tags' | 'mediaTags' | 'categories' | 'users' | 'vipRequests' | 'notifications' | 'settings', BackupRow[]>>
 }
 
 const text = (value: unknown, fallback = '') => String(value ?? fallback).trim()
@@ -18,6 +18,7 @@ const replaceableTables = new Set([
   'media',
   'mediaLinks',
   'mediaEvents',
+  'mediaReviews',
   'userFavorites',
   'tags',
   'mediaTags',
@@ -43,6 +44,7 @@ function readData(payload: BackupPayload) {
     media: Array.isArray(source.media) ? source.media : [],
     mediaLinks: Array.isArray(source.mediaLinks) ? source.mediaLinks : [],
     mediaEvents: Array.isArray(source.mediaEvents) ? source.mediaEvents : [],
+    mediaReviews: Array.isArray(source.mediaReviews) ? source.mediaReviews : [],
     userFavorites: Array.isArray(source.userFavorites) ? source.userFavorites : [],
     tags: Array.isArray(source.tags) ? source.tags : [],
     mediaTags: Array.isArray(source.mediaTags) ? source.mediaTags : [],
@@ -65,6 +67,7 @@ function preview(data: ReturnType<typeof readData>, replaceTables: string[] = []
     media: data.media.length,
     mediaLinks: data.mediaLinks.length,
     mediaEvents: data.mediaEvents.length,
+    mediaReviews: data.mediaReviews.length,
     userFavorites: data.userFavorites.length,
     tags: data.tags.length,
     mediaTags: data.mediaTags.length,
@@ -92,6 +95,7 @@ async function clearSelectedTables(sql: ReturnType<typeof getSql>, tables: strin
     await sql`delete from media`
   } else {
     if (selected.has('mediaEvents')) await sql`delete from media_events`
+    if (selected.has('mediaReviews')) await sql`delete from media_reviews`
     if (selected.has('userFavorites')) await sql`delete from user_favorites`
     if (selected.has('mediaLinks')) await sql`delete from media_links`
     if (selected.has('mediaTags')) await sql`delete from media_tags`
@@ -295,6 +299,18 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
         insert into user_favorites (user_id, media_id, created_at)
         values (${userId}, ${mediaId}, ${text(favorite.created_at) || new Date().toISOString()})
         on conflict (user_id, media_id) do update set created_at = excluded.created_at
+      `
+    }
+
+    for (const review of data.mediaReviews) {
+      const userId = userIdMap.get(Number(review.user_id))
+      const mediaId = mediaIdMap.get(Number(review.media_id))
+      const rating = int(review.rating)
+      if (!userId || !mediaId || rating < 1 || rating > 5) continue
+      await sql`
+        insert into media_reviews (media_id, user_id, rating, comment, created_at, updated_at)
+        values (${mediaId}, ${userId}, ${rating}, ${text(review.comment)}, ${text(review.created_at) || new Date().toISOString()}, ${text(review.updated_at) || new Date().toISOString()})
+        on conflict (media_id, user_id) do update set rating = excluded.rating, comment = excluded.comment, updated_at = excluded.updated_at
       `
     }
 

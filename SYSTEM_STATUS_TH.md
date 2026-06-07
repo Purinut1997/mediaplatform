@@ -37,6 +37,14 @@
   - บันทึก/นำสื่อออกจากรายการโปรดจริงผ่านตาราง `user_favorites`
   - แสดงประวัติดาวน์โหลดและจำนวนครั้งจาก `media_events` เดิม โดยไม่สร้างข้อมูลซ้ำ
   - ปุ่มรายการโปรดในหน้ารายละเอียดสื่อเชื่อมกับ Neon จริง
+- มีหน้าจัดการบัญชีสมาชิก
+  - แก้ชื่อที่แสดง
+  - เปลี่ยนรหัสผ่าน โดยตรวจรหัสเดิมและออกจากระบบทุกอุปกรณ์หลังเปลี่ยน
+  - ออกจากระบบทุกอุปกรณ์
+- มีระบบลืมรหัสผ่าน/ตั้งรหัสผ่านใหม่ผ่าน token อายุ 30 นาที
+  - ส่งอีเมลผ่าน Resend เมื่อกำหนด `RESEND_API_KEY` และ `EMAIL_FROM`
+  - ตอบกลับแบบไม่เปิดเผยว่าอีเมลมีบัญชีหรือไม่
+- มีระบบรีวิวและให้คะแนนจริงต่อสื่อ สมาชิกหนึ่งบัญชีแก้คะแนนของตัวเองได้
 
 ### Super Admin
 
@@ -105,6 +113,12 @@
 
 ### ระบบตรวจสอบและความปลอดภัย
 
+- ลิงก์สื่อที่ผู้ใช้ไม่มีสิทธิ์จะไม่ถูกส่งออกจาก API
+- การเปิดลิงก์/ดาวน์โหลดจริงต้องผ่าน `/api/media/access` เพื่อตรวจทั้งสิทธิ์สื่อและสิทธิ์ลิงก์ก่อน
+- ไม่มีอีเมล ชื่อผู้ใช้ หรือรหัสผ่าน Super Admin ฝังคงที่ในโค้ดแล้ว
+- Bootstrap Super Admin ทำงานเมื่อกำหนด `ADMIN_BOOTSTRAP_EMAIL` และ `ADMIN_BOOTSTRAP_PASSWORD` ผ่าน Secret เท่านั้น
+- รองรับ Cloudflare Turnstile จริงเมื่อกำหนด `TURNSTILE_SITE_KEY` และ `TURNSTILE_SECRET_KEY`
+  - หากยังไม่กำหนด จะใช้ bot check พื้นฐานเดิม
 - มี Activity Log เก็บการกระทำสำคัญ เช่น สมัครสมาชิก แก้ setting อนุมัติ VIP แก้สิทธิ์สมาชิก backup และตรวจลิงก์
   - ค้นหา กรองตามช่วงเวลา กรองตาม action และกรองตาม target type ได้
 - มี Error Log เก็บปัญหา เช่น login failed, bot check failed, register duplicate, API error และ Telegram send failed
@@ -131,6 +145,7 @@
 - Backup/Restore รองรับ `notifications`
 - Backup/Restore รองรับ `media_events`
 - Backup/Restore รองรับ `user_favorites`
+- Backup/Restore รองรับ `media_reviews`
 - มี Restore Import แบบปลอดภัยจากไฟล์ JSON backup
   - Preview ข้อมูลก่อนนำเข้า
   - ยืนยันก่อน restore จริง
@@ -177,11 +192,21 @@
    - มี Worker Cron แยกใน `workers/link-check-cron` แล้ว
    - เหลือ deploy Worker และใส่ `CRON_SECRET` จริงใน Cloudflare Variables and Secrets ก่อนใช้งานจริง
    - ตรวจล่าสุดพบว่า Wrangler บนเครื่องยังไม่ได้ login บัญชี Cloudflare จึงยัง deploy อัตโนมัติไม่ได้
+2. ตั้งค่า Secret ภายนอกก่อนเปิดใช้ฟีเจอร์เต็ม
+   - `TURNSTILE_SITE_KEY` และ `TURNSTILE_SECRET_KEY` สำหรับ Turnstile จริง
+   - `RESEND_API_KEY`, `EMAIL_FROM` และ `APP_URL` สำหรับส่งอีเมลลืมรหัสผ่าน
+3. Google/Facebook OAuth ยังปิดอยู่
+   - หน้าเว็บซ่อนปุ่มไว้เพื่อไม่แสดงฟังก์ชันจำลอง
+   - ต้องมี OAuth Client ID/Secret และตั้งค่า redirect URL จากบัญชีเจ้าของก่อนเชื่อมจริง
+4. ระบบซื้อสื่อแยกและวันหมดอายุ VIP ยังปิดไว้
+   - ต้องกำหนดราคา วิธีรับชำระ อายุ VIP และเงื่อนไขคืนเงินก่อนสร้าง workflow จริง
 
 ## ลำดับงานแนะนำต่อไป
 
-1. ตั้งค่า `CRON_SECRET` ให้ตรงกันทั้ง Cloudflare Pages และ Worker แล้วรัน `npm run cron:secret` + `npm run cron:deploy`
-2. หลังจากระบบใช้งานจริงสักระยะ ค่อยเพิ่มรายงานเฉพาะด้านตามข้อมูล event ที่สะสมจริง
+1. ตั้งค่า Turnstile และ Resend Secrets บน Cloudflare Pages
+2. Login Wrangler แล้วตั้ง `CRON_SECRET` ให้ตรงกันทั้ง Cloudflare Pages และ Worker จากนั้นรัน `npm run cron:secret` + `npm run cron:deploy`
+3. กำหนดกติกาธุรกิจสำหรับซื้อแยกและ VIP expiry ก่อนเปิดสองระบบนี้
+4. หลังจากระบบใช้งานจริงสักระยะ ค่อยเพิ่มรายงานเฉพาะด้านตามข้อมูล event ที่สะสมจริง
 
 ## ไฟล์หลักที่ควรดูเมื่อทำงานต่อ
 
@@ -193,7 +218,12 @@
 - `functions/api/media/index.ts`
 - `functions/api/media/[id].ts`
 - `functions/api/media/track.ts`
+- `functions/api/media/access.ts`
+- `functions/api/media/reviews.ts`
 - `functions/api/member/library.ts`
+- `functions/api/member/account.ts`
+- `functions/api/auth/forgot-password.ts`
+- `functions/api/auth/reset-password.ts`
 - `functions/api/admin/analytics.ts`
 - `functions/api/admin/users.ts`
 - `functions/api/admin/activity.ts`
@@ -215,4 +245,4 @@
 - `npm run lint` ผ่าน
 - `npm run build` ผ่าน
 - Functions TypeScript ผ่าน
-- ฟีเจอร์ที่เพิ่มล่าสุด: Member Library (`คลังของฉัน`) พร้อมรายการโปรดจริง ประวัติดาวน์โหลดจาก `media_events` ข้อมูลบัญชี ปุ่มหัวใจบนหน้ารายละเอียด และ Backup/Restore ตาราง `user_favorites`; Dashboard รายงานเชิงลึกด้าน engagement/สิทธิ์สื่อ/workflow/แหล่งสื่อ; Telegram settings หลังบ้านแบบไม่เปิดเผย secret; Cloudflare Worker Cron แยกสำหรับเรียกตรวจลิงก์อัตโนมัติ
+- ฟีเจอร์ที่เพิ่มล่าสุด: ป้องกัน URL สื่อ Member/VIP ฝั่ง API, endpoint เปิดลิงก์แบบตรวจสิทธิ์, เอารหัส Super Admin ออกจากโค้ด, จัดการบัญชี/เปลี่ยนรหัส/ออกทุกอุปกรณ์, ลืมรหัสผ่านผ่าน Resend, Cloudflare Turnstile แบบเปิดด้วย Secret, รีวิวและคะแนนจริง, Backup/Restore รีวิวสื่อ

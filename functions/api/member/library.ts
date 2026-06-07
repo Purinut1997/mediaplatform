@@ -1,6 +1,7 @@
 import { getCurrentUser } from '../../_lib/auth'
 import { writeAuditLog, writeErrorLog } from '../../_lib/admin'
 import { ensureSchema, getSql, type Env } from '../../_lib/db'
+import { hideProtectedLinks } from '../../_lib/media-access'
 
 type FavoritePayload = {
   mediaId?: number
@@ -164,9 +165,9 @@ export const onRequestGet = async ({ env, request }: { env: Env; request: Reques
         access: user.access_level,
         createdAt: user.created_at,
       },
-      favorites: favorites.map((row) => ({ media: toMedia(row), savedAt: row.saved_at })),
+      favorites: favorites.map((row) => ({ media: hideProtectedLinks(toMedia(row), currentUser), savedAt: row.saved_at })),
       history: history.map((row) => ({
-        media: toMedia(row),
+        media: hideProtectedLinks(toMedia(row), currentUser),
         lastDownloadedAt: row.last_downloaded_at,
         downloadCount: Number(row.download_count ?? 0),
       })),

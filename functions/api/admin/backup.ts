@@ -1,7 +1,7 @@
 import { requireSuperAdmin, writeAuditLog } from '../../_lib/admin'
 import { ensureSchema, getSql, type Env } from '../../_lib/db'
 
-const allowedTables = ['media', 'media_links', 'media_events', 'user_favorites', 'tags', 'media_tags', 'categories', 'users', 'vip_requests', 'notifications', 'app_settings'] as const
+const allowedTables = ['media', 'media_links', 'media_events', 'media_reviews', 'user_favorites', 'tags', 'media_tags', 'categories', 'users', 'vip_requests', 'notifications', 'app_settings'] as const
 type BackupTable = (typeof allowedTables)[number]
 
 function toCsv(rows: Record<string, unknown>[]) {
@@ -19,6 +19,8 @@ async function readTable(sql: ReturnType<typeof getSql>, table: BackupTable) {
       return sql`select * from media_links order by id desc`
     case 'media_events':
       return sql`select * from media_events order by id desc`
+    case 'media_reviews':
+      return sql`select * from media_reviews order by updated_at desc`
     case 'user_favorites':
       return sql`select * from user_favorites order by created_at desc`
     case 'tags':
@@ -64,10 +66,11 @@ export const onRequestGet = async ({ env, request }: { env: Env; request: Reques
     })
   }
 
-  const [media, mediaLinks, mediaEvents, userFavorites, tags, mediaTags, categories, users, vipRequests, notifications, settings] = await Promise.all([
+  const [media, mediaLinks, mediaEvents, mediaReviews, userFavorites, tags, mediaTags, categories, users, vipRequests, notifications, settings] = await Promise.all([
     readTable(sql, 'media'),
     readTable(sql, 'media_links'),
     readTable(sql, 'media_events'),
+    readTable(sql, 'media_reviews'),
     readTable(sql, 'user_favorites'),
     readTable(sql, 'tags'),
     readTable(sql, 'media_tags'),
@@ -86,6 +89,7 @@ export const onRequestGet = async ({ env, request }: { env: Env; request: Reques
       media,
       mediaLinks,
       mediaEvents,
+      mediaReviews,
       userFavorites,
       tags,
       mediaTags,
