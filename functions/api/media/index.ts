@@ -2,6 +2,7 @@ import { getCurrentUser } from '../../_lib/auth'
 import { requireAdminPermission, writeErrorLog } from '../../_lib/admin'
 import { ensureSchema, getSql, type Env } from '../../_lib/db'
 import { hideProtectedLinks } from '../../_lib/media-access'
+import { optionalHttpUrl, safeHttpUrl, UrlValidationError } from '../../_lib/url'
 
 const DEFAULT_COVER_URL =
   'https://raw.githubusercontent.com/Purinut1997/web-images/ab67fea68788dc5db9514475e8f2b8cb1c32d8b3/ChatGPT%20Image%2023%20%E0%B8%9E.%E0%B8%84.%202569%2008_05_56.png'
@@ -57,23 +58,24 @@ function normalizeStatus(status: string) {
 
 function readLinks(body: MediaPayload, title: string) {
   const links = Array.isArray(body.links) ? body.links : []
+  if (links.length > 20) throw new UrlValidationError('สื่อหนึ่งรายการเพิ่มลิงก์ได้สูงสุด 20 ลิงก์')
   const normalized = links
     .map((link, index) => ({
       label: String(link.label ?? '').trim() || `ลิงก์ ${index + 1}`,
       type: String(link.type ?? body.source ?? 'Google Drive'),
-      url: String(link.url ?? '').trim(),
-      previewUrl: String(link.previewUrl ?? '').trim(),
+      url: optionalHttpUrl(link.url, `ลิงก์รายการที่ ${index + 1}`),
+      previewUrl: optionalHttpUrl(link.previewUrl, `ลิงก์ตัวอย่างรายการที่ ${index + 1}`),
       access: String(link.access ?? body.access ?? 'สาธารณะ'),
     }))
     .filter((link) => link.url)
 
-  const resourceUrl = String(body.resourceUrl ?? '').trim()
+  const resourceUrl = optionalHttpUrl(body.resourceUrl, 'ลิงก์ไฟล์หลัก')
   if (!normalized.length && resourceUrl) {
     normalized.push({
       label: title,
       type: String(body.source ?? 'Google Drive'),
       url: resourceUrl,
-      previewUrl: String(body.previewUrl ?? '').trim(),
+      previewUrl: optionalHttpUrl(body.previewUrl, 'ลิงก์ตัวอย่าง'),
       access: String(body.access ?? 'สาธารณะ'),
     })
   }
@@ -130,18 +132,18 @@ function toMedia(row: MediaRow) {
     downloads: row.downloads,
     views: row.views,
     rating: Number(row.rating),
-    cover: row.cover_url,
+    cover: safeHttpUrl(row.cover_url, DEFAULT_COVER_URL),
     source: row.source_type,
     description: row.description,
-    resourceUrl: row.resource_url ?? '',
-    previewUrl: row.preview_url ?? '',
+    resourceUrl: safeHttpUrl(row.resource_url),
+    previewUrl: safeHttpUrl(row.preview_url),
     links: Array.isArray(row.links)
       ? row.links.map((link) => ({
           id: link.id,
           label: link.label,
           type: link.type,
-          url: link.url,
-          previewUrl: link.previewUrl ?? '',
+          url: safeHttpUrl(link.url),
+          previewUrl: safeHttpUrl(link.previewUrl),
           access: link.access,
         }))
       : [],
@@ -252,8 +254,11 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
     const body = (await request.json()) as MediaPayload
     const title = String(body.title ?? '').trim()
 
-    if (!title) {
-      return Response.json({ ok: false, error: 'title is required' }, { status: 400 })
+    if (!title || title.length > 200) {
+      return Response.json({ ok: false, error: 'กรุณากรอกชื่อสื่อไม่เกิน 200 ตัวอักษร' }, { status: 400 })
+    }
+    if (String(body.description ?? '').length > 10_000) {
+      return Response.json({ ok: false, error: 'รายละเอียดสื่อต้องไม่เกิน 10,000 ตัวอักษร' }, { status: 400 })
     }
 
     const slugBase =
@@ -263,7 +268,9 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
         .replace(/[^a-z0-9ก-๙]+/g, '-')
         .replace(/^-|-$/g, '') || 'media'
     const slug = `${slugBase}-${Date.now()}`
-    const coverUrl = String(body.cover ?? '').trim() || DEFAULT_COVER_URL
+    const coverUrl = optionalHttpUrl(body.cover, 'ลิงก์ภาพหน้าปก') || DEFAULT_COVER_URL
+    const links = readLinks(body, title)
+    const tags = readTags(body)
 
     const [row] = (await sql`
       insert into media (
@@ -290,9 +297,6 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
       )
       returning *
     `) as MediaRow[]
-
-    const links = readLinks(body, title)
-    const tags = readTags(body)
 
     for (let index = 0; index < links.length; index += 1) {
       const link = links[index]
@@ -324,6 +328,9 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
 
     return Response.json({ ok: true, media: { ...toMedia(row), tags } }, { status: 201 })
   } catch (error) {
+    if (error instanceof UrlValidationError) {
+      return Response.json({ ok: false, error: error.message }, { status: 400 })
+    }
     console.error('Create media failed', error)
     await writeErrorLog(env, 'media.create', error)
     return Response.json(

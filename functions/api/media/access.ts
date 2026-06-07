@@ -3,6 +3,7 @@ import { writeErrorLog } from '../../_lib/admin'
 import { ensureSchema, getSql, type Env } from '../../_lib/db'
 import { canAccessLevel } from '../../_lib/media-access'
 import { recordMediaEvent } from '../../_lib/media-events'
+import { safeHttpUrl } from '../../_lib/url'
 
 type AccessPayload = { mediaId?: number; linkId?: number }
 
@@ -45,8 +46,12 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
       return Response.json({ ok: false, error: 'บัญชีนี้ยังไม่มีสิทธิ์เปิดสื่อ' }, { status: 403 })
     }
 
+    const url = safeHttpUrl(link.url)
+    if (!url) {
+      return Response.json({ ok: false, error: 'ลิงก์สื่อนี้ไม่ปลอดภัยหรือไม่พร้อมใช้งาน' }, { status: 422 })
+    }
     const counted = await recordMediaEvent(env, request, user, mediaId, 'download')
-    return Response.json({ ok: true, url: link.url, label: link.label, counted })
+    return Response.json({ ok: true, url, label: link.label, counted })
   } catch (error) {
     await writeErrorLog(env, 'media.access', error)
     return Response.json({ ok: false, error: 'เปิดลิงก์สื่อไม่สำเร็จ' }, { status: 500 })

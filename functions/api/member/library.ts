@@ -2,6 +2,7 @@ import { getCurrentUser } from '../../_lib/auth'
 import { writeAuditLog, writeErrorLog } from '../../_lib/admin'
 import { ensureSchema, getSql, type Env } from '../../_lib/db'
 import { hideProtectedLinks } from '../../_lib/media-access'
+import { safeHttpUrl } from '../../_lib/url'
 
 type FavoritePayload = {
   mediaId?: number
@@ -56,7 +57,7 @@ function toMedia(row: MediaRow) {
     downloads: row.downloads,
     views: row.views,
     rating: Number(row.rating),
-    cover: row.cover_url,
+    cover: safeHttpUrl(row.cover_url),
     source: row.source_type,
     description: row.description,
     resourceUrl: row.links?.[0]?.url ?? '',

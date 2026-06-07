@@ -3,6 +3,7 @@ import { type PublicUser } from './auth'
 import { ensureSchema, getSql, type Env } from './db'
 import { notifyTelegram } from './notify'
 import { writeNotification } from './notifications'
+import { safeHttpUrl } from './url'
 
 type LinkRow = {
   media_id: number
@@ -35,22 +36,40 @@ async function fetchStatus(url: string, method: 'HEAD' | 'GET') {
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), 6500)
   try {
-    return await fetch(url, {
-      method,
-      redirect: 'follow',
-      signal: controller.signal,
-      headers: method === 'GET' ? { Range: 'bytes=0-0' } : undefined,
-    })
+    let currentUrl = url
+    for (let redirect = 0; redirect <= 5; redirect += 1) {
+      const response = await fetch(currentUrl, {
+        method,
+        redirect: 'manual',
+        signal: controller.signal,
+        headers: method === 'GET' ? { Range: 'bytes=0-0' } : undefined,
+      })
+      if (![301, 302, 303, 307, 308].includes(response.status)) return response
+      const location = response.headers.get('Location')
+      await response.body?.cancel()
+      const nextUrl = location ? safeHttpUrl(new URL(location, currentUrl).href) : ''
+      if (!nextUrl) throw new Error('Redirect ไปยังลิงก์ที่ไม่ปลอดภัย')
+      currentUrl = nextUrl
+    }
+    throw new Error('ลิงก์ Redirect มากเกินกำหนด')
   } finally {
     clearTimeout(timeout)
   }
 }
 
 async function checkUrl(url: string) {
+  const safeUrl = safeHttpUrl(url)
+  if (!safeUrl) {
+    return {
+      status: 'error',
+      statusCode: null,
+      message: 'ลิงก์ไม่ปลอดภัยหรือชี้ไปยังเครือข่ายภายใน',
+    } as const
+  }
   try {
-    let response = await fetchStatus(url, 'HEAD')
+    let response = await fetchStatus(safeUrl, 'HEAD')
     if ([403, 405, 501].includes(response.status)) {
-      response = await fetchStatus(url, 'GET')
+      response = await fetchStatus(safeUrl, 'GET')
     }
     return {
       status: response.ok ? 'ok' : 'warning',
@@ -102,7 +121,7 @@ export async function runLinkChecks(
       linkId: row.media_link_id,
       label: row.label,
       type: row.type,
-      url: row.url,
+      url: safeHttpUrl(row.url),
       ...result,
     })
   }

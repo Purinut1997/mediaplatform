@@ -1,4 +1,5 @@
 import type { PublicUser } from './auth'
+import { safeHttpUrl } from './url'
 
 export function canAccessLevel(user: PublicUser | null, access: string) {
   if (user?.role === 'superadmin' || user?.role === 'admin') return true
@@ -16,7 +17,7 @@ export function hideProtectedLinks<T extends {
   const canAccessMedia = canAccessLevel(user, media.access)
   const links = (media.links ?? []).map((link) =>
     canAccessMedia && canAccessLevel(user, link.access)
-      ? link
+      ? { ...link, url: safeHttpUrl(link.url), previewUrl: safeHttpUrl(link.previewUrl) }
       : { ...link, url: '', previewUrl: '' },
   )
   const first = links.find((link) => link.url || link.previewUrl)

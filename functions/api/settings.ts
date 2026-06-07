@@ -2,6 +2,7 @@ import { getCurrentUser } from '../_lib/auth'
 import { writeAuditLog, writeErrorLog } from '../_lib/admin'
 import { ensureSchema, getSql, type Env } from '../_lib/db'
 import { writeNotification } from '../_lib/notifications'
+import { optionalHttpUrl, safeHttpUrl, UrlValidationError } from '../_lib/url'
 
 type SiteSettings = {
   heroEyebrow: string
@@ -60,6 +61,8 @@ function normalizeSettings(value?: Partial<SiteSettings>) {
     vipRegistrationEnabled: Boolean(value?.vipRegistrationEnabled),
     maintenanceEnabled: Boolean(value?.maintenanceEnabled),
     vipPrice: Number(value?.vipPrice ?? defaultSettings.vipPrice),
+    heroImageUrl: safeHttpUrl(value?.heroImageUrl, defaultSettings.heroImageUrl),
+    vipQrUrl: safeHttpUrl(value?.vipQrUrl),
   }
 }
 
@@ -88,7 +91,7 @@ export const onRequestPut = async ({ env, request }: { env: Env; request: Reques
       heroEyebrow: String(body.heroEyebrow ?? defaultSettings.heroEyebrow),
       heroTitle: String(body.heroTitle ?? defaultSettings.heroTitle),
       heroDescription: String(body.heroDescription ?? defaultSettings.heroDescription),
-      heroImageUrl: String(body.heroImageUrl ?? defaultSettings.heroImageUrl),
+      heroImageUrl: optionalHttpUrl(body.heroImageUrl, 'ลิงก์ภาพหน้าแรก') || defaultSettings.heroImageUrl,
       heroPrimaryLabel: String(body.heroPrimaryLabel ?? defaultSettings.heroPrimaryLabel),
       heroSecondaryLabel: String(body.heroSecondaryLabel ?? defaultSettings.heroSecondaryLabel),
       announcementText: String(body.announcementText ?? ''),
@@ -97,7 +100,7 @@ export const onRequestPut = async ({ env, request }: { env: Env; request: Reques
       maintenanceMessage: String(body.maintenanceMessage ?? defaultSettings.maintenanceMessage),
       vipRegistrationEnabled: Boolean(body.vipRegistrationEnabled),
       vipPrice: Number(body.vipPrice ?? defaultSettings.vipPrice),
-      vipQrUrl: String(body.vipQrUrl ?? ''),
+      vipQrUrl: optionalHttpUrl(body.vipQrUrl, 'ลิงก์ QR Code'),
       vipBankName: String(body.vipBankName ?? defaultSettings.vipBankName),
       vipAccountNumber: String(body.vipAccountNumber ?? ''),
       vipAccountName: String(body.vipAccountName ?? defaultSettings.vipAccountName),
@@ -135,6 +138,9 @@ export const onRequestPut = async ({ env, request }: { env: Env; request: Reques
 
     return Response.json({ ok: true, settings })
   } catch (error) {
+    if (error instanceof UrlValidationError) {
+      return Response.json({ ok: false, error: error.message }, { status: 400 })
+    }
     await writeErrorLog(env, 'settings.update', error)
     return Response.json({ ok: false, error: 'บันทึกการตั้งค่าไม่สำเร็จ' }, { status: 500 })
   }

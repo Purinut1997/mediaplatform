@@ -1,5 +1,6 @@
 import { requireAdminPermission } from '../../_lib/admin'
 import { ensureSchema, getSql, type Env } from '../../_lib/db'
+import { optionalHttpUrl } from '../../_lib/url'
 
 const DEFAULT_COVER_URL =
   'https://raw.githubusercontent.com/Purinut1997/web-images/ab67fea68788dc5db9514475e8f2b8cb1c32d8b3/ChatGPT%20Image%2023%20%E0%B8%9E.%E0%B8%84.%202569%2008_05_56.png'
@@ -46,23 +47,24 @@ function readId(params: Context['params']) {
 
 function readLinks(body: MediaPayload, title: string) {
   const links = Array.isArray(body.links) ? body.links : []
+  if (links.length > 20) throw new Error('สื่อหนึ่งรายการเพิ่มลิงก์ได้สูงสุด 20 ลิงก์')
   const normalized = links
     .map((link, index) => ({
       label: String(link.label ?? '').trim() || `ลิงก์ ${index + 1}`,
       type: String(link.type ?? body.source ?? 'Google Drive'),
-      url: String(link.url ?? '').trim(),
-      previewUrl: String(link.previewUrl ?? '').trim(),
+      url: optionalHttpUrl(link.url, `ลิงก์รายการที่ ${index + 1}`),
+      previewUrl: optionalHttpUrl(link.previewUrl, `ลิงก์ตัวอย่างรายการที่ ${index + 1}`),
       access: String(link.access ?? body.access ?? 'สาธารณะ'),
     }))
     .filter((link) => link.url)
 
-  const resourceUrl = String(body.resourceUrl ?? '').trim()
+  const resourceUrl = optionalHttpUrl(body.resourceUrl, 'ลิงก์ไฟล์หลัก')
   if (!normalized.length && resourceUrl) {
     normalized.push({
       label: title,
       type: String(body.source ?? 'Google Drive'),
       url: resourceUrl,
-      previewUrl: String(body.previewUrl ?? '').trim(),
+      previewUrl: optionalHttpUrl(body.previewUrl, 'ลิงก์ตัวอย่าง'),
       access: String(body.access ?? 'สาธารณะ'),
     })
   }
@@ -118,7 +120,23 @@ export const onRequestPut = async ({ env, request, params }: Context) => {
   const sql = getSql(env)
   const body = (await request.json().catch(() => ({}))) as MediaPayload
   const title = String(body.title ?? '').trim()
-  if (!title) return Response.json({ ok: false, error: 'title is required' }, { status: 400 })
+  if (!title || title.length > 200) {
+    return Response.json({ ok: false, error: 'กรุณากรอกชื่อสื่อไม่เกิน 200 ตัวอักษร' }, { status: 400 })
+  }
+  if (String(body.description ?? '').length > 10_000) {
+    return Response.json({ ok: false, error: 'รายละเอียดสื่อต้องไม่เกิน 10,000 ตัวอักษร' }, { status: 400 })
+  }
+  let links: ReturnType<typeof readLinks>
+  let coverUrl: string
+  try {
+    links = readLinks(body, title)
+    coverUrl = optionalHttpUrl(body.cover, 'ลิงก์ภาพหน้าปก') || DEFAULT_COVER_URL
+  } catch (error) {
+    return Response.json(
+      { ok: false, error: error instanceof Error ? error.message : 'ข้อมูลลิงก์ไม่ถูกต้อง' },
+      { status: 400 },
+    )
+  }
 
   const [row] = await sql`
     update media
@@ -128,7 +146,7 @@ export const onRequestPut = async ({ env, request, params }: Context) => {
       access_level = ${body.access ?? 'สาธารณะ'},
       status = ${body.status ?? 'ฉบับร่าง'},
       price = ${Number(body.price ?? 0)},
-      cover_url = ${String(body.cover ?? '').trim() || DEFAULT_COVER_URL},
+      cover_url = ${coverUrl},
       source_type = ${body.source ?? 'Google Drive'},
       description = ${body.description ?? ''},
       updated_at = now()
@@ -138,7 +156,6 @@ export const onRequestPut = async ({ env, request, params }: Context) => {
   if (!row) return Response.json({ ok: false, error: 'Media not found' }, { status: 404 })
 
   await sql`delete from media_links where media_id = ${id}`
-  const links = readLinks(body, title)
   for (let index = 0; index < links.length; index += 1) {
     const link = links[index]
     await sql`

@@ -436,10 +436,14 @@ const portalTiles = [
 ]
 
 function canViewMedia(user: CurrentUser | null, item: MediaItem) {
+  return canViewAccess(user, item.access)
+}
+
+function canViewAccess(user: CurrentUser | null, access: AccessLevel) {
   if (user?.role === 'superadmin' || user?.role === 'admin') return true
-  if (item.access === 'สาธารณะ') return true
-  if (user?.access === 'VIP') return item.access !== 'ซื้อแยก'
-  if (user?.access === 'สมาชิก') return item.access === 'สมาชิก'
+  if (access === 'สาธารณะ') return true
+  if (user?.access === 'VIP') return access !== 'ซื้อแยก'
+  if (user?.access === 'สมาชิก') return access === 'สมาชิก'
   return false
 }
 
@@ -1821,8 +1825,9 @@ function MediaDetail({
   onFavorite: () => void
 }) {
   const previewUrl = getPreviewUrl(item)
-  const openResource = async () => {
-    if (!canDownload) {
+  const primaryLink = item.links?.find((link) => canViewAccess(currentUser, link.access) && link.url) ?? item.links?.[0]
+  const openResource = async (linkId?: number, allowed = canDownload) => {
+    if (!allowed) {
       onError()
       return
     }
@@ -1832,7 +1837,7 @@ function MediaDetail({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ mediaId: item.id, linkId: item.links?.[0]?.id }),
+        body: JSON.stringify({ mediaId: item.id, linkId }),
       })
       const result = await readJson<{ url?: string; error?: string }>(response)
       if (!response.ok || !result.url) throw new Error(result.error || 'เปิดลิงก์ไม่สำเร็จ')
@@ -1895,7 +1900,7 @@ function MediaDetail({
           <div className="mt-6 flex flex-col gap-3 sm:flex-row">
             <button
               className="inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-2xl bg-cyan-400 px-5 font-black text-slate-950 shadow-lg shadow-cyan-500/20"
-              onClick={() => void openResource()}
+              onClick={() => void openResource(primaryLink?.id, canDownload && (!primaryLink || canViewAccess(currentUser, primaryLink.access)))}
               type="button"
             >
               <Download size={20} />
@@ -1916,6 +1921,43 @@ function MediaDetail({
           </div>
         </div>
       </div>
+
+      {Boolean(item.links?.length) && (
+        <section className="mt-6 rounded-3xl border border-white/70 bg-white/76 p-6 shadow-sm backdrop-blur dark:border-white/10 dark:bg-white/[0.06]">
+          <div className="mb-4 flex flex-wrap items-end justify-between gap-2">
+            <div>
+              <h3 className="text-xl font-black text-slate-950 dark:text-white">ไฟล์และบทเรียนในชุดนี้</h3>
+              <p className="mt-1 text-sm font-semibold text-slate-500 dark:text-slate-400">เลือกเปิดเอกสาร วิดีโอ หรือลิงก์ที่ต้องการได้โดยตรง</p>
+            </div>
+            <span className="rounded-full bg-cyan-100 px-3 py-1 text-xs font-black text-cyan-800 dark:bg-cyan-300/10 dark:text-cyan-200">
+              {item.links?.length ?? 0} รายการ
+            </span>
+          </div>
+          <div className="grid gap-3 md:grid-cols-2">
+            {item.links?.map((link, index) => {
+              const allowed = canDownload && canViewAccess(currentUser, link.access)
+              return (
+                <button
+                  className={`flex min-h-16 items-center gap-3 rounded-2xl border px-4 py-3 text-left transition ${
+                    allowed
+                      ? 'border-cyan-200 bg-cyan-50 hover:border-cyan-400 hover:bg-cyan-100 dark:border-cyan-300/20 dark:bg-cyan-300/10 dark:hover:bg-cyan-300/15'
+                      : 'border-slate-200 bg-slate-100 text-slate-500 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-400'
+                  }`}
+                  key={link.id ?? `${link.label}-${index}`}
+                  onClick={() => void openResource(link.id, allowed)}
+                  type="button"
+                >
+                  {allowed ? <ExternalLink className="shrink-0 text-cyan-600 dark:text-cyan-300" size={21} /> : <LockKeyhole className="shrink-0" size={21} />}
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate font-black text-slate-900 dark:text-white">{link.label}</span>
+                    <span className="mt-0.5 block text-xs font-bold">{link.type} · {link.access}</span>
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+        </section>
+      )}
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_360px]">
         <section className="rounded-3xl border border-white/70 bg-white/76 p-6 shadow-sm backdrop-blur dark:border-white/10 dark:bg-white/[0.06]">

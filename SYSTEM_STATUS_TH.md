@@ -32,6 +32,8 @@
   - การเปิดไฟล์ยังทำงานตามปกติแม้เหตุการณ์ซ้ำจะไม่ถูกเพิ่มยอด
 - แยกสิทธิ์ Public / Member / VIP / ซื้อแยก
 - รองรับลิงก์สื่อหลายรายการต่อการ์ด เช่น Google Drive, Google Sheet, YouTube และ External Link
+  - หน้ารายละเอียดแสดงรายการไฟล์/บทเรียนทุกลิงก์ให้ผู้ใช้เลือกเปิดได้
+  - แต่ละปุ่มตรวจสิทธิ์ของลิงก์นั้นผ่าน backend ก่อนเปิดจริง
 - รองรับแท็กจริงต่อสื่อผ่านตาราง `tags` และ `media_tags`
 - มีหน้า Login และ Register พร้อม bot check แบบพื้นฐาน
 - มีหน้า Maintenance Mode สำหรับผู้ใช้ทั่วไป เมื่อเปิดจากหลังบ้าน
@@ -133,6 +135,12 @@
 - มี API middleware ป้องกันคำขอแก้ไขข้อมูลจากเว็บไซต์อื่น และบังคับไม่ให้ cache ข้อมูล API
 - มี Security Headers สำหรับหน้าเว็บ เช่น CSP, Permissions Policy, Referrer Policy, `nosniff` และป้องกันการฝังเว็บใน iframe
 - ไฟล์ build ใต้ `/assets` ใช้ immutable cache ระยะยาวเพื่อเพิ่มความเร็วและลดการใช้ทรัพยากร Cloudflare
+- มีตัวตรวจ URL กลางสำหรับลิงก์สื่อ ภาพหน้าเว็บ และ QR Code
+  - ยอมรับเฉพาะ `http/https`
+  - ปฏิเสธ URL ที่ฝัง username/password, localhost, private IP และเครือข่ายภายใน
+  - ตรวจ redirect ทุกขั้นของ Broken Link Checker เพื่อป้องกัน SSRF
+  - ข้อมูล URL เก่าที่ไม่ปลอดภัยจะไม่ถูกส่งไปหน้าเว็บหรือเปิดให้ผู้ใช้
+- จำกัดขนาด request API โดยให้ Restore backup มีเพดานแยกที่สูงกว่า API ทั่วไป
 - มี Activity Log เก็บการกระทำสำคัญ เช่น สมัครสมาชิก แก้ setting อนุมัติ VIP แก้สิทธิ์สมาชิก backup และตรวจลิงก์
   - ค้นหา กรองตามช่วงเวลา กรองตาม action และกรองตาม target type ได้
 - มี Error Log เก็บปัญหา เช่น login failed, bot check failed, register duplicate, API error และ Telegram send failed
@@ -233,6 +241,7 @@
 - `functions/_lib/notifications.ts`
 - `functions/_lib/rate-limit.ts`
 - `functions/_lib/media-events.ts`
+- `functions/_lib/url.ts`
 - `functions/api/_middleware.ts`
 - `functions/api/media/index.ts`
 - `functions/api/media/[id].ts`
@@ -264,4 +273,4 @@
 - `npm run lint` ผ่าน
 - `npm run build` ผ่าน
 - Functions TypeScript ผ่าน
-- ฟีเจอร์ที่เพิ่มล่าสุด: ป้องกันคำขอข้ามเว็บไซต์, Security Headers/CSP, API no-store, cache ไฟล์ build และ Web App Manifest พร้อมไอคอน MIKPURINUT
+- ฟีเจอร์ที่เพิ่มล่าสุด: ตรวจ URL กลาง ป้องกัน SSRF/URL scheme อันตราย ตรวจ redirect ทุกขั้น ซ่อน URL เก่าที่ไม่ปลอดภัย และจำกัดขนาด request API

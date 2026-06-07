@@ -9,12 +9,17 @@ export const onRequest = async ({ request, next }: Context) => {
   const url = new URL(request.url)
   const origin = request.headers.get('Origin')
   const fetchSite = request.headers.get('Sec-Fetch-Site')
+  const contentLength = Number(request.headers.get('Content-Length') ?? 0)
+  const maxBodyBytes = url.pathname === '/api/admin/restore' ? 25_000_000 : 512_000
 
   if (
     unsafeMethods.has(request.method) &&
     ((origin && origin !== url.origin) || fetchSite === 'cross-site')
   ) {
     return Response.json({ ok: false, error: 'Cross-site request blocked' }, { status: 403 })
+  }
+  if (unsafeMethods.has(request.method) && contentLength > maxBodyBytes) {
+    return Response.json({ ok: false, error: 'Request body is too large' }, { status: 413 })
   }
 
   const response = await next()
