@@ -4,6 +4,7 @@ import { validateBotCheck, type BotCheckPayload } from '../../_lib/bot'
 import { ensureSchema, getSql, hashPassword, type Env } from '../../_lib/db'
 import { notifyTelegram } from '../../_lib/notify'
 import { writeNotification } from '../../_lib/notifications'
+import { enforceRateLimits, rateLimitResponse, requestIp } from '../../_lib/rate-limit'
 
 type RegisterPayload = BotCheckPayload & {
   name?: string
@@ -23,6 +24,16 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
   const password = String(body.password ?? '')
   const phone = String(body.phone ?? '').trim()
   const membership = body.membership === 'vip' ? 'vip' : 'member'
+  const rateLimit = await enforceRateLimits(env, [
+    {
+      action: 'register:ip',
+      identifier: requestIp(request),
+      limit: 5,
+      windowSeconds: 3600,
+      blockSeconds: 3600,
+    },
+  ])
+  if (!rateLimit.allowed) return rateLimitResponse(rateLimit.retryAfter)
   const botError = await validateBotCheck(body, env.TURNSTILE_SECRET_KEY, request.headers.get('CF-Connecting-IP'))
 
   if (botError) {

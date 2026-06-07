@@ -27,6 +27,8 @@
 - มีภาพแบรนด์, particle/grid background และเครดิต `Created by MIKPURINUT`
 - แสดงสื่อแบบการ์ดและหน้ารายละเอียดสื่อ
 - เก็บ event การเข้าชมและดาวน์โหลดจริงผ่านตาราง `media_events`
+  - ป้องกันการปั่นสถิติ โดยไม่นับการเข้าชมหรือดาวน์โหลดซ้ำจากผู้ใช้/ผู้เยี่ยมชมเดิมในช่วงเวลาสั้น ๆ
+  - การเปิดไฟล์ยังทำงานตามปกติแม้เหตุการณ์ซ้ำจะไม่ถูกเพิ่มยอด
 - แยกสิทธิ์ Public / Member / VIP / ซื้อแยก
 - รองรับลิงก์สื่อหลายรายการต่อการ์ด เช่น Google Drive, Google Sheet, YouTube และ External Link
 - รองรับแท็กจริงต่อสื่อผ่านตาราง `tags` และ `media_tags`
@@ -121,6 +123,12 @@
 - บัญชี Super Admin แบบชื่อผู้ใช้เดิม `admin` จะถูกปิดอัตโนมัติ เหลือการเข้าใช้ผ่านอีเมล Secret เท่านั้น
 - รองรับ Cloudflare Turnstile จริงเมื่อกำหนด `TURNSTILE_SITE_KEY` และ `TURNSTILE_SECRET_KEY`
   - หากยังไม่กำหนด จะใช้ bot check พื้นฐานเดิม
+- มี Rate Limit ฝั่ง Neon แบบ atomic ใช้งานร่วมกันได้ทุก Cloudflare instance
+  - จำกัดการยิง Login แยกตามต้นทางและบัญชี
+  - จำกัดการสมัครสมาชิก ลืมรหัสผ่าน และรีเซ็ตรหัสผ่าน
+  - เก็บเฉพาะ hash ของตัวระบุ ไม่เก็บ IP หรืออีเมลดิบในตาราง rate limit
+  - ตอบกลับ HTTP `429` และ `Retry-After` เมื่อถูกจำกัด
+- ล้าง session หมดอายุ, reset token เก่า และข้อมูล rate limit เก่าอัตโนมัติระหว่างเตรียม schema
 - มี Activity Log เก็บการกระทำสำคัญ เช่น สมัครสมาชิก แก้ setting อนุมัติ VIP แก้สิทธิ์สมาชิก backup และตรวจลิงก์
   - ค้นหา กรองตามช่วงเวลา กรองตาม action และกรองตาม target type ได้
 - มี Error Log เก็บปัญหา เช่น login failed, bot check failed, register duplicate, API error และ Telegram send failed
@@ -131,6 +139,7 @@
   - กดอ่านทีละรายการ หรืออ่านทั้งหมดแล้วได้
   - สร้างแจ้งเตือนจากคำขอ VIP, สื่อรอตรวจ, error ล่าสุด, ลิงก์เสีย และ Maintenance Mode
 - มี System Health ดู Cloudflare, Neon, API, response time, last backup, error ล่าสุด และจำนวนข้อมูลสำคัญ
+  - แสดงจำนวนการป้องกันคำขอที่กำลังบล็อกอยู่
   - มีการ์ดแนะนำการตั้งค่า Cron ตรวจลิงก์อัตโนมัติ โดยไม่แสดงค่า secret บนหน้าเว็บ
   - มีการ์ดแนะนำ env สำหรับ Telegram notification โดยไม่แสดง token จริง
 - มี Broken Link Checker ตรวจลิงก์จาก media links และบันทึกผลลงฐานข้อมูล
@@ -218,6 +227,8 @@
 - `functions/_lib/admin.ts`
 - `functions/_lib/notify.ts`
 - `functions/_lib/notifications.ts`
+- `functions/_lib/rate-limit.ts`
+- `functions/_lib/media-events.ts`
 - `functions/api/media/index.ts`
 - `functions/api/media/[id].ts`
 - `functions/api/media/track.ts`
@@ -248,4 +259,4 @@
 - `npm run lint` ผ่าน
 - `npm run build` ผ่าน
 - Functions TypeScript ผ่าน
-- ฟีเจอร์ที่เพิ่มล่าสุด: ป้องกัน URL สื่อ Member/VIP ฝั่ง API, endpoint เปิดลิงก์แบบตรวจสิทธิ์, เอารหัส Super Admin ออกจากโค้ด, จัดการบัญชี/เปลี่ยนรหัส/ออกทุกอุปกรณ์, ลืมรหัสผ่านผ่าน Resend, Cloudflare Turnstile แบบเปิดด้วย Secret, รีวิวและคะแนนจริง, Backup/Restore รีวิวสื่อ
+- ฟีเจอร์ที่เพิ่มล่าสุด: Rate Limit ป้องกัน brute force/spam ผ่าน Neon, ล้าง session/token/rate limit หมดอายุอัตโนมัติ, แสดงจำนวนการบล็อกใน System Health และป้องกันการปั่นสถิติการเข้าชม/ดาวน์โหลด

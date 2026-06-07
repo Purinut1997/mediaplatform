@@ -17,7 +17,8 @@ export const onRequestGet = async ({ env, request }: { env: Env; request: Reques
       (select count(*)::int from vip_requests where status = 'pending') as pending_vip_count,
       (select count(*)::int from media_links) as link_count,
       (select count(*)::int from error_logs where created_at > now() - interval '24 hours') as error_24h_count,
-      (select count(*)::int from notifications where read_at is null) as unread_notification_count
+      (select count(*)::int from notifications where read_at is null) as unread_notification_count,
+      (select count(*)::int from request_limits where blocked_until > now()) as active_rate_limit_count
   `
   const [lastBackup] = await sql`
     select created_at
@@ -65,6 +66,7 @@ export const onRequestGet = async ({ env, request }: { env: Env; request: Reques
         links: counts?.link_count ?? 0,
         errors24h: counts?.error_24h_count ?? 0,
         unreadNotifications: counts?.unread_notification_count ?? 0,
+        activeRateLimits: counts?.active_rate_limit_count ?? 0,
       },
     },
   })

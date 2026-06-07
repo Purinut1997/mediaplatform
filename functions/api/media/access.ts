@@ -2,6 +2,7 @@ import { getCurrentUser } from '../../_lib/auth'
 import { writeErrorLog } from '../../_lib/admin'
 import { ensureSchema, getSql, type Env } from '../../_lib/db'
 import { canAccessLevel } from '../../_lib/media-access'
+import { recordMediaEvent } from '../../_lib/media-events'
 
 type AccessPayload = { mediaId?: number; linkId?: number }
 
@@ -44,12 +45,8 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
       return Response.json({ ok: false, error: 'บัญชีนี้ยังไม่มีสิทธิ์เปิดสื่อ' }, { status: 403 })
     }
 
-    await sql`
-      insert into media_events (media_id, user_email, event_type)
-      values (${mediaId}, ${user?.email ?? null}, 'download')
-    `
-    await sql`update media set downloads = downloads + 1, updated_at = now() where id = ${mediaId}`
-    return Response.json({ ok: true, url: link.url, label: link.label })
+    const counted = await recordMediaEvent(env, request, user, mediaId, 'download')
+    return Response.json({ ok: true, url: link.url, label: link.label, counted })
   } catch (error) {
     await writeErrorLog(env, 'media.access', error)
     return Response.json({ ok: false, error: 'เปิดลิงก์สื่อไม่สำเร็จ' }, { status: 500 })

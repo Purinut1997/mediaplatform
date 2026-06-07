@@ -215,6 +215,18 @@ export async function ensureSchema(env: Env) {
   `
 
   await sql`
+    create table if not exists request_limits (
+      key_hash text not null,
+      action text not null,
+      window_started_at timestamptz not null default now(),
+      attempts integer not null default 0,
+      blocked_until timestamptz,
+      updated_at timestamptz not null default now(),
+      primary key (key_hash, action)
+    )
+  `
+
+  await sql`
     create table if not exists vip_requests (
       id serial primary key,
       user_id integer references users(id) on delete set null,
@@ -313,6 +325,11 @@ export async function ensureSchema(env: Env) {
     create index if not exists media_reviews_media_idx on media_reviews(media_id, updated_at desc)
   `
 
+  await sql`
+    create index if not exists request_limits_updated_idx on request_limits(updated_at)
+  `
+
+  await cleanupExpiredSecurityData(sql)
   await seedInitialData(env)
   await seedSettings(env)
   try {
@@ -322,6 +339,14 @@ export async function ensureSchema(env: Env) {
   }
 
   schemaReady = true
+}
+
+async function cleanupExpiredSecurityData(sql: ReturnType<typeof getSql>) {
+  await Promise.all([
+    sql`delete from sessions where expires_at < now()`,
+    sql`delete from password_reset_tokens where expires_at < now() - interval '1 day'`,
+    sql`delete from request_limits where updated_at < now() - interval '2 days'`,
+  ])
 }
 
 export async function hashPassword(password: string, salt = randomHex(16)) {

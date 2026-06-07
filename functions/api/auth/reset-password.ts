@@ -1,5 +1,6 @@
 import { writeAuditLog, writeErrorLog } from '../../_lib/admin'
 import { ensureSchema, getSql, hashPassword, sha256Hex, type Env } from '../../_lib/db'
+import { enforceRateLimits, rateLimitResponse, requestIp } from '../../_lib/rate-limit'
 
 type Payload = { token?: string; password?: string }
 
@@ -9,6 +10,18 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
     const body = (await request.json().catch(() => ({}))) as Payload
     const token = String(body.token ?? '')
     const password = String(body.password ?? '')
+    const ip = requestIp(request)
+    const rateLimit = await enforceRateLimits(env, [
+      { action: 'reset:ip', identifier: ip, limit: 10, windowSeconds: 3600, blockSeconds: 3600 },
+      {
+        action: 'reset:token',
+        identifier: `${ip}:${token}`,
+        limit: 5,
+        windowSeconds: 3600,
+        blockSeconds: 3600,
+      },
+    ])
+    if (!rateLimit.allowed) return rateLimitResponse(rateLimit.retryAfter)
     if (!token || password.length < 10) {
       return Response.json({ ok: false, error: 'ลิงก์ไม่ถูกต้องหรือรหัสผ่านสั้นกว่า 10 ตัวอักษร' }, { status: 400 })
     }

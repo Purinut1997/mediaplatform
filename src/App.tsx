@@ -178,6 +178,7 @@ type SystemHealth = {
     links: number
     errors24h: number
     unreadNotifications?: number
+    activeRateLimits?: number
   }
 }
 
@@ -446,7 +447,7 @@ function canAccessAdmin(user: CurrentUser | null) {
   return user?.role === 'superadmin' || user?.role === 'admin'
 }
 
-function trackMediaEvent(mediaId: number, eventType: 'view' | 'download') {
+function trackMediaEvent(mediaId: number, eventType: 'view') {
   void fetch('/api/media/track', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -4474,6 +4475,7 @@ function AdminPanel({
                   ['สื่อทั้งหมด', systemHealth.counts.media.toLocaleString('th-TH')],
                   ['Error 24 ชม.', systemHealth.counts.errors24h.toLocaleString('th-TH')],
                   ['แจ้งเตือนยังไม่อ่าน', (systemHealth.counts.unreadNotifications ?? unreadNotifications).toLocaleString('th-TH')],
+                  ['การป้องกันคำขอที่กำลังบล็อก', (systemHealth.counts.activeRateLimits ?? 0).toLocaleString('th-TH')],
                 ].map(([label, value]) => (
                   <article className="rounded-2xl border border-white/10 bg-black/20 p-4" key={label}>
                     <p className="text-sm font-bold text-slate-400">{label}</p>

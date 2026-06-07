@@ -2,6 +2,7 @@ import { writeAuditLog, writeErrorLog } from '../../_lib/admin'
 import { validateBotCheck, type BotCheckPayload } from '../../_lib/bot'
 import { ensureSchema, getSql, randomHex, sha256Hex, type Env } from '../../_lib/db'
 import { sendEmail } from '../../_lib/email'
+import { enforceRateLimits, rateLimitResponse, requestIp } from '../../_lib/rate-limit'
 
 type Payload = BotCheckPayload & { email?: string }
 
@@ -10,6 +11,18 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
     await ensureSchema(env)
     const body = (await request.json().catch(() => ({}))) as Payload
     const email = String(body.email ?? '').trim().toLowerCase()
+    const ip = requestIp(request)
+    const rateLimit = await enforceRateLimits(env, [
+      { action: 'forgot:ip', identifier: ip, limit: 8, windowSeconds: 3600, blockSeconds: 3600 },
+      {
+        action: 'forgot:account',
+        identifier: `${ip}:${email}`,
+        limit: 3,
+        windowSeconds: 3600,
+        blockSeconds: 3600,
+      },
+    ])
+    if (!rateLimit.allowed) return rateLimitResponse(rateLimit.retryAfter)
     const botError = await validateBotCheck(body, env.TURNSTILE_SECRET_KEY, request.headers.get('CF-Connecting-IP'))
     if (botError) return Response.json({ ok: false, error: botError }, { status: 400 })
 

@@ -2,6 +2,7 @@ import { loginWithPassword, sessionCookie } from '../../_lib/auth'
 import { writeErrorLog } from '../../_lib/admin'
 import { validateBotCheck, type BotCheckPayload } from '../../_lib/bot'
 import type { Env } from '../../_lib/db'
+import { enforceRateLimits, rateLimitResponse, requestIp } from '../../_lib/rate-limit'
 
 type LoginPayload = BotCheckPayload & {
   email?: string
@@ -12,6 +13,18 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
   const body = (await request.json().catch(() => ({}))) as LoginPayload
   const email = String(body.email ?? '').trim()
   const password = String(body.password ?? '')
+  const ip = requestIp(request)
+  const rateLimit = await enforceRateLimits(env, [
+    { action: 'login:ip', identifier: ip, limit: 15, windowSeconds: 900, blockSeconds: 900 },
+    {
+      action: 'login:account',
+      identifier: `${ip}:${email.toLowerCase()}`,
+      limit: 8,
+      windowSeconds: 900,
+      blockSeconds: 900,
+    },
+  ])
+  if (!rateLimit.allowed) return rateLimitResponse(rateLimit.retryAfter)
   const botError = await validateBotCheck(body, env.TURNSTILE_SECRET_KEY, request.headers.get('CF-Connecting-IP'))
 
   if (botError) {

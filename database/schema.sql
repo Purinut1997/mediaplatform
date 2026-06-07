@@ -86,6 +86,16 @@ create table if not exists media_reviews (
   unique (media_id, user_id)
 );
 
+create table if not exists request_limits (
+  key_hash text not null,
+  action text not null,
+  window_started_at timestamptz not null default now(),
+  attempts integer not null default 0,
+  blocked_until timestamptz,
+  updated_at timestamptz not null default now(),
+  primary key (key_hash, action)
+);
+
 create table if not exists user_favorites (
   user_id integer not null references users(id) on delete cascade,
   media_id integer not null references media(id) on delete cascade,
@@ -118,3 +128,4 @@ create index if not exists vip_requests_status_idx on vip_requests(status, creat
 create index if not exists user_favorites_user_created_idx on user_favorites(user_id, created_at desc);
 create index if not exists password_reset_tokens_user_idx on password_reset_tokens(user_id, expires_at desc);
 create index if not exists media_reviews_media_idx on media_reviews(media_id, updated_at desc);
+create index if not exists request_limits_updated_idx on request_limits(updated_at);
