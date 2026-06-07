@@ -286,4 +286,5 @@
 - `npm run lint` ผ่าน
 - `npm run build` ผ่าน
 - Functions TypeScript ผ่าน
+- วันที่ 7 มิถุนายน 2026 ยืนยันว่า Functions production เป็นรุ่นล่าสุดแล้ว แต่ static frontend ยังเสิร์ฟ asset ก่อน UI หลายลิงก์ จึงเพิ่ม `app-version` ใน `index.html` เพื่อบังคับอัปเดตและใช้ตรวจ deployment
 - ฟีเจอร์ที่เพิ่มล่าสุด: คืน `CHECK constraint` ระดับ Neon, ทำ Restore ให้ปลอดภัยขึ้น, บังคับสวิตช์ปิดรับ VIP ที่ backend และตรวจความยาวข้อมูลบัญชีก่อนประมวลผล
