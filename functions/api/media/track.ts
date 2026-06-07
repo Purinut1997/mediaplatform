@@ -19,7 +19,12 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
 
   const user = await getCurrentUser(env, request)
   const sql = getSql(env)
-  const [media] = await sql`select id, access_level from media where id = ${mediaId} limit 1`
+  const [media] = await sql`
+    select id
+    from media
+    where id = ${mediaId} and status in ('เผยแพร่', 'เผยแพร่แล้ว')
+    limit 1
+  `
   if (!media) {
     return Response.json({ ok: false, error: 'Media not found' }, { status: 404 })
   }

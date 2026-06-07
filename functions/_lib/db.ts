@@ -50,7 +50,7 @@ export async function ensureSchema(env: Env) {
       slug text not null unique,
       topic text not null,
       access_level text not null check (access_level in ('สาธารณะ', 'สมาชิก', 'VIP', 'ซื้อแยก')),
-      status text not null default 'เผยแพร่' check (status in ('เผยแพร่', 'แบบร่าง', 'ซ่อน')),
+      status text not null default 'ฉบับร่าง' check (status in ('ฉบับร่าง', 'รอตรวจสอบ', 'เผยแพร่แล้ว', 'ซ่อนชั่วคราว', 'ถูกปฏิเสธ')),
       price integer not null default 0,
       downloads integer not null default 0,
       views integer not null default 0,
@@ -248,24 +248,72 @@ export async function ensureSchema(env: Env) {
     )
   `
 
-  await sql`alter table media drop constraint if exists media_access_level_check`
-  await sql`alter table media drop constraint if exists media_status_check`
-  await sql`alter table users drop constraint if exists users_access_level_check`
-  await sql`alter table users drop constraint if exists users_role_check`
-  await sql`alter table users drop constraint if exists users_status_check`
-  await sql`alter table vip_requests drop constraint if exists vip_requests_status_check`
+  await sql`
+    update media set
+      access_level = case when access_level in ('สาธารณะ', 'สมาชิก', 'VIP', 'ซื้อแยก') then access_level else 'สาธารณะ' end,
+      status = case
+        when status = 'เผยแพร่' then 'เผยแพร่แล้ว'
+        when status = 'แบบร่าง' then 'ฉบับร่าง'
+        when status = 'ซ่อน' then 'ซ่อนชั่วคราว'
+        when status in ('ฉบับร่าง', 'รอตรวจสอบ', 'เผยแพร่แล้ว', 'ซ่อนชั่วคราว', 'ถูกปฏิเสธ') then status
+        else 'ฉบับร่าง'
+      end,
+      price = case when price between 0 and 10000000 then price else 0 end,
+      rating = case when rating between 0 and 5 then rating else 5 end
+    where access_level not in ('สาธารณะ', 'สมาชิก', 'VIP', 'ซื้อแยก')
+      or status not in ('ฉบับร่าง', 'รอตรวจสอบ', 'เผยแพร่แล้ว', 'ซ่อนชั่วคราว', 'ถูกปฏิเสธ')
+      or price not between 0 and 10000000
+      or rating not between 0 and 5
+  `
+  await sql`
+    update media_links
+    set access_level = 'สาธารณะ'
+    where access_level not in ('สาธารณะ', 'สมาชิก', 'VIP', 'ซื้อแยก')
+  `
+  await sql`
+    update users set
+      role = case when role in ('superadmin', 'admin', 'member') then role else 'member' end,
+      access_level = case when access_level in ('สมาชิก', 'VIP') then access_level else 'สมาชิก' end,
+      status = case when status in ('active', 'disabled') then status else 'disabled' end
+    where role not in ('superadmin', 'admin', 'member')
+      or access_level not in ('สมาชิก', 'VIP')
+      or status not in ('active', 'disabled')
+  `
+  await sql`
+    update vip_requests
+    set status = 'pending'
+    where status not in ('pending', 'approved', 'rejected')
+  `
   await sql`
     do $$
-    declare item record;
     begin
-      for item in
-        select conrelid::regclass::text as table_name, conname
-        from pg_constraint
-        where contype = 'c'
-          and conrelid in ('media'::regclass, 'media_links'::regclass, 'users'::regclass, 'vip_requests'::regclass)
-      loop
-        execute format('alter table %s drop constraint %I', item.table_name, item.conname);
-      end loop;
+      if not exists (select 1 from pg_constraint where conname = 'media_access_level_check') then
+        alter table media add constraint media_access_level_check check (access_level in ('สาธารณะ', 'สมาชิก', 'VIP', 'ซื้อแยก'));
+      end if;
+      if not exists (select 1 from pg_constraint where conname = 'media_status_check') then
+        alter table media add constraint media_status_check check (status in ('ฉบับร่าง', 'รอตรวจสอบ', 'เผยแพร่แล้ว', 'ซ่อนชั่วคราว', 'ถูกปฏิเสธ'));
+      end if;
+      if not exists (select 1 from pg_constraint where conname = 'media_price_check') then
+        alter table media add constraint media_price_check check (price between 0 and 10000000);
+      end if;
+      if not exists (select 1 from pg_constraint where conname = 'media_rating_check') then
+        alter table media add constraint media_rating_check check (rating between 0 and 5);
+      end if;
+      if not exists (select 1 from pg_constraint where conname = 'media_links_access_level_check') then
+        alter table media_links add constraint media_links_access_level_check check (access_level in ('สาธารณะ', 'สมาชิก', 'VIP', 'ซื้อแยก'));
+      end if;
+      if not exists (select 1 from pg_constraint where conname = 'users_role_check') then
+        alter table users add constraint users_role_check check (role in ('superadmin', 'admin', 'member'));
+      end if;
+      if not exists (select 1 from pg_constraint where conname = 'users_access_level_check') then
+        alter table users add constraint users_access_level_check check (access_level in ('สมาชิก', 'VIP'));
+      end if;
+      if not exists (select 1 from pg_constraint where conname = 'users_status_check') then
+        alter table users add constraint users_status_check check (status in ('active', 'disabled'));
+      end if;
+      if not exists (select 1 from pg_constraint where conname = 'vip_requests_status_check') then
+        alter table vip_requests add constraint vip_requests_status_check check (status in ('pending', 'approved', 'rejected'));
+      end if;
     end $$;
   `
 
@@ -532,7 +580,7 @@ async function seedInitialData(env: Env) {
         'ai-teacher-training-pack',
         'AI',
         'สาธารณะ',
-        'เผยแพร่',
+        'เผยแพร่แล้ว',
         0,
         428,
         2460,
@@ -546,7 +594,7 @@ async function seedInitialData(env: Env) {
         'online-attendance-google-sheet',
         'AppScript',
         'สมาชิก',
-        'เผยแพร่',
+        'เผยแพร่แล้ว',
         0,
         189,
         1120,
@@ -560,7 +608,7 @@ async function seedInitialData(env: Env) {
         'media-platform-install-video',
         'อบรม',
         'VIP',
-        'เผยแพร่',
+        'เผยแพร่แล้ว',
         0,
         76,
         890,
@@ -574,7 +622,7 @@ async function seedInitialData(env: Env) {
         'school-admin-prompt-pack',
         'งานเอกสาร',
         'ซื้อแยก',
-        'แบบร่าง',
+        'ฉบับร่าง',
         499,
         32,
         510,

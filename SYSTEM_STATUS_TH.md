@@ -141,6 +141,12 @@
   - ตรวจ redirect ทุกขั้นของ Broken Link Checker เพื่อป้องกัน SSRF
   - ข้อมูล URL เก่าที่ไม่ปลอดภัยจะไม่ถูกส่งไปหน้าเว็บหรือเปิดให้ผู้ใช้
 - จำกัดขนาด request API โดยให้ Restore backup มีเพดานแยกที่สูงกว่า API ทั่วไป
+- ผู้ใช้ทั่วไปไม่สามารถเปลี่ยน query เพื่ออ่านสื่อสถานะฉบับร่าง/รอตรวจสอบ/ซ่อน/ปฏิเสธได้
+- การนับยอดเข้าชมรับเฉพาะสื่อที่เผยแพร่แล้ว
+- มีกฎตรวจข้อมูลสื่อกลาง ป้องกันสถานะ สิทธิ์ ราคา ชื่อ หมวดหมู่ แท็ก และชนิดลิงก์ที่ผิดรูปก่อนบันทึกลงฐานข้อมูล
+- Neon มีกฎ `CHECK constraint` สำหรับสถานะ/สิทธิ์/ราคา/คะแนนสื่อ สิทธิ์ลิงก์ บทบาท/สถานะสมาชิก และสถานะคำขอ VIP
+  - migration จะแปลงสถานะสื่อเก่าเป็น workflow ใหม่และซ่อมค่าผิดรูปก่อนคืน constraint
+  - ไม่ลบ constraint รวมของตารางทิ้งทุกครั้งที่ Functions เริ่มทำงานแล้ว
 - มี Activity Log เก็บการกระทำสำคัญ เช่น สมัครสมาชิก แก้ setting อนุมัติ VIP แก้สิทธิ์สมาชิก backup และตรวจลิงก์
   - ค้นหา กรองตามช่วงเวลา กรองตาม action และกรองตาม target type ได้
 - มี Error Log เก็บปัญหา เช่น login failed, bot check failed, register duplicate, API error และ Telegram send failed
@@ -175,6 +181,9 @@
   - Restore แบบ merge ไม่ลบข้อมูลเดิม
   - Restore แบบ replace เฉพาะตารางที่เลือกได้ โดยไม่ล้าง users เพื่อความปลอดภัย
   - ข้ามผู้ใช้ใหม่ที่ไม่มี password hash เพื่อความปลอดภัย
+  - แปลงสถานะ backup รุ่นเก่าให้เข้ากับ workflow ใหม่ และปรับค่าตัวเลข/สิทธิ์ที่ผิดรูปให้อยู่ในช่วงปลอดภัย
+  - ไม่อนุญาตให้ไฟล์ restore สร้างหรือยกระดับบัญชีเป็น superadmin
+  - ข้ามลิงก์ภายในเครือข่ายหรือ URL อันตรายจากไฟล์ restore
 - มี Telegram Notification แบบ optional ผ่าน env `TELEGRAM_BOT_TOKEN` และ `TELEGRAM_CHAT_ID`
   - แจ้งคำขอ VIP ใหม่
   - แจ้งผลอนุมัติ/ปฏิเสธ VIP
@@ -241,6 +250,7 @@
 - `functions/_lib/notifications.ts`
 - `functions/_lib/rate-limit.ts`
 - `functions/_lib/media-events.ts`
+- `functions/_lib/media-validation.ts`
 - `functions/_lib/url.ts`
 - `functions/api/_middleware.ts`
 - `functions/api/media/index.ts`
@@ -273,4 +283,4 @@
 - `npm run lint` ผ่าน
 - `npm run build` ผ่าน
 - Functions TypeScript ผ่าน
-- ฟีเจอร์ที่เพิ่มล่าสุด: ตรวจ URL กลาง ป้องกัน SSRF/URL scheme อันตราย ตรวจ redirect ทุกขั้น ซ่อน URL เก่าที่ไม่ปลอดภัย และจำกัดขนาด request API
+- ฟีเจอร์ที่เพิ่มล่าสุด: ปิดการอ่าน/นับยอดสื่อที่ยังไม่เผยแพร่ เพิ่มกฎตรวจข้อมูลสื่อกลาง และคืน `CHECK constraint` ระดับ Neon เพื่อกันข้อมูลผิดรูป

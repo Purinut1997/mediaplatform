@@ -1,5 +1,7 @@
 import { requireSuperAdmin, writeAuditLog, writeErrorLog } from '../../_lib/admin'
 import { ensureSchema, getSql, hashPassword, randomHex, type Env } from '../../_lib/db'
+import { MEDIA_ACCESS_LEVELS, mediaPrice, mediaStatus } from '../../_lib/media-validation'
+import { safeHttpUrl } from '../../_lib/url'
 
 type BackupRow = Record<string, unknown>
 type BackupPayload = {
@@ -13,7 +15,17 @@ type BackupPayload = {
 }
 
 const text = (value: unknown, fallback = '') => String(value ?? fallback).trim()
-const int = (value: unknown, fallback = 0) => Number.isFinite(Number(value)) ? Number(value) : fallback
+const int = (value: unknown, fallback = 0) => Number.isFinite(Number(value)) ? Math.trunc(Number(value)) : fallback
+const choice = <T extends readonly string[]>(value: unknown, allowed: T, fallback: T[number]) => {
+  const normalized = text(value, fallback)
+  return allowed.includes(normalized) ? (normalized as T[number]) : fallback
+}
+const USER_ROLES = ['admin', 'member'] as const
+const USER_ACCESS_LEVELS = ['สมาชิก', 'VIP'] as const
+const USER_STATUSES = ['active', 'disabled'] as const
+const VIP_STATUSES = ['pending', 'approved', 'rejected'] as const
+const DEFAULT_COVER_URL =
+  'https://raw.githubusercontent.com/Purinut1997/web-images/ab67fea68788dc5db9514475e8f2b8cb1c32d8b3/ChatGPT%20Image%2023%20%E0%B8%9E.%E0%B8%84.%202569%2008_05_56.png'
 const replaceableTables = new Set([
   'media',
   'mediaLinks',
@@ -155,6 +167,17 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
       const title = text(item.title)
       const slug = text(item.slug, `${title || 'media'}-${Date.now()}`)
       if (!title) continue
+      const access = choice(item.access_level, MEDIA_ACCESS_LEVELS, 'สาธารณะ')
+      let status = 'ฉบับร่าง'
+      let price = 0
+      try {
+        status = mediaStatus(item.status)
+        price = mediaPrice(item.price)
+      } catch {
+        // Backup เก่าหรือค่าที่แก้เองจะถูกคืนเป็นฉบับร่างราคา 0 เพื่อให้ผู้ดูแลตรวจอีกครั้ง
+      }
+      const rawRating = Number(item.rating ?? 5)
+      const rating = Number.isFinite(rawRating) ? Math.min(5, Math.max(0, rawRating)) : 5
       const [row] = await sql`
         insert into media (
           title, slug, topic, access_level, status, price, downloads, views, rating,
@@ -164,13 +187,13 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
           ${title},
           ${slug},
           ${text(item.topic, 'โรงเรียน')},
-          ${text(item.access_level, 'สาธารณะ')},
-          ${text(item.status, 'ฉบับร่าง')},
-          ${int(item.price)},
-          ${int(item.downloads)},
-          ${int(item.views)},
-          ${Number(item.rating ?? 5)},
-          ${text(item.cover_url)},
+          ${access},
+          ${status},
+          ${price},
+          ${Math.max(0, int(item.downloads))},
+          ${Math.max(0, int(item.views))},
+          ${rating},
+          ${safeHttpUrl(item.cover_url, DEFAULT_COVER_URL)},
           ${text(item.source_type, 'Google Drive')},
           ${text(item.description)},
           ${text(item.created_at) || new Date().toISOString()},
@@ -224,7 +247,7 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
     for (const link of data.mediaLinks) {
       const oldMediaId = Number(link.media_id)
       const mediaId = mediaIdMap.get(oldMediaId)
-      const url = text(link.url)
+      const url = safeHttpUrl(link.url)
       if (!mediaId || !url) continue
       await sql`delete from media_links where media_id = ${mediaId} and url = ${url}`
       await sql`
@@ -234,8 +257,8 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
           ${text(link.label, 'ไฟล์สื่อ')},
           ${text(link.type, 'Google Drive')},
           ${url},
-          ${text(link.preview_url) || null},
-          ${text(link.access_level, 'สาธารณะ')},
+          ${safeHttpUrl(link.preview_url) || null},
+          ${choice(link.access_level, MEDIA_ACCESS_LEVELS, 'สาธารณะ')},
           ${int(link.sort_order)}
         )
       `
@@ -259,12 +282,15 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
     for (const user of data.users) {
       const email = text(user.email).toLowerCase()
       if (!email) continue
+      const role = choice(user.role, USER_ROLES, 'member')
+      const access = choice(user.access_level, USER_ACCESS_LEVELS, 'สมาชิก')
+      const status = choice(user.status, USER_STATUSES, 'disabled')
       if (!user.password_hash) {
         const [existing] = await sql`select id from users where lower(email) = ${email} limit 1`
         if (existing) {
           await sql`
             update users
-            set name = ${text(user.name, email)}, role = ${text(user.role, 'member')}, access_level = ${text(user.access_level, 'สมาชิก')}, status = ${text(user.status, 'active')}, updated_at = now()
+            set name = ${text(user.name, email)}, role = ${role}, access_level = ${access}, status = ${status}, updated_at = now()
             where lower(email) = ${email} and role <> 'superadmin'
           `
           if (Number.isFinite(Number(user.id))) {
@@ -275,9 +301,10 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
         }
         continue
       }
+      const passwordHash = text(user.password_hash) || await hashPassword(randomHex(16))
       const [restoredUser] = await sql`
         insert into users (name, email, password_hash, role, access_level, status)
-        values (${text(user.name, email)}, ${email}, ${text(user.password_hash, await hashPassword(randomHex(16)))}, ${text(user.role, 'member')}, ${text(user.access_level, 'สมาชิก')}, ${text(user.status, 'disabled')})
+        values (${text(user.name, email)}, ${email}, ${passwordHash}, ${role}, ${access}, ${status})
         on conflict (email) do update set
           name = excluded.name,
           role = case when users.role = 'superadmin' then users.role else excluded.role end,
@@ -320,7 +347,7 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
       if (!email || !text(requestRow.name)) continue
       await sql`
         insert into vip_requests (user_id, name, email, phone, slip_name, status, created_at, updated_at)
-        select null, ${text(requestRow.name)}, ${email}, ${text(requestRow.phone) || null}, ${text(requestRow.slip_name) || null}, ${text(requestRow.status, 'pending')}, ${createdAt}, ${text(requestRow.updated_at) || createdAt}
+        select null, ${text(requestRow.name)}, ${email}, ${text(requestRow.phone) || null}, ${text(requestRow.slip_name) || null}, ${choice(requestRow.status, VIP_STATUSES, 'pending')}, ${createdAt}, ${text(requestRow.updated_at) || createdAt}
         where not exists (
           select 1 from vip_requests where lower(email) = ${email} and created_at = ${createdAt}
         )

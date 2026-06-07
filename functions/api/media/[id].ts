@@ -1,5 +1,11 @@
 import { requireAdminPermission } from '../../_lib/admin'
 import { ensureSchema, getSql, type Env } from '../../_lib/db'
+import {
+  mediaAccess,
+  mediaPrice,
+  mediaStatus,
+  mediaText,
+} from '../../_lib/media-validation'
 import { optionalHttpUrl } from '../../_lib/url'
 
 const DEFAULT_COVER_URL =
@@ -50,11 +56,11 @@ function readLinks(body: MediaPayload, title: string) {
   if (links.length > 20) throw new Error('สื่อหนึ่งรายการเพิ่มลิงก์ได้สูงสุด 20 ลิงก์')
   const normalized = links
     .map((link, index) => ({
-      label: String(link.label ?? '').trim() || `ลิงก์ ${index + 1}`,
-      type: String(link.type ?? body.source ?? 'Google Drive'),
+      label: mediaText(link.label, `ชื่อปุ่มลิงก์รายการที่ ${index + 1}`, 120) || `ลิงก์ ${index + 1}`,
+      type: mediaText(link.type, `ชนิดลิงก์รายการที่ ${index + 1}`, 80, String(body.source ?? 'Google Drive')),
       url: optionalHttpUrl(link.url, `ลิงก์รายการที่ ${index + 1}`),
       previewUrl: optionalHttpUrl(link.previewUrl, `ลิงก์ตัวอย่างรายการที่ ${index + 1}`),
-      access: String(link.access ?? body.access ?? 'สาธารณะ'),
+      access: mediaAccess(link.access, mediaAccess(body.access)),
     }))
     .filter((link) => link.url)
 
@@ -62,10 +68,10 @@ function readLinks(body: MediaPayload, title: string) {
   if (!normalized.length && resourceUrl) {
     normalized.push({
       label: title,
-      type: String(body.source ?? 'Google Drive'),
+      type: mediaText(body.source, 'ชนิดลิงก์ไฟล์หลัก', 80, 'Google Drive') || 'Google Drive',
       url: resourceUrl,
       previewUrl: optionalHttpUrl(body.previewUrl, 'ลิงก์ตัวอย่าง'),
-      access: String(body.access ?? 'สาธารณะ'),
+      access: mediaAccess(body.access),
     })
   }
 
@@ -77,7 +83,19 @@ function readTags(body: MediaPayload) {
     ? body.tags
     : String(body.tags ?? '')
         .split(',')
-  return Array.from(new Set(raw.map((tag) => String(tag).trim()).filter(Boolean))).slice(0, 12)
+  return Array.from(new Set(raw.map((tag) => mediaText(tag, 'ชื่อแท็ก', 60)).filter(Boolean))).slice(0, 12)
+}
+
+function readMediaFields(body: MediaPayload) {
+  return {
+    title: mediaText(body.title, 'ชื่อสื่อ', 200),
+    description: mediaText(body.description, 'รายละเอียดสื่อ', 10_000),
+    topic: mediaText(body.topic, 'หมวดหมู่', 100, 'โรงเรียน') || 'โรงเรียน',
+    access: mediaAccess(body.access),
+    status: mediaStatus(body.status),
+    price: mediaPrice(body.price),
+    source: mediaText(body.source, 'ชนิดสื่อ', 80, 'Google Drive') || 'Google Drive',
+  }
 }
 
 function tagSlug(name: string) {
@@ -119,12 +137,18 @@ export const onRequestPut = async ({ env, request, params }: Context) => {
   await ensureSchema(env)
   const sql = getSql(env)
   const body = (await request.json().catch(() => ({}))) as MediaPayload
-  const title = String(body.title ?? '').trim()
-  if (!title || title.length > 200) {
-    return Response.json({ ok: false, error: 'กรุณากรอกชื่อสื่อไม่เกิน 200 ตัวอักษร' }, { status: 400 })
+  let fields: ReturnType<typeof readMediaFields>
+  try {
+    fields = readMediaFields(body)
+  } catch (error) {
+    return Response.json(
+      { ok: false, error: error instanceof Error ? error.message : 'ข้อมูลสื่อไม่ถูกต้อง' },
+      { status: 400 },
+    )
   }
-  if (String(body.description ?? '').length > 10_000) {
-    return Response.json({ ok: false, error: 'รายละเอียดสื่อต้องไม่เกิน 10,000 ตัวอักษร' }, { status: 400 })
+  const { title, description, topic, access, status, price, source } = fields
+  if (!title) {
+    return Response.json({ ok: false, error: 'กรุณากรอกชื่อสื่อไม่เกิน 200 ตัวอักษร' }, { status: 400 })
   }
   let links: ReturnType<typeof readLinks>
   let coverUrl: string
@@ -142,13 +166,13 @@ export const onRequestPut = async ({ env, request, params }: Context) => {
     update media
     set
       title = ${title},
-      topic = ${body.topic ?? 'โรงเรียน'},
-      access_level = ${body.access ?? 'สาธารณะ'},
-      status = ${body.status ?? 'ฉบับร่าง'},
-      price = ${Number(body.price ?? 0)},
+      topic = ${topic},
+      access_level = ${access},
+      status = ${status},
+      price = ${price},
       cover_url = ${coverUrl},
-      source_type = ${body.source ?? 'Google Drive'},
-      description = ${body.description ?? ''},
+      source_type = ${source},
+      description = ${description},
       updated_at = now()
     where id = ${id}
     returning id

@@ -2,6 +2,14 @@ import { getCurrentUser } from '../../_lib/auth'
 import { requireAdminPermission, writeErrorLog } from '../../_lib/admin'
 import { ensureSchema, getSql, type Env } from '../../_lib/db'
 import { hideProtectedLinks } from '../../_lib/media-access'
+import {
+  mediaAccess,
+  mediaPrice,
+  mediaStatus,
+  mediaText,
+  MEDIA_STATUSES,
+  MediaValidationError,
+} from '../../_lib/media-validation'
 import { optionalHttpUrl, safeHttpUrl, UrlValidationError } from '../../_lib/url'
 
 const DEFAULT_COVER_URL =
@@ -61,11 +69,11 @@ function readLinks(body: MediaPayload, title: string) {
   if (links.length > 20) throw new UrlValidationError('สื่อหนึ่งรายการเพิ่มลิงก์ได้สูงสุด 20 ลิงก์')
   const normalized = links
     .map((link, index) => ({
-      label: String(link.label ?? '').trim() || `ลิงก์ ${index + 1}`,
-      type: String(link.type ?? body.source ?? 'Google Drive'),
+      label: mediaText(link.label, `ชื่อปุ่มลิงก์รายการที่ ${index + 1}`, 120) || `ลิงก์ ${index + 1}`,
+      type: mediaText(link.type, `ชนิดลิงก์รายการที่ ${index + 1}`, 80, String(body.source ?? 'Google Drive')),
       url: optionalHttpUrl(link.url, `ลิงก์รายการที่ ${index + 1}`),
       previewUrl: optionalHttpUrl(link.previewUrl, `ลิงก์ตัวอย่างรายการที่ ${index + 1}`),
-      access: String(link.access ?? body.access ?? 'สาธารณะ'),
+      access: mediaAccess(link.access, mediaAccess(body.access)),
     }))
     .filter((link) => link.url)
 
@@ -73,10 +81,10 @@ function readLinks(body: MediaPayload, title: string) {
   if (!normalized.length && resourceUrl) {
     normalized.push({
       label: title,
-      type: String(body.source ?? 'Google Drive'),
+      type: mediaText(body.source, 'ชนิดลิงก์ไฟล์หลัก', 80, 'Google Drive') || 'Google Drive',
       url: resourceUrl,
       previewUrl: optionalHttpUrl(body.previewUrl, 'ลิงก์ตัวอย่าง'),
-      access: String(body.access ?? 'สาธารณะ'),
+      access: mediaAccess(body.access),
     })
   }
 
@@ -88,7 +96,7 @@ function readTags(body: MediaPayload) {
     ? body.tags
     : String(body.tags ?? '')
         .split(',')
-  return Array.from(new Set(raw.map((tag) => String(tag).trim()).filter(Boolean))).slice(0, 12)
+  return Array.from(new Set(raw.map((tag) => mediaText(tag, 'ชื่อแท็ก', 60)).filter(Boolean))).slice(0, 12)
 }
 
 function tagSlug(name: string) {
@@ -161,7 +169,12 @@ export const onRequestGet = async ({ env, request }: { env: Env; request: Reques
   const requestedStatus = url.searchParams.get('status')
   const canReadAll = await requireAdminPermission(env, request, 'media:read')
   const currentUser = await getCurrentUser(env, request)
-  const status = requestedStatus === 'all' && canReadAll ? 'all' : requestedStatus ?? 'เผยแพร่แล้ว'
+  const status =
+    canReadAll && requestedStatus === 'all'
+      ? 'all'
+      : canReadAll && requestedStatus && MEDIA_STATUSES.includes(requestedStatus as (typeof MEDIA_STATUSES)[number])
+        ? requestedStatus
+        : 'เผยแพร่แล้ว'
   const isAllStatus = status === 'all'
   const statusList = status === 'เผยแพร่แล้ว' ? ['เผยแพร่แล้ว', 'เผยแพร่'] : [status]
 
@@ -252,14 +265,17 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
     await ensureSchema(env)
     const sql = getSql(env)
     const body = (await request.json()) as MediaPayload
-    const title = String(body.title ?? '').trim()
+    const title = mediaText(body.title, 'ชื่อสื่อ', 200)
 
-    if (!title || title.length > 200) {
+    if (!title) {
       return Response.json({ ok: false, error: 'กรุณากรอกชื่อสื่อไม่เกิน 200 ตัวอักษร' }, { status: 400 })
     }
-    if (String(body.description ?? '').length > 10_000) {
-      return Response.json({ ok: false, error: 'รายละเอียดสื่อต้องไม่เกิน 10,000 ตัวอักษร' }, { status: 400 })
-    }
+    const description = mediaText(body.description, 'รายละเอียดสื่อ', 10_000)
+    const topic = mediaText(body.topic, 'หมวดหมู่', 100, 'โรงเรียน') || 'โรงเรียน'
+    const access = mediaAccess(body.access)
+    const status = mediaStatus(body.status)
+    const price = mediaPrice(body.price)
+    const source = mediaText(body.source, 'ชนิดสื่อ', 80, 'Google Drive') || 'Google Drive'
 
     const slugBase =
       String(body.slug || title)
@@ -287,13 +303,13 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
       values (
         ${title},
         ${slug},
-        ${body.topic ?? 'โรงเรียน'},
-        ${body.access ?? 'สาธารณะ'},
-        ${body.status ?? 'ฉบับร่าง'},
-        ${body.price ?? 0},
+        ${topic},
+        ${access},
+        ${status},
+        ${price},
         ${coverUrl},
-        ${body.source ?? 'Google Drive'},
-        ${body.description ?? ''}
+        ${source},
+        ${description}
       )
       returning *
     `) as MediaRow[]
@@ -328,7 +344,7 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
 
     return Response.json({ ok: true, media: { ...toMedia(row), tags } }, { status: 201 })
   } catch (error) {
-    if (error instanceof UrlValidationError) {
+    if (error instanceof UrlValidationError || error instanceof MediaValidationError) {
       return Response.json({ ok: false, error: error.message }, { status: 400 })
     }
     console.error('Create media failed', error)
