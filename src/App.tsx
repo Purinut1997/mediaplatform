@@ -192,6 +192,15 @@ type AdminAnalytics = {
   membersMonthly: AnalyticsPoint[]
   vipWeekly: AnalyticsPoint[]
   topDownloads: AnalyticsPoint[]
+  accessBreakdown: AnalyticsPoint[]
+  statusBreakdown: AnalyticsPoint[]
+  sourceBreakdown: AnalyticsPoint[]
+  engagement: {
+    views30d: number
+    downloads30d: number
+    activeUsers: number
+    vipUsers: number
+  }
 }
 
 type LinkCheckResult = {
@@ -2260,6 +2269,12 @@ function AdminPanel({
     .slice(0, 5)
   const maxDownloads = Math.max(1, ...(analytics?.topDownloads.length ? analytics.topDownloads.map((item) => item.value) : topDownloadedMedia.map((item) => item.downloads)))
   const maxCategoryCount = Math.max(1, ...categoryStats.map((item) => item.count))
+  const downloadConversion = analytics?.engagement.views30d
+    ? (analytics.engagement.downloads30d / analytics.engagement.views30d) * 100
+    : 0
+  const vipMemberRate = analytics?.engagement.activeUsers
+    ? (analytics.engagement.vipUsers / analytics.engagement.activeUsers) * 100
+    : 0
   const unreadNotifications = notifications.filter((notice) => !notice.readAt).length
   const activityActions = Array.from(new Set(auditLogs.map((log) => log.action).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'th'))
   const activityTargets = Array.from(new Set(auditLogs.map((log) => log.targetType).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'th'))
@@ -2988,6 +3003,28 @@ function AdminPanel({
                     </div>
                   </div>
                 </div>
+              </div>
+
+              <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                {[
+                  ['เข้าชม 30 วัน', analytics?.engagement.views30d ?? 0, 'text-sky-200'],
+                  ['ดาวน์โหลด 30 วัน', analytics?.engagement.downloads30d ?? 0, 'text-cyan-200'],
+                  ['เข้าชม → ดาวน์โหลด', `${downloadConversion.toFixed(1)}%`, 'text-emerald-200'],
+                  ['สมาชิก VIP', `${vipMemberRate.toFixed(1)}%`, 'text-amber-200'],
+                ].map(([label, value, tone]) => (
+                  <article className="rounded-2xl border border-white/10 bg-black/20 p-4" key={label as string}>
+                    <p className="text-sm font-bold text-slate-400">{label as string}</p>
+                    <p className={`mt-2 text-2xl font-black ${tone as string}`}>
+                      {typeof value === 'number' ? value.toLocaleString('th-TH') : value}
+                    </p>
+                  </article>
+                ))}
+              </div>
+
+              <div className="mt-4 grid gap-4 xl:grid-cols-3">
+                <AnalyticsBreakdown points={analytics?.accessBreakdown ?? []} title="สัดส่วนสิทธิ์สื่อ" tone="cyan" />
+                <AnalyticsBreakdown points={analytics?.statusBreakdown ?? []} title="สถานะ Workflow สื่อ" tone="emerald" />
+                <AnalyticsBreakdown points={analytics?.sourceBreakdown ?? []} title="แหล่งสื่อที่ใช้งาน" tone="violet" />
               </div>
 
               <div className="mt-4 grid gap-4 xl:grid-cols-2">
@@ -4657,6 +4694,56 @@ function AdminSelect<T extends string>({
         ))}
       </select>
     </label>
+  )
+}
+
+function AnalyticsBreakdown({
+  points,
+  title,
+  tone,
+}: {
+  points: AnalyticsPoint[]
+  title: string
+  tone: 'cyan' | 'emerald' | 'violet'
+}) {
+  const total = Math.max(1, points.reduce((sum, point) => sum + point.value, 0))
+  const fill = {
+    cyan: 'from-cyan-300 to-sky-400 text-cyan-200',
+    emerald: 'from-emerald-300 to-cyan-300 text-emerald-200',
+    violet: 'from-violet-300 to-pink-300 text-violet-200',
+  }[tone]
+
+  return (
+    <article className="rounded-2xl border border-white/10 bg-black/20 p-5">
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <p className="font-black text-white">{title}</p>
+        <span className={`text-sm font-black ${fill.split(' ').at(-1)}`}>
+          {points.reduce((sum, point) => sum + point.value, 0).toLocaleString('th-TH')}
+        </span>
+      </div>
+      {points.length === 0 ? (
+        <p className="text-sm font-bold text-slate-500">ยังไม่มีข้อมูล</p>
+      ) : (
+        <div className="grid gap-3">
+          {points.map((point) => (
+            <div key={point.label}>
+              <div className="mb-1 flex items-center justify-between gap-3 text-sm">
+                <span className="truncate font-bold text-slate-200">{point.label}</span>
+                <span className="font-black text-slate-300">
+                  {point.value.toLocaleString('th-TH')} · {((point.value / total) * 100).toFixed(0)}%
+                </span>
+              </div>
+              <div className="h-2 overflow-hidden rounded-full bg-white/10">
+                <div
+                  className={`h-full rounded-full bg-gradient-to-r ${fill}`}
+                  style={{ width: `${Math.max(6, (point.value / total) * 100)}%` }}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </article>
   )
 }
 

@@ -153,6 +153,13 @@
   - สมาชิกใหม่รายเดือน
   - คำขอ VIP รายสัปดาห์
   - สื่อยอดดาวน์โหลดจริง 10 อันดับ
+- มีรายงานเชิงลึกสำหรับตัดสินใจ:
+  - ยอดเข้าชมและดาวน์โหลด 30 วัน
+  - อัตราเข้าชมต่อดาวน์โหลด
+  - สัดส่วนสมาชิก VIP
+  - สัดส่วนสิทธิ์สื่อ
+  - สถานะ workflow สื่อ
+  - แหล่งสื่อที่ใช้งาน
 
 ## สิ่งที่ยังขาดหรือควรทำต่อ
 
@@ -163,11 +170,12 @@
    - หลังบ้านมีคู่มือ endpoint/header/env ให้ดูจากหน้า System Health แล้ว
    - มี Worker Cron แยกใน `workers/link-check-cron` แล้ว
    - เหลือ deploy Worker และใส่ `CRON_SECRET` จริงใน Cloudflare Variables and Secrets ก่อนใช้งานจริง
+   - ตรวจล่าสุดพบว่า Wrangler บนเครื่องยังไม่ได้ login บัญชี Cloudflare จึงยัง deploy อัตโนมัติไม่ได้
 
 ## ลำดับงานแนะนำต่อไป
 
 1. ตั้งค่า `CRON_SECRET` ให้ตรงกันทั้ง Cloudflare Pages และ Worker แล้วรัน `npm run cron:secret` + `npm run cron:deploy`
-2. หลังจากระบบใช้งานจริงสักระยะ ค่อยเพิ่มรายงานเชิงลึกตามข้อมูล event ที่สะสมจริง
+2. หลังจากระบบใช้งานจริงสักระยะ ค่อยเพิ่มรายงานเฉพาะด้านตามข้อมูล event ที่สะสมจริง
 
 ## ไฟล์หลักที่ควรดูเมื่อทำงานต่อ
 
@@ -199,4 +207,4 @@
 
 - `npm run lint` ผ่าน
 - `npm run build` ผ่าน
-- ฟีเจอร์ที่เพิ่มล่าสุด: Telegram settings หลังบ้านแบบไม่เปิดเผย secret พร้อมปุ่มส่งข้อความทดสอบ, Cloudflare Worker Cron แยกสำหรับเรียกตรวจลิงก์อัตโนมัติ, คำสั่ง npm สำหรับ deploy/ใส่ secret/ดู log ของ cron worker, Activity Log filter แบบ action/target type dropdown, การ์ดคู่มือตั้งค่า Cron/Telegram ใน System Health, Restore replace เฉพาะตารางที่เลือก, Cron endpoint สำหรับตรวจลิงก์อัตโนมัติ, Analytics เชิงเวลาจริงด้วย `media_events`, filter/clear Error Log, Notification Center แบบฐานข้อมูลพร้อม read/unread, ระบบแท็กจริง `tags/media_tags`, Admin Permission รายเมนู, Activity/Error Log CSV export, System Health, Backup Export, Broken Link Checker, Maintenance Mode, admin role toggle และ Telegram optional notification
+- ฟีเจอร์ที่เพิ่มล่าสุด: Dashboard รายงานเชิงลึกด้าน engagement/สิทธิ์สื่อ/workflow/แหล่งสื่อ, Telegram settings หลังบ้านแบบไม่เปิดเผย secret พร้อมปุ่มส่งข้อความทดสอบ, Cloudflare Worker Cron แยกสำหรับเรียกตรวจลิงก์อัตโนมัติ, คำสั่ง npm สำหรับ deploy/ใส่ secret/ดู log ของ cron worker, Activity Log filter แบบ action/target type dropdown, การ์ดคู่มือตั้งค่า Cron/Telegram ใน System Health, Restore replace เฉพาะตารางที่เลือก, Cron endpoint สำหรับตรวจลิงก์อัตโนมัติ, Analytics เชิงเวลาจริงด้วย `media_events`, filter/clear Error Log, Notification Center แบบฐานข้อมูลพร้อม read/unread, ระบบแท็กจริง `tags/media_tags`, Admin Permission รายเมนู, Activity/Error Log CSV export, System Health, Backup Export, Broken Link Checker, Maintenance Mode, admin role toggle และ Telegram optional notification
