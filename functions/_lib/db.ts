@@ -398,10 +398,16 @@ async function seedBootstrapAdmin(env: Env) {
     values (${name}, ${primaryEmail}, ${passwordHash}, 'superadmin', 'VIP', 'active')
     on conflict (email) do update set
       name = excluded.name,
+      password_hash = excluded.password_hash,
       role = 'superadmin',
       access_level = 'VIP',
       status = 'active',
       updated_at = now()
+  `
+  await sql`
+    update users
+    set status = 'disabled', updated_at = now()
+    where lower(email) = 'admin' and lower(email) <> ${primaryEmail} and role = 'superadmin'
   `
 }
 
