@@ -1,0 +1,19 @@
+{
+  "name": "MIKPURINUT Media Platform",
+  "short_name": "MIKPURINUT",
+  "description": "คลังสื่อการเรียนรู้และระบบสมาชิกสำหรับโรงเรียน",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#effaff",
+  "theme_color": "#0891b2",
+  "lang": "th",
+  "icons": [
+    {
+      "src": "https://raw.githubusercontent.com/Purinut1997/web-images/ab67fea68788dc5db9514475e8f2b8cb1c32d8b3/ChatGPT%20Image%2023%20%E0%B8%9E.%E0%B8%84.%202569%2008_05_56.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -25,6 +25,7 @@
 - หน้าแรกแนว AI / Cyber / School Operations
 - รองรับ Light Mode และ Dark Mode
 - มีภาพแบรนด์, particle/grid background และเครดิต `Created by MIKPURINUT`
+- มี Web App Manifest สำหรับเพิ่มเว็บไว้หน้าจอโฮม โดยใช้โลโก้ MIKPURINUT เป็นไอคอน
 - แสดงสื่อแบบการ์ดและหน้ารายละเอียดสื่อ
 - เก็บ event การเข้าชมและดาวน์โหลดจริงผ่านตาราง `media_events`
   - ป้องกันการปั่นสถิติ โดยไม่นับการเข้าชมหรือดาวน์โหลดซ้ำจากผู้ใช้/ผู้เยี่ยมชมเดิมในช่วงเวลาสั้น ๆ
@@ -129,6 +130,9 @@
   - เก็บเฉพาะ hash ของตัวระบุ ไม่เก็บ IP หรืออีเมลดิบในตาราง rate limit
   - ตอบกลับ HTTP `429` และ `Retry-After` เมื่อถูกจำกัด
 - ล้าง session หมดอายุ, reset token เก่า และข้อมูล rate limit เก่าอัตโนมัติระหว่างเตรียม schema
+- มี API middleware ป้องกันคำขอแก้ไขข้อมูลจากเว็บไซต์อื่น และบังคับไม่ให้ cache ข้อมูล API
+- มี Security Headers สำหรับหน้าเว็บ เช่น CSP, Permissions Policy, Referrer Policy, `nosniff` และป้องกันการฝังเว็บใน iframe
+- ไฟล์ build ใต้ `/assets` ใช้ immutable cache ระยะยาวเพื่อเพิ่มความเร็วและลดการใช้ทรัพยากร Cloudflare
 - มี Activity Log เก็บการกระทำสำคัญ เช่น สมัครสมาชิก แก้ setting อนุมัติ VIP แก้สิทธิ์สมาชิก backup และตรวจลิงก์
   - ค้นหา กรองตามช่วงเวลา กรองตาม action และกรองตาม target type ได้
 - มี Error Log เก็บปัญหา เช่น login failed, bot check failed, register duplicate, API error และ Telegram send failed
@@ -229,6 +233,7 @@
 - `functions/_lib/notifications.ts`
 - `functions/_lib/rate-limit.ts`
 - `functions/_lib/media-events.ts`
+- `functions/api/_middleware.ts`
 - `functions/api/media/index.ts`
 - `functions/api/media/[id].ts`
 - `functions/api/media/track.ts`
@@ -259,4 +264,4 @@
 - `npm run lint` ผ่าน
 - `npm run build` ผ่าน
 - Functions TypeScript ผ่าน
-- ฟีเจอร์ที่เพิ่มล่าสุด: Rate Limit ป้องกัน brute force/spam ผ่าน Neon, ล้าง session/token/rate limit หมดอายุอัตโนมัติ, แสดงจำนวนการบล็อกใน System Health และป้องกันการปั่นสถิติการเข้าชม/ดาวน์โหลด
+- ฟีเจอร์ที่เพิ่มล่าสุด: ป้องกันคำขอข้ามเว็บไซต์, Security Headers/CSP, API no-store, cache ไฟล์ build และ Web App Manifest พร้อมไอคอน MIKPURINUT
