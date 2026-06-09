@@ -19,7 +19,7 @@ export type Env = {
 }
 
 let schemaReady = false
-const SCHEMA_VERSION = '2026.06.09.2'
+const SCHEMA_VERSION = '2026.06.09.1'
 
 export function getSql(env: Env) {
   if (!env.DATABASE_URL) {
@@ -338,42 +338,6 @@ export async function ensureSchema(env: Env) {
 
   await sql`
     create index if not exists media_access_idx on media(access_level)
-  `
-
-  await sql`
-    create index if not exists media_status_updated_idx on media(status, updated_at desc, id desc)
-  `
-
-  await sql`
-    create index if not exists media_admin_filter_idx on media(status, access_level, created_at desc, id desc)
-  `
-
-  await sql`
-    create index if not exists media_status_downloads_idx on media(status, downloads desc, id desc)
-  `
-
-  await sql`
-    create index if not exists media_status_views_idx on media(status, views desc, id desc)
-  `
-
-  await sql`
-    create extension if not exists pg_trgm
-  `
-
-  await sql`
-    create index if not exists media_title_trgm_idx on media using gin(title gin_trgm_ops)
-  `
-
-  await sql`
-    create index if not exists media_description_trgm_idx on media using gin(description gin_trgm_ops)
-  `
-
-  await sql`
-    create index if not exists media_topic_trgm_idx on media using gin(topic gin_trgm_ops)
-  `
-
-  await sql`
-    create index if not exists tags_name_trgm_idx on tags using gin(name gin_trgm_ops)
   `
 
   await sql`
