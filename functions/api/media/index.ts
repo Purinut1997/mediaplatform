@@ -109,25 +109,6 @@ function tagSlug(name: string) {
   return `${base}-${hash.toString(36)}`
 }
 
-async function saveTags(sql: ReturnType<typeof getSql>, mediaId: number, tags: string[]) {
-  await sql`delete from media_tags where media_id = ${mediaId}`
-  for (const name of tags) {
-    const [tag] = await sql`
-      insert into tags (name, slug)
-      values (${name}, ${tagSlug(name)})
-      on conflict (name) do update set name = excluded.name
-      returning id
-    `
-    if (tag?.id) {
-      await sql`
-        insert into media_tags (media_id, tag_id)
-        values (${mediaId}, ${tag.id})
-        on conflict do nothing
-      `
-    }
-  }
-}
-
 function toMedia(row: MediaRow) {
   return {
     id: row.id,
@@ -288,59 +269,38 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
     const links = readLinks(body, title)
     const tags = readTags(body)
 
-    const [row] = (await sql`
-      insert into media (
-        title,
-        slug,
-        topic,
-        access_level,
-        status,
-        price,
-        cover_url,
-        source_type,
-        description
-      )
-      values (
-        ${title},
-        ${slug},
-        ${topic},
-        ${access},
-        ${status},
-        ${price},
-        ${coverUrl},
-        ${source},
-        ${description}
-      )
-      returning *
-    `) as MediaRow[]
-
-    for (let index = 0; index < links.length; index += 1) {
-      const link = links[index]
-      await sql`
-        insert into media_links (
-          media_id,
-          label,
-          type,
-          url,
-          preview_url,
-          access_level
+    await sql.transaction((tx) => [
+      tx`
+        insert into media (
+          title, slug, topic, access_level, status, price, cover_url, source_type, description
         )
-        values (
-          ${row.id},
-          ${link.label},
-          ${link.type},
-          ${link.url},
-          ${link.previewUrl || null},
-          ${link.access}
-        )
-      `
-    }
-    await saveTags(sql, row.id, tags)
-
-    await sql`
-      insert into audit_logs (actor, action, target_type, target_id, detail)
-      values (${currentUser?.email ?? 'token-superadmin'}, 'create', 'media', ${String(row.id)}, ${JSON.stringify({ title, tags })}::jsonb)
-    `
+        values (${title}, ${slug}, ${topic}, ${access}, ${status}, ${price}, ${coverUrl}, ${source}, ${description})
+      `,
+      ...links.map((link, index) => tx`
+        insert into media_links (media_id, label, type, url, preview_url, access_level, sort_order)
+        select id, ${link.label}, ${link.type}, ${link.url}, ${link.previewUrl || null}, ${link.access}, ${index}
+        from media where slug = ${slug}
+      `),
+      ...tags.flatMap((name) => [
+        tx`
+          insert into tags (name, slug)
+          values (${name}, ${tagSlug(name)})
+          on conflict (name) do update set name = excluded.name
+        `,
+        tx`
+          insert into media_tags (media_id, tag_id)
+          select media.id, tags.id from media cross join tags
+          where media.slug = ${slug} and tags.name = ${name}
+          on conflict do nothing
+        `,
+      ]),
+      tx`
+        insert into audit_logs (actor, action, target_type, target_id, detail)
+        values (${currentUser?.email ?? 'token-superadmin'}, 'create', 'media', ${slug}, ${JSON.stringify({ title, tags })}::jsonb)
+      `,
+    ])
+    const [row] = (await sql`select * from media where slug = ${slug} limit 1`) as MediaRow[]
+    if (!row) throw new Error('Created media could not be loaded')
 
     return Response.json({ ok: true, media: { ...toMedia(row), tags } }, { status: 201 })
   } catch (error) {

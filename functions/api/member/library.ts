@@ -1,7 +1,7 @@
 import { getCurrentUser } from '../../_lib/auth'
 import { writeAuditLog, writeErrorLog } from '../../_lib/admin'
 import { ensureSchema, getSql, type Env } from '../../_lib/db'
-import { hideProtectedLinks } from '../../_lib/media-access'
+import { canAccessLevel, hideProtectedLinks } from '../../_lib/media-access'
 import { safeHttpUrl } from '../../_lib/url'
 
 type FavoritePayload = {
@@ -121,7 +121,7 @@ export const onRequestGet = async ({ env, request }: { env: Env; request: Reques
           from media_tags join tags on tags.id = media_tags.tag_id
           where media_tags.media_id = media.id
         ) tagset on true
-        where user_favorites.user_id = $1
+        where user_favorites.user_id = $1 and media.status in ('เผยแพร่', 'เผยแพร่แล้ว')
         order by user_favorites.created_at desc
         limit 60
       `,
@@ -150,6 +150,7 @@ export const onRequestGet = async ({ env, request }: { env: Env; request: Reques
           where media_tags.media_id = media.id
         ) tagset on true
         where lower(media_events.user_email) = $1 and media_events.event_type = 'download'
+          and media.status in ('เผยแพร่', 'เผยแพร่แล้ว')
         group by media.id, link.links, tagset.tags
         order by last_downloaded_at desc
         limit 30
@@ -195,9 +196,17 @@ export const onRequestPatch = async ({ env, request }: { env: Env; request: Requ
 
     const sql = getSql(env)
     const [user] = await sql`select id from users where lower(email) = ${currentUser.email.toLowerCase()} limit 1`
-    const [media] = await sql`select id, title from media where id = ${mediaId} limit 1`
+    const [media] = await sql`
+      select id, title, access_level
+      from media
+      where id = ${mediaId} and status in ('เผยแพร่', 'เผยแพร่แล้ว')
+      limit 1
+    `
     if (!user || !media) {
       return Response.json({ ok: false, error: 'ไม่พบสมาชิกหรือสื่อที่ต้องการ' }, { status: 404 })
+    }
+    if (body.favorite && !canAccessLevel(currentUser, String(media.access_level))) {
+      return Response.json({ ok: false, error: 'บัญชีนี้ยังไม่มีสิทธิ์บันทึกสื่อนี้' }, { status: 403 })
     }
 
     if (body.favorite) {

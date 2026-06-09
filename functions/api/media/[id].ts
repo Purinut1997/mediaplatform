@@ -108,25 +108,6 @@ function tagSlug(name: string) {
   return `${base}-${hash.toString(36)}`
 }
 
-async function saveTags(sql: ReturnType<typeof getSql>, mediaId: number, tags: string[]) {
-  await sql`delete from media_tags where media_id = ${mediaId}`
-  for (const name of tags) {
-    const [tag] = await sql`
-      insert into tags (name, slug)
-      values (${name}, ${tagSlug(name)})
-      on conflict (name) do update set name = excluded.name
-      returning id
-    `
-    if (tag?.id) {
-      await sql`
-        insert into media_tags (media_id, tag_id)
-        values (${mediaId}, ${tag.id})
-        on conflict do nothing
-      `
-    }
-  }
-}
-
 export const onRequestPut = async ({ env, request, params }: Context) => {
   const auth = await requireSuperAdmin(env, request)
   if (!auth.ok) return auth.response
@@ -162,45 +143,41 @@ export const onRequestPut = async ({ env, request, params }: Context) => {
     )
   }
 
-  const [row] = await sql`
-    update media
-    set
-      title = ${title},
-      topic = ${topic},
-      access_level = ${access},
-      status = ${status},
-      price = ${price},
-      cover_url = ${coverUrl},
-      source_type = ${source},
-      description = ${description},
-      updated_at = now()
-    where id = ${id}
-    returning id
-  `
-  if (!row) return Response.json({ ok: false, error: 'Media not found' }, { status: 404 })
-
-  await sql`delete from media_links where media_id = ${id}`
-  for (let index = 0; index < links.length; index += 1) {
-    const link = links[index]
-    await sql`
-      insert into media_links (media_id, label, type, url, preview_url, access_level)
-      values (
-        ${id},
-        ${link.label},
-        ${link.type},
-        ${link.url},
-        ${link.previewUrl || null},
-        ${link.access}
-      )
-    `
-  }
   const tags = readTags(body)
-  await saveTags(sql, id, tags)
+  const [existing] = await sql`select id from media where id = ${id} limit 1`
+  if (!existing) return Response.json({ ok: false, error: 'Media not found' }, { status: 404 })
 
-  await sql`
-    insert into audit_logs (actor, action, target_type, target_id, detail)
-    values (${auth.actor}, 'update', 'media', ${String(id)}, ${JSON.stringify({ title, tags })}::jsonb)
-  `
+  await sql.transaction((tx) => [
+    tx`
+      update media
+      set title = ${title}, topic = ${topic}, access_level = ${access}, status = ${status},
+        price = ${price}, cover_url = ${coverUrl}, source_type = ${source},
+        description = ${description}, updated_at = now()
+      where id = ${id}
+    `,
+    tx`delete from media_links where media_id = ${id}`,
+    ...links.map((link, index) => tx`
+      insert into media_links (media_id, label, type, url, preview_url, access_level, sort_order)
+      values (${id}, ${link.label}, ${link.type}, ${link.url}, ${link.previewUrl || null}, ${link.access}, ${index})
+    `),
+    tx`delete from media_tags where media_id = ${id}`,
+    ...tags.flatMap((name) => [
+      tx`
+        insert into tags (name, slug)
+        values (${name}, ${tagSlug(name)})
+        on conflict (name) do update set name = excluded.name
+      `,
+      tx`
+        insert into media_tags (media_id, tag_id)
+        select ${id}, tags.id from tags where tags.name = ${name}
+        on conflict do nothing
+      `,
+    ]),
+    tx`
+      insert into audit_logs (actor, action, target_type, target_id, detail)
+      values (${auth.actor}, 'update', 'media', ${String(id)}, ${JSON.stringify({ title, tags })}::jsonb)
+    `,
+  ])
 
   return Response.json({ ok: true })
 }

@@ -91,36 +91,12 @@ function preview(data: ReturnType<typeof readData>, replaceTables: string[] = []
     replaceTables,
     warnings: [
       replaceTables.length
-        ? `โหมด replace จะล้างเฉพาะตารางที่เลือก: ${replaceTables.join(', ')}`
+        ? `โหมด Replace ถูกปิดเพื่อป้องกันข้อมูลหาย: ${replaceTables.join(', ')}`
         : 'โหมด restore นี้เป็นแบบ merge และไม่ลบข้อมูลเดิม',
       'ผู้ใช้ใหม่จากไฟล์ backup ที่ไม่มี password_hash จะถูกข้ามเพื่อความปลอดภัย',
       'คำขอ VIP จะนำเข้าแบบกันซ้ำจาก email และ created_at',
     ],
   }
-}
-
-async function clearSelectedTables(sql: ReturnType<typeof getSql>, tables: string[]) {
-  const selected = new Set(tables)
-  if (!selected.size) return
-
-  if (selected.has('media')) {
-    await sql`delete from media`
-  } else {
-    if (selected.has('mediaEvents')) await sql`delete from media_events`
-    if (selected.has('mediaReviews')) await sql`delete from media_reviews`
-    if (selected.has('userFavorites')) await sql`delete from user_favorites`
-    if (selected.has('mediaLinks')) await sql`delete from media_links`
-    if (selected.has('mediaTags')) await sql`delete from media_tags`
-  }
-
-  if (selected.has('tags')) {
-    await sql`delete from media_tags`
-    await sql`delete from tags`
-  }
-  if (selected.has('vipRequests')) await sql`delete from vip_requests`
-  if (selected.has('notifications')) await sql`delete from notifications`
-  if (selected.has('categories')) await sql`delete from categories`
-  if (selected.has('settings')) await sql`delete from app_settings`
 }
 
 export const onRequestPost = async ({ env, request }: { env: Env; request: Request }) => {
@@ -143,13 +119,21 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
     if (!payload.confirm) {
       return Response.json({ ok: false, error: 'Restore ต้องยืนยัน confirm ก่อนนำเข้า' }, { status: 400 })
     }
+    if (replaceTables.length) {
+      return Response.json(
+        {
+          ok: false,
+          error: 'ปิดโหมด Replace ชั่วคราวเพื่อป้องกันข้อมูลหาย กรุณาใช้ Merge หรือกู้คืนผ่าน Neon Restore',
+        },
+        { status: 409 },
+      )
+    }
 
     const sql = getSql(env)
     const mediaIdMap = new Map<number, number>()
     const tagIdMap = new Map<number, number>()
     const userIdMap = new Map<number, number>()
     let skippedUsers = 0
-    await clearSelectedTables(sql, replaceTables)
 
     for (const category of data.categories) {
       const name = text(category.name)

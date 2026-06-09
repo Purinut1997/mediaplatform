@@ -83,17 +83,25 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
   }
 
   const passwordHash = await hashPassword(password)
-  const [user] = (await sql`
-    insert into users (name, email, password_hash, role, access_level, status)
-    values (${name}, ${email}, ${passwordHash}, 'member', 'สมาชิก', 'active')
-    returning id
-  `) as Array<{ id: number }>
+  await sql.transaction((tx) => [
+    tx`
+      insert into users (name, email, password_hash, role, access_level, status)
+      values (${name}, ${email}, ${passwordHash}, 'member', 'สมาชิก', 'active')
+    `,
+    ...(membership === 'vip'
+      ? [tx`
+          insert into vip_requests (user_id, name, email, phone, slip_name)
+          select id, ${name}, ${email}, ${phone || null}, ${slipName || null}
+          from users where lower(email) = ${email}
+        `]
+      : []),
+  ])
+  const [user] = (await sql`select id from users where lower(email) = ${email} limit 1`) as Array<{ id: number }>
+  if (!user) throw new Error('Registered user could not be loaded')
 
   if (membership === 'vip') {
     const [vipRequest] = await sql`
-      insert into vip_requests (user_id, name, email, phone, slip_name)
-      values (${user.id}, ${name}, ${email}, ${phone || null}, ${slipName || null})
-      returning id
+      select id from vip_requests where user_id = ${user.id} order by created_at desc limit 1
     `
     await writeNotification(env, {
       audience: 'superadmin',

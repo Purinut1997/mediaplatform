@@ -610,7 +610,7 @@ function App() {
 
         if (!active) return
 
-        const nextMedia = mediaJson.media?.length ? mediaJson.media : mediaItems
+        const nextMedia = mediaJson.media ?? []
         setMediaRecords(nextMedia)
         setSelected(nextMedia[0] ?? mediaItems[0])
         setTopicOptions([
@@ -621,7 +621,7 @@ function App() {
         setDataStatus('ready')
       } catch {
         if (!active) return
-        setMediaRecords(mediaItems)
+        setMediaRecords([])
         setTopicOptions(topics)
         setSiteSettings(defaultSiteSettings)
         setDataStatus('fallback')
@@ -2874,6 +2874,9 @@ function AdminPanel({
   const [saving, setSaving] = useState(false)
   const [savingSettings, setSavingSettings] = useState(false)
   const [adminUsers, setAdminUsers] = useState<AdminUser[]>([])
+  const [memberQuery, setMemberQuery] = useState('')
+  const [memberPage, setMemberPage] = useState(1)
+  const [memberTotal, setMemberTotal] = useState(0)
   const [vipRequests, setVipRequests] = useState<VipRequest[]>([])
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([])
   const [errorLogs, setErrorLogs] = useState<ErrorLog[]>([])
@@ -3006,7 +3009,7 @@ function AdminPanel({
   ]
   const adminMenu = allAdminMenu.filter((item) => isSuperAdmin || !item.ownerOnly)
   const adminMetrics = [
-    { label: 'สมาชิกทั้งหมด', value: adminUsers.length.toLocaleString('th-TH'), icon: Users },
+    { label: 'สมาชิกทั้งหมด', value: memberTotal.toLocaleString('th-TH'), icon: Users },
     { label: 'สื่อเผยแพร่', value: publishedMediaCount.toLocaleString('th-TH'), icon: Layers3 },
     {
       label: 'ดาวน์โหลดรวม',
@@ -3029,20 +3032,26 @@ function AdminPanel({
     ['settings', 'Settings'],
   ] as const
 
-  const loadMembers = async () => {
+  const loadMembers = async (page = memberPage, query = memberQuery) => {
     setLoadingMembers(true)
     setMemberError('')
     try {
-      const response = await fetch('/api/admin/users', { credentials: 'include' })
+      const params = new URLSearchParams({ page: String(page), pageSize: '50' })
+      if (query.trim()) params.set('query', query.trim())
+      const response = await fetch(`/api/admin/users?${params}`, { credentials: 'include' })
       const result = await readJson<{
         users?: AdminUser[]
         vipRequests?: VipRequest[]
+        total?: number
+        page?: number
         error?: string
       }>(response)
 
       if (!response.ok) throw new Error(result.error ?? 'โหลดข้อมูลสมาชิกไม่สำเร็จ')
       setAdminUsers(result.users ?? [])
       setVipRequests(result.vipRequests ?? [])
+      setMemberTotal(result.total ?? 0)
+      setMemberPage(result.page ?? page)
     } catch (loadError) {
       setMemberError(
         loadError instanceof Error ? loadError.message : 'โหลดข้อมูลสมาชิกไม่สำเร็จ',
@@ -3884,7 +3893,7 @@ function AdminPanel({
               <button
                 className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-emerald-300 px-4 font-black text-slate-950 disabled:opacity-60"
                 disabled={loadingMembers}
-                onClick={loadMembers}
+                onClick={() => void loadMembers()}
                 type="button"
               >
                 {loadingMembers ? <Loader2 className="animate-spin" size={18} /> : <Database size={18} />}
@@ -3953,7 +3962,34 @@ function AdminPanel({
               </div>
 
               <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-                <p className="mb-3 font-black text-white">สมาชิกทั้งหมด</p>
+                <div className="mb-3 flex flex-col gap-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="font-black text-white">สมาชิกทั้งหมด</p>
+                    <span className="text-xs font-bold text-slate-400">
+                      {memberTotal.toLocaleString('th-TH')} บัญชี
+                    </span>
+                  </div>
+                  <form
+                    className="flex gap-2"
+                    onSubmit={(event) => {
+                      event.preventDefault()
+                      void loadMembers(1, memberQuery)
+                    }}
+                  >
+                    <label className="flex min-h-11 flex-1 items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3">
+                      <Search size={17} className="text-cyan-300" />
+                      <input
+                        className="min-w-0 flex-1 bg-transparent text-sm font-semibold text-white outline-none placeholder:text-slate-500"
+                        onChange={(event) => setMemberQuery(event.target.value)}
+                        placeholder="ค้นหาชื่อหรืออีเมล"
+                        value={memberQuery}
+                      />
+                    </label>
+                    <button className="min-h-11 rounded-xl bg-cyan-300 px-4 font-black text-slate-950" type="submit">
+                      ค้นหา
+                    </button>
+                  </form>
+                </div>
                 <div className="grid max-h-[520px] gap-3 overflow-y-auto pr-1">
                   {adminUsers.length === 0 && (
                     <div className="rounded-2xl border border-dashed border-white/15 p-5 text-sm font-bold text-slate-400">
@@ -4023,6 +4059,27 @@ function AdminPanel({
                       </article>
                     )
                   })}
+                </div>
+                <div className="mt-4 flex items-center justify-between gap-3 border-t border-white/10 pt-4">
+                  <button
+                    className="min-h-10 rounded-xl bg-white/10 px-4 text-sm font-black text-white disabled:opacity-35"
+                    disabled={loadingMembers || memberPage <= 1}
+                    onClick={() => void loadMembers(memberPage - 1, memberQuery)}
+                    type="button"
+                  >
+                    ก่อนหน้า
+                  </button>
+                  <span className="text-xs font-bold text-slate-400">
+                    หน้า {memberPage.toLocaleString('th-TH')} / {Math.max(1, Math.ceil(memberTotal / 50)).toLocaleString('th-TH')}
+                  </span>
+                  <button
+                    className="min-h-10 rounded-xl bg-white/10 px-4 text-sm font-black text-white disabled:opacity-35"
+                    disabled={loadingMembers || memberPage * 50 >= memberTotal}
+                    onClick={() => void loadMembers(memberPage + 1, memberQuery)}
+                    type="button"
+                  >
+                    ถัดไป
+                  </button>
                 </div>
               </div>
             </div>
@@ -4883,19 +4940,22 @@ function AdminPanel({
                   <div className="grid gap-2 sm:grid-cols-2">
                     {(['merge', 'replace'] as const).map((mode) => (
                       <button
-                        className={`min-h-12 rounded-2xl border px-4 font-black transition ${
+                        className={`min-h-12 rounded-2xl border px-4 font-black transition disabled:cursor-not-allowed disabled:opacity-45 ${
                           restoreMode === mode
                             ? 'border-emerald-300 bg-emerald-300 text-slate-950'
                             : 'border-white/10 bg-white/[0.04] text-slate-200'
                         }`}
                         key={mode}
                         onClick={() => {
-                          setRestoreMode(mode)
-                          setRestorePreview(null)
+                          if (mode === 'merge') {
+                            setRestoreMode(mode)
+                            setRestorePreview(null)
+                          }
                         }}
+                        disabled={mode === 'replace'}
                         type="button"
                       >
-                        {mode === 'merge' ? 'Merge ไม่ลบข้อมูลเดิม' : 'Replace เฉพาะตารางที่เลือก'}
+                        {mode === 'merge' ? 'Merge ไม่ลบข้อมูลเดิม' : 'Replace ปิดเพื่อป้องกันข้อมูลหาย'}
                       </button>
                     ))}
                   </div>

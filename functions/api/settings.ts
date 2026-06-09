@@ -94,9 +94,27 @@ function readSettings(body: Partial<SiteSettings>): SiteSettings {
   })
 }
 
-export const onRequestGet = async ({ env }: { env: Env }) => {
+function settingsForViewer(settings: SiteSettings, isSuperAdmin: boolean) {
+  if (isSuperAdmin || settings.vipRegistrationEnabled) return settings
+  return {
+    ...settings,
+    vipPrice: 0,
+    vipQrUrl: '',
+    vipBankName: '',
+    vipAccountNumber: '',
+    vipAccountName: '',
+    vipPaymentTitle: '',
+    vipPaymentSubtitle: '',
+    vipSlipLabel: '',
+    vipAgreementLabel: '',
+    vipSubmitLabel: '',
+  }
+}
+
+export const onRequestGet = async ({ env, request }: { env: Env; request: Request }) => {
   await ensureSchema(env)
   const sql = getSql(env)
+  const currentUser = await getCurrentUser(env, request)
   const [row] = (await sql`
     select value
     from app_settings
@@ -104,7 +122,8 @@ export const onRequestGet = async ({ env }: { env: Env }) => {
     limit 1
   `) as Array<{ value: SiteSettings }>
 
-  return Response.json({ ok: true, settings: normalizeSettings(row?.value) })
+  const settings = normalizeSettings(row?.value)
+  return Response.json({ ok: true, settings: settingsForViewer(settings, currentUser?.role === 'superadmin') })
 }
 
 export const onRequestPut = async ({ env, request }: { env: Env; request: Request }) => {

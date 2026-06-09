@@ -30,11 +30,22 @@ export const onRequestGet = async ({ env, request }: { env: Env; request: Reques
 
   await ensureSchema(env)
   const sql = getSql(env)
+  const url = new URL(request.url)
+  const page = Math.max(1, Math.trunc(Number(url.searchParams.get('page') ?? 1)) || 1)
+  const pageSize = Math.min(100, Math.max(10, Math.trunc(Number(url.searchParams.get('pageSize') ?? 50)) || 50))
+  const offset = (page - 1) * pageSize
+  const query = url.searchParams.get('query')?.trim().slice(0, 120) ?? ''
+  const pattern = `%${query}%`
   const users = await sql`
     select id, name, email, role, access_level, status, created_at
     from users
+    where (${query} = '' or name ilike ${pattern} or email ilike ${pattern})
     order by created_at desc
-    limit 300
+    limit ${pageSize} offset ${offset}
+  `
+  const [countRow] = await sql`
+    select count(*)::int as total from users
+    where (${query} = '' or name ilike ${pattern} or email ilike ${pattern})
   `
   const vipRequests = await sql`
     select id, user_id, name, email, phone, slip_name, status, created_at
@@ -45,6 +56,9 @@ export const onRequestGet = async ({ env, request }: { env: Env; request: Reques
 
   return Response.json({
     ok: true,
+    page,
+    pageSize,
+    total: Number(countRow?.total ?? 0),
     users: users.map((user) => ({
       id: user.id,
       name: user.name,
@@ -82,18 +96,25 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
 
     if (body.action === 'approve-vip' && requestId) {
       const [vipRequest] = await sql`
-        update vip_requests
-        set status = 'approved', updated_at = now()
-        where id = ${requestId} and status = 'pending'
-        returning user_id
-      `
-      if (!vipRequest) return Response.json({ ok: false, error: 'ไม่พบคำขอ VIP ที่รอตรวจสอบ' }, { status: 409 })
-      if (vipRequest.user_id) {
-        await sql`
+        with approved as (
+          update vip_requests
+          set status = 'approved', updated_at = now()
+          where id = ${requestId} and status = 'pending'
+          returning user_id
+        ),
+        activated as (
           update users
           set access_level = 'VIP', status = 'active', updated_at = now()
-          where id = ${vipRequest.user_id} and role <> 'superadmin'
-        `
+          where id in (select user_id from approved where user_id is not null)
+            and role <> 'superadmin'
+          returning id
+        )
+        select approved.user_id, activated.id as activated_user_id
+        from approved left join activated on activated.id = approved.user_id
+      `
+      if (!vipRequest) return Response.json({ ok: false, error: 'ไม่พบคำขอ VIP ที่รอตรวจสอบ' }, { status: 409 })
+      if (vipRequest.user_id && !vipRequest.activated_user_id) {
+        throw new Error('VIP request user could not be activated')
       }
       await writeAuditLog(env, currentUser, 'approve_vip', 'vip_request', requestId)
       await writeNotification(env, {

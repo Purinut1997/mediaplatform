@@ -249,12 +249,28 @@
 4. ระบบซื้อสื่อแยกและวันหมดอายุ VIP ยังปิดไว้
    - ต้องกำหนดราคา วิธีรับชำระ อายุ VIP และเงื่อนไขคืนเงินก่อนสร้าง workflow จริง
 
+### งานปรับความทนทานที่ยังควรทำต่อ
+
+1. เพิ่ม Server-side Pagination ให้รายการสื่อ, Activity Log, Error Log และ Notification
+   - หน้าสมาชิกหลังบ้านรองรับค้นหาและแบ่งหน้าจาก API แล้ว
+   - รายการสื่อและ Logs ยังโหลดหรือจำกัดจำนวนแบบเดิม
+2. แยก Database Migration ออกจาก `ensureSchema`
+   - ปัจจุบัน Worker ใหม่ยังตรวจ schema, cleanup และ seed ตอน request แรก
+3. ทำ Backup/Restore สำหรับข้อมูลขนาดใหญ่แบบ Background Job หรือใช้ Neon Restore
+   - JSON Backup ปัจจุบันยังโหลดทุกตารางใน request เดียว
+   - Restore แบบ Merge เปิดใช้งานได้
+   - Restore แบบ Replace ถูกปิดเพื่อป้องกันข้อมูลหายจากคำสั่งที่หยุดกลางทาง
+4. ทยอยแยก `src/App.tsx` เป็นหน้าและ component ย่อย เพื่อลดความเสี่ยงเวลาแก้ระบบระยะยาว
+5. เพิ่ม Integration Test สำหรับ Login, สมัครสมาชิก, Workflow สื่อ, VIP และ Backup/Restore
+   - ตอนนี้มี Unit Test ด้าน URL และสิทธิ์สื่อ พร้อม GitHub Actions แล้ว
+
 ## ลำดับงานแนะนำต่อไป
 
 1. ตั้งค่า Turnstile และ Resend Secrets บน Cloudflare Pages
 2. Login Wrangler แล้วตั้ง `CRON_SECRET` ให้ตรงกันทั้ง Cloudflare Pages และ Worker จากนั้นรัน `npm run cron:secret` + `npm run cron:deploy`
-3. กำหนดกติกาธุรกิจสำหรับซื้อแยกและ VIP expiry ก่อนเปิดสองระบบนี้
-4. หลังจากระบบใช้งานจริงสักระยะ ค่อยเพิ่มรายงานเฉพาะด้านตามข้อมูล event ที่สะสมจริง
+3. เพิ่ม Pagination สำหรับสื่อและ Logs ก่อนข้อมูลจริงมีจำนวนมาก
+4. แยก Migration และปรับ Backup/Restore ขนาดใหญ่
+5. กำหนดกติกาธุรกิจสำหรับซื้อแยกและ VIP expiry ก่อนเปิดสองระบบนี้
 
 ## ไฟล์หลักที่ควรดูเมื่อทำงานต่อ
 
@@ -298,6 +314,15 @@
 
 - `npm run lint` ผ่าน
 - `npm run build` ผ่าน
+- `npm test` ผ่าน 9 tests
 - Functions TypeScript ผ่าน
+- มี GitHub Actions ตรวจ `lint`, `test` และ `build` ทุก push/PR
+- วันที่ 9 มิถุนายน 2026 ตรวจหน้าเว็บบนเครื่องทั้ง desktop/mobile แล้ว ไม่พบ horizontal overflow หรือ console error
+- เพิ่ม Transaction สำหรับการเพิ่ม/แก้สื่อ, สมัคร VIP และอนุมัติ VIP เพื่อลดข้อมูลค้างครึ่งชุด
+- สมาชิกไม่สามารถบันทึกรายการโปรดหรือรีวิวสื่อที่ยังไม่เผยแพร่/ไม่มีสิทธิ์ได้
+- API Settings ซ่อนข้อมูล QR/เลขบัญชีเมื่อปิดรับสมัคร VIP สำหรับผู้ใช้ทั่วไป
+- เมื่อ API โหลดข้อมูลล้มเหลว หน้า Production จะแสดง Empty/Error state แทนข้อมูลตัวอย่าง
+- หน้าสมาชิกหลังบ้านรองรับค้นหาชื่อ/อีเมลและแบ่งหน้า 50 บัญชีต่อหน้า
+- Restore แบบ Replace ถูกปิดทั้ง API/UI จนกว่าจะมีวิธี restore แบบ atomic หรือใช้ Neon Restore
 - วันที่ 7 มิถุนายน 2026 ยืนยันว่า production ใช้ Functions และ static frontend รุ่นล่าสุดแล้ว มี `app-version` สำหรับตรวจ deployment และ asset production มี UI หลายลิงก์ครบ
 - ฟีเจอร์ที่เพิ่มล่าสุด: จัดการหมวดหมู่ครบ, ตรวจค่าตั้งค่าเว็บก่อนบันทึก และป้องกันการอนุมัติ VIP/แก้สมาชิกซ้ำหรือสำเร็จลวง
