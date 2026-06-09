@@ -1,5 +1,5 @@
 import { getCurrentUser } from '../../_lib/auth'
-import { writeAuditLog } from '../../_lib/admin'
+import { writeAuditLog, writeErrorLog } from '../../_lib/admin'
 import { ensureSchema, getSql, type Env } from '../../_lib/db'
 import { notifyTelegram } from '../../_lib/notify'
 import { writeNotification } from '../../_lib/notifications'
@@ -16,6 +16,11 @@ type AdminAction = {
 async function requireSuperAdmin(env: Env, request: Request) {
   const currentUser = await getCurrentUser(env, request)
   return currentUser?.role === 'superadmin' ? currentUser : null
+}
+
+function positiveId(value: unknown) {
+  const id = Number(value)
+  return Number.isInteger(id) && id > 0 ? id : 0
 }
 
 export const onRequestGet = async ({ env, request }: { env: Env; request: Request }) => {
@@ -68,78 +73,89 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
     return Response.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
   }
 
-  await ensureSchema(env)
-  const sql = getSql(env)
-  const body = (await request.json().catch(() => ({}))) as AdminAction
+  try {
+    await ensureSchema(env)
+    const sql = getSql(env)
+    const body = (await request.json().catch(() => ({}))) as AdminAction
+    const requestId = positiveId(body.requestId)
+    const userId = positiveId(body.userId)
 
-  if (body.action === 'approve-vip' && body.requestId) {
-    const [vipRequest] = await sql`
-      update vip_requests
-      set status = 'approved', updated_at = now()
-      where id = ${body.requestId}
-      returning user_id
-    `
-    if (vipRequest?.user_id) {
-      await sql`
-        update users
-        set access_level = 'VIP', status = 'active', updated_at = now()
-        where id = ${vipRequest.user_id}
+    if (body.action === 'approve-vip' && requestId) {
+      const [vipRequest] = await sql`
+        update vip_requests
+        set status = 'approved', updated_at = now()
+        where id = ${requestId} and status = 'pending'
+        returning user_id
       `
+      if (!vipRequest) return Response.json({ ok: false, error: 'ไม่พบคำขอ VIP ที่รอตรวจสอบ' }, { status: 409 })
+      if (vipRequest.user_id) {
+        await sql`
+          update users
+          set access_level = 'VIP', status = 'active', updated_at = now()
+          where id = ${vipRequest.user_id} and role <> 'superadmin'
+        `
+      }
+      await writeAuditLog(env, currentUser, 'approve_vip', 'vip_request', requestId)
+      await writeNotification(env, {
+        audience: 'superadmin',
+        type: 'vip_resolved',
+        title: 'อนุมัติคำขอ VIP แล้ว',
+        detail: `Request ID ${requestId} ถูกอนุมัติ`,
+        tone: 'emerald',
+        targetType: 'vip_request',
+        targetId: requestId,
+        fingerprint: `vip_request:${requestId}:approved`,
+      })
+      await notifyTelegram(env, `MIKPURINUT Media Platform\nอนุมัติคำขอ VIP แล้ว\nRequest ID: ${requestId}`)
+    } else if (body.action === 'reject-vip' && requestId) {
+      const [vipRequest] = await sql`
+        update vip_requests
+        set status = 'rejected', updated_at = now()
+        where id = ${requestId} and status = 'pending'
+        returning id
+      `
+      if (!vipRequest) return Response.json({ ok: false, error: 'ไม่พบคำขอ VIP ที่รอตรวจสอบ' }, { status: 409 })
+      await writeAuditLog(env, currentUser, 'reject_vip', 'vip_request', requestId)
+      await writeNotification(env, {
+        audience: 'superadmin',
+        type: 'vip_resolved',
+        title: 'ปฏิเสธคำขอ VIP แล้ว',
+        detail: `Request ID ${requestId} ถูกปฏิเสธ`,
+        tone: 'red',
+        targetType: 'vip_request',
+        targetId: requestId,
+        fingerprint: `vip_request:${requestId}:rejected`,
+      })
+      await notifyTelegram(env, `MIKPURINUT Media Platform\nปฏิเสธคำขอ VIP\nRequest ID: ${requestId}`)
+    } else if (body.action === 'set-access' && userId && ['สมาชิก', 'VIP'].includes(String(body.access))) {
+      const [updated] = await sql`
+        update users set access_level = ${body.access}, updated_at = now()
+        where id = ${userId} and role <> 'superadmin' returning id
+      `
+      if (!updated) return Response.json({ ok: false, error: 'ไม่พบสมาชิกที่แก้ไขสิทธิ์ได้' }, { status: 404 })
+      await writeAuditLog(env, currentUser, 'set_user_access', 'user', userId, { access: body.access })
+    } else if (body.action === 'set-status' && userId && ['active', 'disabled'].includes(String(body.status))) {
+      const [updated] = await sql`
+        update users set status = ${body.status}, updated_at = now()
+        where id = ${userId} and role <> 'superadmin' returning id
+      `
+      if (!updated) return Response.json({ ok: false, error: 'ไม่พบสมาชิกที่เปิดหรือปิดบัญชีได้' }, { status: 404 })
+      if (body.status === 'disabled') await sql`delete from sessions where user_id = ${userId}`
+      await writeAuditLog(env, currentUser, 'set_user_status', 'user', userId, { status: body.status })
+    } else if (body.action === 'set-role' && userId && ['admin', 'member'].includes(String(body.role))) {
+      const [updated] = await sql`
+        update users set role = ${body.role}, updated_at = now()
+        where id = ${userId} and role <> 'superadmin' returning id
+      `
+      if (!updated) return Response.json({ ok: false, error: 'ไม่พบสมาชิกที่เปลี่ยนบทบาทได้' }, { status: 404 })
+      await writeAuditLog(env, currentUser, 'set_user_role', 'user', userId, { role: body.role })
+    } else {
+      return Response.json({ ok: false, error: 'Invalid action' }, { status: 400 })
     }
-    await writeAuditLog(env, currentUser, 'approve_vip', 'vip_request', body.requestId)
-    await writeNotification(env, {
-      audience: 'superadmin',
-      type: 'vip_resolved',
-      title: 'อนุมัติคำขอ VIP แล้ว',
-      detail: `Request ID ${body.requestId} ถูกอนุมัติ`,
-      tone: 'emerald',
-      targetType: 'vip_request',
-      targetId: body.requestId,
-      fingerprint: `vip_request:${body.requestId}:approved`,
-    })
-    await notifyTelegram(env, `MIKPURINUT Media Platform\nอนุมัติคำขอ VIP แล้ว\nRequest ID: ${body.requestId}`)
-  } else if (body.action === 'reject-vip' && body.requestId) {
-    await sql`
-      update vip_requests
-      set status = 'rejected', updated_at = now()
-      where id = ${body.requestId}
-    `
-    await writeAuditLog(env, currentUser, 'reject_vip', 'vip_request', body.requestId)
-    await writeNotification(env, {
-      audience: 'superadmin',
-      type: 'vip_resolved',
-      title: 'ปฏิเสธคำขอ VIP แล้ว',
-      detail: `Request ID ${body.requestId} ถูกปฏิเสธ`,
-      tone: 'red',
-      targetType: 'vip_request',
-      targetId: body.requestId,
-      fingerprint: `vip_request:${body.requestId}:rejected`,
-    })
-    await notifyTelegram(env, `MIKPURINUT Media Platform\nปฏิเสธคำขอ VIP\nRequest ID: ${body.requestId}`)
-  } else if (body.action === 'set-access' && body.userId && body.access) {
-    await sql`
-      update users
-      set access_level = ${body.access}, updated_at = now()
-      where id = ${body.userId} and role <> 'superadmin'
-    `
-    await writeAuditLog(env, currentUser, 'set_user_access', 'user', body.userId, { access: body.access })
-  } else if (body.action === 'set-status' && body.userId && body.status) {
-    await sql`
-      update users
-      set status = ${body.status}, updated_at = now()
-      where id = ${body.userId} and role <> 'superadmin'
-    `
-    await writeAuditLog(env, currentUser, 'set_user_status', 'user', body.userId, { status: body.status })
-  } else if (body.action === 'set-role' && body.userId && body.role) {
-    await sql`
-      update users
-      set role = ${body.role}, updated_at = now()
-      where id = ${body.userId} and role <> 'superadmin'
-    `
-    await writeAuditLog(env, currentUser, 'set_user_role', 'user', body.userId, { role: body.role })
-  } else {
-    return Response.json({ ok: false, error: 'Invalid action' }, { status: 400 })
-  }
 
-  return Response.json({ ok: true })
+    return Response.json({ ok: true })
+  } catch (error) {
+    await writeErrorLog(env, 'admin.users', error)
+    return Response.json({ ok: false, error: 'จัดการสมาชิกไม่สำเร็จ' }, { status: 500 })
+  }
 }
