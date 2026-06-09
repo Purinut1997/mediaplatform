@@ -147,7 +147,12 @@ export const onRequestGet = async ({ env, request }: { env: Env; request: Reques
   const sql = getSql(env)
   const url = new URL(request.url)
   const topic = url.searchParams.get('topic')
+  const query = url.searchParams.get('query')?.trim().slice(0, 120) ?? ''
+  const pattern = `%${query}%`
   const requestedStatus = url.searchParams.get('status')
+  const page = Math.max(1, Math.trunc(Number(url.searchParams.get('page') ?? 1)) || 1)
+  const pageSize = Math.min(100, Math.max(10, Math.trunc(Number(url.searchParams.get('pageSize') ?? 40)) || 40))
+  const offset = (page - 1) * pageSize
   const canReadAll = await requireAdminPermission(env, request, 'media:read')
   const currentUser = await getCurrentUser(env, request)
   const status =
@@ -188,8 +193,11 @@ export const onRequestGet = async ({ env, request }: { env: Env; request: Reques
             join tags on tags.id = media_tags.tag_id
             where media_tags.media_id = media.id
           ) tagset on true
-          where (${isAllStatus} or media.status = any(${statusList})) and media.topic = ${topic}
+          where (${isAllStatus} or media.status = any(${statusList}))
+            and media.topic = ${topic}
+            and (${query} = '' or media.title ilike ${pattern} or media.description ilike ${pattern})
           order by updated_at desc, id desc
+          limit ${pageSize} offset ${offset}
         `
       : await sql`
           select media.*, link.url as resource_url, link.preview_url, link.links, tagset.tags
@@ -219,11 +227,28 @@ export const onRequestGet = async ({ env, request }: { env: Env; request: Reques
             where media_tags.media_id = media.id
           ) tagset on true
           where (${isAllStatus} or media.status = any(${statusList}))
+            and (${query} = '' or media.title ilike ${pattern} or media.description ilike ${pattern})
           order by updated_at desc, id desc
+          limit ${pageSize} offset ${offset}
         `
+  const [countRow] = topic && topic !== 'ทั้งหมด'
+    ? await sql`
+        select count(*)::int as total from media
+        where (${isAllStatus} or status = any(${statusList})) and topic = ${topic}
+          and (${query} = '' or title ilike ${pattern} or description ilike ${pattern})
+      `
+    : await sql`
+        select count(*)::int as total from media
+        where (${isAllStatus} or status = any(${statusList}))
+          and (${query} = '' or title ilike ${pattern} or description ilike ${pattern})
+      `
 
   return Response.json({
     ok: true,
+    page,
+    pageSize,
+    total: Number(countRow?.total ?? 0),
+    hasMore: offset + rows.length < Number(countRow?.total ?? 0),
     media: (rows as MediaRow[]).map((row) => {
       const media = toMedia(row)
       return canReadAll ? media : hideProtectedLinks(media, currentUser)

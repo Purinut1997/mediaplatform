@@ -513,6 +513,9 @@ function App() {
     return saved ? (JSON.parse(saved) as CurrentUser) : null
   })
   const [mediaRecords, setMediaRecords] = useState<MediaItem[]>(mediaItems)
+  const [mediaPage, setMediaPage] = useState(1)
+  const [mediaTotal, setMediaTotal] = useState(0)
+  const [loadingMoreMedia, setLoadingMoreMedia] = useState(false)
   const [topicOptions, setTopicOptions] = useState(topics)
   const [dataStatus, setDataStatus] = useState<'loading' | 'ready' | 'fallback'>(
     'loading',
@@ -588,8 +591,15 @@ function App() {
 
     async function loadData() {
       try {
+        const mediaParams = new URLSearchParams({ page: '1', pageSize: '40' })
+        if (currentUser?.role === 'superadmin' || currentUser?.role === 'admin') {
+          mediaParams.set('status', 'all')
+        } else {
+          if (query.trim()) mediaParams.set('query', query.trim())
+          if (topic !== 'ทั้งหมด') mediaParams.set('topic', topic)
+        }
         const [mediaResponse, categoriesResponse, settingsResponse] = await Promise.all([
-          fetch(currentUser?.role === 'superadmin' || currentUser?.role === 'admin' ? '/api/media?status=all' : '/api/media'),
+          fetch(`/api/media?${mediaParams}`),
           fetch('/api/categories'),
           fetch('/api/settings'),
         ])
@@ -600,6 +610,8 @@ function App() {
 
         const mediaJson = (await mediaResponse.json()) as {
           media?: MediaItem[]
+          page?: number
+          total?: number
         }
         const categoriesJson = (await categoriesResponse.json()) as {
           categories?: Array<{ name: string }>
@@ -612,6 +624,8 @@ function App() {
 
         const nextMedia = mediaJson.media ?? []
         setMediaRecords(nextMedia)
+        setMediaPage(mediaJson.page ?? 1)
+        setMediaTotal(mediaJson.total ?? nextMedia.length)
         setSelected(nextMedia[0] ?? mediaItems[0])
         setTopicOptions([
           'ทั้งหมด',
@@ -622,18 +636,48 @@ function App() {
       } catch {
         if (!active) return
         setMediaRecords([])
+        setMediaPage(1)
+        setMediaTotal(0)
         setTopicOptions(topics)
         setSiteSettings(defaultSiteSettings)
         setDataStatus('fallback')
       }
     }
 
-    void loadData()
+    const timer = window.setTimeout(() => void loadData(), 250)
 
     return () => {
       active = false
+      window.clearTimeout(timer)
     }
-  }, [currentUser?.role, refreshToken])
+  }, [currentUser?.role, query, refreshToken, topic])
+
+  const loadMoreMedia = async () => {
+    if (loadingMoreMedia || mediaRecords.length >= mediaTotal) return
+    setLoadingMoreMedia(true)
+    try {
+      const nextPage = mediaPage + 1
+      const mediaParams = new URLSearchParams({ page: String(nextPage), pageSize: '40' })
+      if (currentUser?.role === 'superadmin' || currentUser?.role === 'admin') mediaParams.set('status', 'all')
+      else {
+        if (query.trim()) mediaParams.set('query', query.trim())
+        if (topic !== 'ทั้งหมด') mediaParams.set('topic', topic)
+      }
+      const response = await fetch(`/api/media?${mediaParams}`)
+      const result = await readJson<{ media?: MediaItem[]; page?: number; total?: number; error?: string }>(response)
+      if (!response.ok) throw new Error(result.error || 'โหลดสื่อเพิ่มเติมไม่สำเร็จ')
+      setMediaRecords((items) => {
+        const known = new Set(items.map((item) => item.id))
+        return [...items, ...(result.media ?? []).filter((item) => !known.has(item.id))]
+      })
+      setMediaPage(result.page ?? nextPage)
+      setMediaTotal(result.total ?? mediaTotal)
+    } catch (error) {
+      setToast(error instanceof Error ? error.message : 'โหลดสื่อเพิ่มเติมไม่สำเร็จ')
+    } finally {
+      setLoadingMoreMedia(false)
+    }
+  }
 
   useEffect(() => {
     let active = true
@@ -770,6 +814,10 @@ function App() {
                 dataStatus={dataStatus}
                 filteredMedia={filteredMedia}
                 lockedPreviewMedia={lockedPreviewMedia}
+                loadingMore={loadingMoreMedia}
+                mediaLoadedCount={mediaRecords.length}
+                mediaTotal={mediaTotal}
+                onLoadMore={() => void loadMoreMedia()}
                 openDetail={openDetail}
                 query={query}
                 setQuery={setQuery}
@@ -786,6 +834,10 @@ function App() {
               expanded
               filteredMedia={filteredMedia}
               lockedPreviewMedia={lockedPreviewMedia}
+              loadingMore={loadingMoreMedia}
+              mediaLoadedCount={mediaRecords.length}
+              mediaTotal={mediaTotal}
+              onLoadMore={() => void loadMoreMedia()}
               openDetail={openDetail}
               query={query}
               setQuery={setQuery}
@@ -852,6 +904,9 @@ function App() {
             <AdminPanel
               currentUser={currentUser}
               mediaItems={mediaRecords}
+              mediaTotal={mediaTotal}
+              loadingMoreMedia={loadingMoreMedia}
+              onLoadMoreMedia={() => void loadMoreMedia()}
               onCreated={() => {
                 setRefreshToken((value) => value + 1)
                 notifySuccess('เพิ่มสื่อใหม่ลง Neon แล้ว')
@@ -1252,6 +1307,10 @@ function MediaSection({
   dataStatus,
   filteredMedia,
   lockedPreviewMedia,
+  loadingMore,
+  mediaLoadedCount,
+  mediaTotal,
+  onLoadMore,
   query,
   setQuery,
   setTopic,
@@ -1264,6 +1323,10 @@ function MediaSection({
   dataStatus: 'loading' | 'ready' | 'fallback'
   filteredMedia: MediaItem[]
   lockedPreviewMedia: MediaItem[]
+  loadingMore: boolean
+  mediaLoadedCount: number
+  mediaTotal: number
+  onLoadMore: () => void
   query: string
   setQuery: (value: string) => void
   setTopic: (value: string) => void
@@ -1287,7 +1350,7 @@ function MediaSection({
             {dataStatus === 'ready'
               ? 'ข้อมูลนี้ดึงจาก Neon ผ่าน Cloudflare Functions'
               : dataStatus === 'fallback'
-                ? 'กำลังใช้ข้อมูลสำรองในหน้าเว็บ เพราะ API ยังไม่พร้อม'
+                ? 'เชื่อมต่อ API ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง'
                 : 'กำลังโหลดข้อมูลจาก Neon...'}
           </p>
         </div>
@@ -1330,6 +1393,22 @@ function MediaSection({
       )}
       {lockedPreviewMedia.length > 0 && (
         <VipPreview lockedMedia={lockedPreviewMedia} />
+      )}
+      {mediaLoadedCount < mediaTotal && (
+        <div className="mt-7 flex flex-col items-center gap-2">
+          <p className="text-sm font-bold text-slate-500 dark:text-slate-400">
+            โหลดแล้ว {mediaLoadedCount.toLocaleString('th-TH')} จาก {mediaTotal.toLocaleString('th-TH')} รายการ
+          </p>
+          <button
+            className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-cyan-500 px-6 font-black text-white shadow-lg shadow-cyan-500/20 disabled:opacity-50"
+            disabled={loadingMore}
+            onClick={onLoadMore}
+            type="button"
+          >
+            {loadingMore ? <Loader2 className="animate-spin" size={18} /> : <Download size={18} />}
+            โหลดสื่อเพิ่มเติม
+          </button>
+        </div>
       )}
     </section>
   )
@@ -2838,15 +2917,21 @@ function MembershipCard({
 
 function AdminPanel({
   currentUser,
+  loadingMoreMedia,
   mediaItems,
+  mediaTotal,
   onCreated,
+  onLoadMoreMedia,
   onSettingsSaved,
   settings,
   topics,
 }: {
   currentUser: CurrentUser
+  loadingMoreMedia: boolean
   mediaItems: MediaItem[]
+  mediaTotal: number
   onCreated: () => void
+  onLoadMoreMedia: () => void
   onSettingsSaved: (settings: SiteSettings) => void
   settings: SiteSettings
   topics: string[]
@@ -5518,6 +5603,22 @@ function AdminPanel({
                 </article>
               ))}
             </div>
+            {mediaItems.length < mediaTotal && (
+              <div className="mt-5 flex flex-col items-center gap-2 border-t border-white/10 pt-5">
+                <p className="text-xs font-bold text-slate-400">
+                  โหลดแล้ว {mediaItems.length.toLocaleString('th-TH')} จาก {mediaTotal.toLocaleString('th-TH')} รายการ
+                </p>
+                <button
+                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-cyan-300 px-5 font-black text-slate-950 disabled:opacity-50"
+                  disabled={loadingMoreMedia}
+                  onClick={onLoadMoreMedia}
+                  type="button"
+                >
+                  {loadingMoreMedia ? <Loader2 className="animate-spin" size={18} /> : <Download size={18} />}
+                  โหลดสื่อเพิ่มเติม
+                </button>
+              </div>
+            )}
           </section>
           </>
           )}
