@@ -253,12 +253,15 @@
 
 1. เพิ่ม Server-side Pagination ให้รายการสื่อ, Activity Log, Error Log และ Notification
    - หน้าสมาชิกหลังบ้านรองรับค้นหาและแบ่งหน้าจาก API แล้ว
-   - รายการสื่อและ Logs ยังโหลดหรือจำกัดจำนวนแบบเดิม
+   - Activity Log และ Error Log รองรับแบ่งหน้า 50 รายการแล้ว
+   - Notification กรองสิทธิ์จากฐานข้อมูลก่อนจำกัดจำนวน และแสดงยอดยังไม่อ่านจริงแล้ว
+   - รายการสื่อยังโหลดทั้งหมดและควรเพิ่ม Pagination เป็นงานถัดไป
 2. แยก Database Migration ออกจาก `ensureSchema`
    - เพิ่ม Schema Version Guard แล้ว ทำให้ Worker ใหม่ไม่รัน schema, cleanup และ seed ซ้ำเมื่อเวอร์ชันตรงกัน
    - ระยะยาวยังควรแยก migration เป็นคำสั่ง deploy โดยเฉพาะ
 3. ทำ Backup/Restore สำหรับข้อมูลขนาดใหญ่แบบ Background Job หรือใช้ Neon Restore
    - JSON Backup ปัจจุบันยังโหลดทุกตารางใน request เดียว
+   - เพิ่ม JSON ข้อมูลหลักสำหรับสำรองประจำวัน โดยไม่รวมประวัติ, รีวิว, รายการโปรด และแจ้งเตือน
    - Restore แบบ Merge เปิดใช้งานได้
    - Restore แบบ Replace ถูกปิดเพื่อป้องกันข้อมูลหายจากคำสั่งที่หยุดกลางทาง
 4. ทยอยแยก `src/App.tsx` เป็นหน้าและ component ย่อย เพื่อลดความเสี่ยงเวลาแก้ระบบระยะยาว
@@ -326,5 +329,9 @@
 - หน้าสมาชิกหลังบ้านรองรับค้นหาชื่อ/อีเมลและแบ่งหน้า 50 บัญชีต่อหน้า
 - Restore แบบ Replace ถูกปิดทั้ง API/UI จนกว่าจะมีวิธี restore แบบ atomic หรือใช้ Neon Restore
 - เพิ่ม Schema Version Guard ลด cold-start จากการรัน DDL/seed ซ้ำใน Worker ใหม่
+- Activity Log และ Error Log รองรับ Server-side Pagination 50 รายการต่อหน้า
+- Notification Center กรอง audience ก่อน limit และแสดงยอด unread จากฐานข้อมูลจริง
+- Link Checker เลือกลิงก์ที่ไม่เคยตรวจหรือเก่าสุดก่อน และตรวจขนานเป็นชุดละ 10 ลิงก์
+- Backup มี JSON ข้อมูลหลักแบบเบา และ JSON ทั้งระบบสำหรับเก็บประวัติครบ
 - วันที่ 7 มิถุนายน 2026 ยืนยันว่า production ใช้ Functions และ static frontend รุ่นล่าสุดแล้ว มี `app-version` สำหรับตรวจ deployment และ asset production มี UI หลายลิงก์ครบ
 - ฟีเจอร์ที่เพิ่มล่าสุด: จัดการหมวดหมู่ครบ, ตรวจค่าตั้งค่าเว็บก่อนบันทึก และป้องกันการอนุมัติ VIP/แก้สมาชิกซ้ำหรือสำเร็จลวง

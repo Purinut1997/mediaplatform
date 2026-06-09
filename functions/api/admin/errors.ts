@@ -8,15 +8,23 @@ export const onRequestGet = async ({ env, request }: { env: Env; request: Reques
 
   await ensureSchema(env)
   const sql = getSql(env)
+  const url = new URL(request.url)
+  const page = Math.max(1, Math.trunc(Number(url.searchParams.get('page') ?? 1)) || 1)
+  const pageSize = Math.min(100, Math.max(10, Math.trunc(Number(url.searchParams.get('pageSize') ?? 50)) || 50))
+  const offset = (page - 1) * pageSize
   const errors = await sql`
     select id, source, message, stack, detail, created_at
     from error_logs
     order by created_at desc
-    limit 120
+    limit ${pageSize} offset ${offset}
   `
+  const [countRow] = await sql`select count(*)::int as total from error_logs`
 
   return Response.json({
     ok: true,
+    page,
+    pageSize,
+    total: Number(countRow?.total ?? 0),
     errors: errors.map((error) => ({
       id: error.id,
       source: error.source,

@@ -2879,8 +2879,13 @@ function AdminPanel({
   const [memberTotal, setMemberTotal] = useState(0)
   const [vipRequests, setVipRequests] = useState<VipRequest[]>([])
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([])
+  const [activityPage, setActivityPage] = useState(1)
+  const [activityTotal, setActivityTotal] = useState(0)
   const [errorLogs, setErrorLogs] = useState<ErrorLog[]>([])
+  const [errorPage, setErrorPage] = useState(1)
+  const [errorTotal, setErrorTotal] = useState(0)
   const [notifications, setNotifications] = useState<AdminNotification[]>([])
+  const [notificationUnread, setNotificationUnread] = useState(0)
   const [analytics, setAnalytics] = useState<AdminAnalytics | null>(null)
   const [systemHealth, setSystemHealth] = useState<SystemHealth | null>(null)
   const [telegramStatus, setTelegramStatus] = useState<TelegramStatus | null>(null)
@@ -2957,7 +2962,7 @@ function AdminPanel({
   const vipMemberRate = analytics?.engagement.activeUsers
     ? (analytics.engagement.vipUsers / analytics.engagement.activeUsers) * 100
     : 0
-  const unreadNotifications = notifications.filter((notice) => !notice.readAt).length
+  const unreadNotifications = notificationUnread
   const activityActions = Array.from(new Set(auditLogs.map((log) => log.action).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'th'))
   const activityTargets = Array.from(new Set(auditLogs.map((log) => log.targetType).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'th'))
   const filteredAuditLogs = auditLogs.filter((log) => {
@@ -3001,10 +3006,10 @@ function AdminPanel({
     { id: 'members', label: 'สมาชิกและ VIP', icon: Users, detail: `${pendingVipRequests.length} รอตรวจ`, ownerOnly: true },
     { id: 'taxonomy', label: 'หมวดหมู่และแท็ก', icon: Tag, detail: `${topics.length} หมวด / ${tagStats.length} แท็ก` },
     { id: 'links', label: 'ลิงก์ภายนอก', icon: Link2, detail: `${linkedMedia.length} ลิงก์` },
-    { id: 'activity', label: 'Activity Log', icon: FileText, detail: `${auditLogs.length} รายการ`, ownerOnly: true },
+    { id: 'activity', label: 'Activity Log', icon: FileText, detail: `${activityTotal} รายการ`, ownerOnly: true },
     { id: 'health', label: 'System Health', icon: Gauge, detail: systemHealth ? `${systemHealth.responseTimeMs} ms` : 'ตรวจระบบ' },
     { id: 'backup', label: 'Backup', icon: Database, detail: 'JSON / CSV', ownerOnly: true },
-    { id: 'errors', label: 'Error Log', icon: AlertCircle, detail: `${errorLogs.length} รายการ`, ownerOnly: true },
+    { id: 'errors', label: 'Error Log', icon: AlertCircle, detail: `${errorTotal} รายการ`, ownerOnly: true },
     { id: 'settings', label: 'ตั้งค่าเว็บ', icon: Settings, detail: 'หน้าแรกและ VIP', ownerOnly: true },
   ]
   const adminMenu = allAdminMenu.filter((item) => isSuperAdmin || !item.ownerOnly)
@@ -3071,9 +3076,10 @@ function AdminPanel({
 
   const loadNotifications = async () => {
     const response = await fetch('/api/admin/notifications', { credentials: 'include' })
-    const result = await readJson<{ notifications?: AdminNotification[]; error?: string }>(response)
+    const result = await readJson<{ notifications?: AdminNotification[]; unread?: number; error?: string }>(response)
     if (!response.ok) throw new Error(result.error ?? 'โหลด Notification Center ไม่สำเร็จ')
     setNotifications(result.notifications ?? [])
+    setNotificationUnread(result.unread ?? 0)
   }
 
   const loadAnalytics = async () => {
@@ -3081,6 +3087,24 @@ function AdminPanel({
     const result = await readJson<{ analytics?: AdminAnalytics; error?: string }>(response)
     if (!response.ok) throw new Error(result.error ?? 'โหลด Analytics ไม่สำเร็จ')
     setAnalytics(result.analytics ?? null)
+  }
+
+  const loadActivity = async (page = activityPage) => {
+    const response = await fetch(`/api/admin/activity?page=${page}&pageSize=50`, { credentials: 'include' })
+    const result = await readJson<{ logs?: AuditLog[]; total?: number; page?: number; error?: string }>(response)
+    if (!response.ok) throw new Error(result.error ?? 'โหลด Activity Log ไม่สำเร็จ')
+    setAuditLogs(result.logs ?? [])
+    setActivityTotal(result.total ?? 0)
+    setActivityPage(result.page ?? page)
+  }
+
+  const loadErrors = async (page = errorPage) => {
+    const response = await fetch(`/api/admin/errors?page=${page}&pageSize=50`, { credentials: 'include' })
+    const result = await readJson<{ errors?: ErrorLog[]; total?: number; page?: number; error?: string }>(response)
+    if (!response.ok) throw new Error(result.error ?? 'โหลด Error Log ไม่สำเร็จ')
+    setErrorLogs(result.errors ?? [])
+    setErrorTotal(result.total ?? 0)
+    setErrorPage(result.page ?? page)
   }
 
   const loadOpsData = async () => {
@@ -3096,25 +3120,19 @@ function AdminPanel({
       if (!healthResponse.ok) throw new Error(health.error ?? 'โหลด System Health ไม่สำเร็จ')
 
       if (isSuperAdmin) {
-        const [activityResponse, errorsResponse, telegramResponse] = await Promise.all([
-          fetch('/api/admin/activity', { credentials: 'include' }),
-          fetch('/api/admin/errors', { credentials: 'include' }),
+        const [, , telegramResponse] = await Promise.all([
+          loadActivity(),
+          loadErrors(),
           fetch('/api/admin/telegram', { credentials: 'include' }),
         ])
-        const [activity, errors, telegram] = await Promise.all([
-          readJson<{ logs?: AuditLog[]; error?: string }>(activityResponse),
-          readJson<{ logs?: ErrorLog[]; error?: string }>(errorsResponse),
-          readJson<{ telegram?: TelegramStatus; error?: string }>(telegramResponse),
-        ])
-        if (!activityResponse.ok) throw new Error(activity.error ?? 'โหลด Activity Log ไม่สำเร็จ')
-        if (!errorsResponse.ok) throw new Error(errors.error ?? 'โหลด Error Log ไม่สำเร็จ')
+        const telegram = await readJson<{ telegram?: TelegramStatus; error?: string }>(telegramResponse)
         if (!telegramResponse.ok) throw new Error(telegram.error ?? 'โหลดสถานะ Telegram ไม่สำเร็จ')
-        setAuditLogs(activity.logs ?? [])
-        setErrorLogs(errors.logs ?? [])
         setTelegramStatus(telegram.telegram ?? null)
       } else {
         setAuditLogs([])
+        setActivityTotal(0)
         setErrorLogs([])
+        setErrorTotal(0)
         setTelegramStatus(null)
       }
       setSystemHealth(health.health ?? null)
@@ -3185,11 +3203,11 @@ function AdminPanel({
     }
   }
 
-  const downloadBackup = async (format: 'json' | 'csv', table = 'media') => {
+  const downloadBackup = async (format: 'json' | 'csv', table = 'media', scope: 'full' | 'core' = 'full') => {
     setLoadingOps(true)
     setOpsError('')
     try {
-      const query = format === 'json' ? '?format=json' : `?format=csv&table=${encodeURIComponent(table)}`
+      const query = format === 'json' ? `?format=json&scope=${scope}` : `?format=csv&table=${encodeURIComponent(table)}`
       const response = await fetch(`/api/admin/backup${query}`, { credentials: 'include' })
       if (!response.ok) {
         const result = await readJson<{ error?: string }>(response)
@@ -3199,7 +3217,7 @@ function AdminPanel({
       const url = URL.createObjectURL(blob)
       const link = document.createElement('a')
       link.href = url
-      link.download = `mikpurinut-backup-${format === 'json' ? 'full.json' : `${table}.csv`}`
+      link.download = `mikpurinut-backup-${format === 'json' ? `${scope}.json` : `${table}.csv`}`
       document.body.appendChild(link)
       link.click()
       link.remove()
@@ -4723,7 +4741,7 @@ function AdminPanel({
                 <button className="min-h-11 rounded-2xl bg-white/10 px-4 font-black text-white" onClick={() => downloadCsv('activity-log.csv', filteredAuditLogs)} type="button">
                   Export CSV
                 </button>
-                <button className="min-h-11 rounded-2xl bg-sky-300 px-4 font-black text-slate-950" onClick={loadOpsData} type="button">
+                <button className="min-h-11 rounded-2xl bg-sky-300 px-4 font-black text-slate-950" onClick={() => void loadActivity()} type="button">
                   รีเฟรช
                 </button>
               </div>
@@ -4786,6 +4804,28 @@ function AdminPanel({
                 </article>
               ))}
             </div>
+            <div className="mt-4 flex items-center justify-between gap-3 border-t border-white/10 pt-4">
+              <button
+                className="min-h-10 rounded-xl bg-white/10 px-4 text-sm font-black text-white disabled:opacity-35"
+                disabled={loadingOps || activityPage <= 1}
+                onClick={() => void loadActivity(activityPage - 1)}
+                type="button"
+              >
+                ก่อนหน้า
+              </button>
+              <span className="text-xs font-bold text-slate-400">
+                หน้า {activityPage.toLocaleString('th-TH')} / {Math.max(1, Math.ceil(activityTotal / 50)).toLocaleString('th-TH')}
+                {' · '}{activityTotal.toLocaleString('th-TH')} รายการ
+              </span>
+              <button
+                className="min-h-10 rounded-xl bg-white/10 px-4 text-sm font-black text-white disabled:opacity-35"
+                disabled={loadingOps || activityPage * 50 >= activityTotal}
+                onClick={() => void loadActivity(activityPage + 1)}
+                type="button"
+              >
+                ถัดไป
+              </button>
+            </div>
           </section>
           )}
 
@@ -4808,7 +4848,7 @@ function AdminPanel({
                 <button className="min-h-11 rounded-2xl bg-red-400/15 px-4 font-black text-red-100" onClick={clearOldErrors} type="button">
                   ลบเก่ากว่า 30 วัน
                 </button>
-                <button className="min-h-11 rounded-2xl bg-red-300 px-4 font-black text-slate-950" onClick={loadOpsData} type="button">
+                <button className="min-h-11 rounded-2xl bg-red-300 px-4 font-black text-slate-950" onClick={() => void loadErrors()} type="button">
                   รีเฟรช
                 </button>
               </div>
@@ -4860,6 +4900,28 @@ function AdminPanel({
                 </article>
               ))}
             </div>
+            <div className="mt-4 flex items-center justify-between gap-3 border-t border-white/10 pt-4">
+              <button
+                className="min-h-10 rounded-xl bg-white/10 px-4 text-sm font-black text-white disabled:opacity-35"
+                disabled={loadingOps || errorPage <= 1}
+                onClick={() => void loadErrors(errorPage - 1)}
+                type="button"
+              >
+                ก่อนหน้า
+              </button>
+              <span className="text-xs font-bold text-slate-400">
+                หน้า {errorPage.toLocaleString('th-TH')} / {Math.max(1, Math.ceil(errorTotal / 50)).toLocaleString('th-TH')}
+                {' · '}{errorTotal.toLocaleString('th-TH')} รายการ
+              </span>
+              <button
+                className="min-h-10 rounded-xl bg-white/10 px-4 text-sm font-black text-white disabled:opacity-35"
+                disabled={loadingOps || errorPage * 50 >= errorTotal}
+                onClick={() => void loadErrors(errorPage + 1)}
+                type="button"
+              >
+                ถัดไป
+              </button>
+            </div>
           </section>
           )}
 
@@ -4881,13 +4943,22 @@ function AdminPanel({
             )}
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
               <button
-                className="inline-flex min-h-16 items-center justify-center gap-2 rounded-2xl bg-violet-300 px-5 font-black text-slate-950 disabled:opacity-60"
+                className="inline-flex min-h-16 items-center justify-center gap-2 rounded-2xl bg-emerald-300 px-5 font-black text-slate-950 disabled:opacity-60"
                 disabled={loadingOps}
-                onClick={() => downloadBackup('json')}
+                onClick={() => downloadBackup('json', 'media', 'core')}
                 type="button"
               >
                 <Archive size={20} />
-                ดาวน์โหลด JSON ทั้งระบบ
+                JSON ข้อมูลหลัก
+              </button>
+              <button
+                className="inline-flex min-h-16 items-center justify-center gap-2 rounded-2xl bg-violet-300 px-5 font-black text-slate-950 disabled:opacity-60"
+                disabled={loadingOps}
+                onClick={() => downloadBackup('json', 'media', 'full')}
+                type="button"
+              >
+                <Archive size={20} />
+                JSON ทั้งระบบ
               </button>
               {['media', 'media_links', 'media_events', 'media_reviews', 'user_favorites', 'tags', 'media_tags', 'categories', 'users', 'vip_requests', 'notifications', 'app_settings'].map((table) => (
                 <button
@@ -4903,7 +4974,7 @@ function AdminPanel({
               ))}
             </div>
             <div className="mt-4 rounded-2xl border border-amber-300/20 bg-amber-300/10 p-4 text-sm font-bold text-amber-100">
-              Export เหมาะสำหรับสำรองข้อมูลก่อนแก้ชุดใหญ่ หรือย้ายระบบไปเครื่อง/บัญชีใหม่
+              แนะนำ JSON ข้อมูลหลักสำหรับสำรองประจำวัน ส่วน JSON ทั้งระบบจะรวมประวัติและแจ้งเตือนซึ่งมีขนาดใหญ่กว่า
             </div>
 
             <div className="mt-5 rounded-2xl border border-emerald-300/20 bg-black/20 p-4">

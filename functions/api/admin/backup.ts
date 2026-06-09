@@ -51,6 +51,7 @@ export const onRequestGet = async ({ env, request }: { env: Env; request: Reques
   const url = new URL(request.url)
   const format = url.searchParams.get('format') ?? 'json'
   const table = (url.searchParams.get('table') ?? 'media') as BackupTable
+  const scope = url.searchParams.get('scope') === 'core' ? 'core' : 'full'
 
   if (format === 'csv') {
     if (!allowedTables.includes(table)) {
@@ -66,25 +67,30 @@ export const onRequestGet = async ({ env, request }: { env: Env; request: Reques
     })
   }
 
-  const [media, mediaLinks, mediaEvents, mediaReviews, userFavorites, tags, mediaTags, categories, users, vipRequests, notifications, settings] = await Promise.all([
+  const [media, mediaLinks, tags, mediaTags, categories, users, vipRequests, settings] = await Promise.all([
     readTable(sql, 'media'),
     readTable(sql, 'media_links'),
-    readTable(sql, 'media_events'),
-    readTable(sql, 'media_reviews'),
-    readTable(sql, 'user_favorites'),
     readTable(sql, 'tags'),
     readTable(sql, 'media_tags'),
     readTable(sql, 'categories'),
     readTable(sql, 'users'),
     readTable(sql, 'vip_requests'),
-    readTable(sql, 'notifications'),
     readTable(sql, 'app_settings'),
   ])
-  await writeAuditLog(env, currentUser, 'backup_export', 'system', null, { format: 'json' })
+  const [mediaEvents, mediaReviews, userFavorites, notifications] = scope === 'full'
+    ? await Promise.all([
+        readTable(sql, 'media_events'),
+        readTable(sql, 'media_reviews'),
+        readTable(sql, 'user_favorites'),
+        readTable(sql, 'notifications'),
+      ])
+    : [[], [], [], []]
+  await writeAuditLog(env, currentUser, 'backup_export', 'system', null, { format: 'json', scope })
 
   return Response.json({
     ok: true,
     exportedAt: new Date().toISOString(),
+    scope,
     data: {
       media,
       mediaLinks,

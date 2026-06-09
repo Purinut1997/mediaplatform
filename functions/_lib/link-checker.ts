@@ -103,27 +103,37 @@ export async function runLinkChecks(
       media_links.url
     from media_links
     join media on media.id = media_links.media_id
+    left join lateral (
+      select max(checked_at) as last_checked_at
+      from link_checks
+      where link_checks.media_link_id = media_links.id
+    ) last_check on true
     where media_links.url <> ''
-    order by media.updated_at desc, media_links.sort_order asc, media_links.id asc
+    order by last_check.last_checked_at asc nulls first, media_links.id asc
     limit ${limit}
   `) as LinkRow[]
 
   const results: LinkCheckResult[] = []
-  for (const row of rows) {
-    const result = await checkUrl(row.url)
-    await sql`
-      insert into link_checks (media_id, media_link_id, url, status, status_code, message)
-      values (${row.media_id}, ${row.media_link_id}, ${row.url}, ${result.status}, ${result.statusCode}, ${result.message})
-    `
-    results.push({
-      mediaId: row.media_id,
-      mediaTitle: row.media_title,
-      linkId: row.media_link_id,
-      label: row.label,
-      type: row.type,
-      url: safeHttpUrl(row.url),
-      ...result,
-    })
+  const batchSize = 10
+  for (let index = 0; index < rows.length; index += batchSize) {
+    const batch = rows.slice(index, index + batchSize)
+    const batchResults = await Promise.all(batch.map(async (row) => {
+      const result = await checkUrl(row.url)
+      await sql`
+        insert into link_checks (media_id, media_link_id, url, status, status_code, message)
+        values (${row.media_id}, ${row.media_link_id}, ${row.url}, ${result.status}, ${result.statusCode}, ${result.message})
+      `
+      return {
+        mediaId: row.media_id,
+        mediaTitle: row.media_title,
+        linkId: row.media_link_id,
+        label: row.label,
+        type: row.type,
+        url: safeHttpUrl(row.url),
+        ...result,
+      }
+    }))
+    results.push(...batchResults)
   }
 
   const errorCount = results.filter((result) => result.status === 'error').length
