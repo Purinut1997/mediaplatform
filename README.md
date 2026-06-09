@@ -129,3 +129,15 @@ managed without editing code. Writes require `x-admin-token` to match
 `ADMIN_WRITE_TOKEN` or a valid logged-in `superadmin` session.
 
 Reference SQL is kept in `database/schema.sql`.
+
+## Database Migrations
+
+Heavy database changes must not run inside a Cloudflare Pages Function request.
+Run SQL files in `database/migrations` manually from the Neon SQL Editor during
+deployment. Each migration is idempotent and can be reviewed before execution.
+
+For faster media filters and partial-text search, run:
+
+```text
+database/migrations/2026-06-09-media-filter-indexes.sql
+```

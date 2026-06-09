@@ -266,6 +266,7 @@
    - ตัวกรองขั้นสูงในหลังบ้านค้นจาก Neon ทั้งระบบแล้ว รองรับคำค้น หมวดหมู่ แท็ก สถานะ สิทธิ์ วันที่ และการเรียงลำดับ
 2. แยก Database Migration ออกจาก `ensureSchema`
    - เพิ่ม Schema Version Guard แล้ว ทำให้ Worker ใหม่ไม่รัน schema, cleanup และ seed ซ้ำเมื่อเวอร์ชันตรงกัน
+   - มีไฟล์ migration ดัชนีตัวกรองสื่อที่ `database/migrations/2026-06-09-media-filter-indexes.sql` สำหรับรันจาก Neon SQL Editor โดยไม่ทำให้ Cloudflare request ช้า
    - ระยะยาวยังควรแยก migration เป็นคำสั่ง deploy โดยเฉพาะ
 3. ทำ Backup/Restore สำหรับข้อมูลขนาดใหญ่แบบ Background Job หรือใช้ Neon Restore
    - JSON Backup ปัจจุบันยังโหลดทุกตารางใน request เดียว
