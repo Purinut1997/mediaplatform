@@ -904,9 +904,6 @@ function App() {
             <AdminPanel
               currentUser={currentUser}
               mediaItems={mediaRecords}
-              mediaTotal={mediaTotal}
-              loadingMoreMedia={loadingMoreMedia}
-              onLoadMoreMedia={() => void loadMoreMedia()}
               onCreated={() => {
                 setRefreshToken((value) => value + 1)
                 notifySuccess('เพิ่มสื่อใหม่ลง Neon แล้ว')
@@ -2917,21 +2914,15 @@ function MembershipCard({
 
 function AdminPanel({
   currentUser,
-  loadingMoreMedia,
   mediaItems,
-  mediaTotal,
   onCreated,
-  onLoadMoreMedia,
   onSettingsSaved,
   settings,
   topics,
 }: {
   currentUser: CurrentUser
-  loadingMoreMedia: boolean
   mediaItems: MediaItem[]
-  mediaTotal: number
   onCreated: () => void
-  onLoadMoreMedia: () => void
   onSettingsSaved: (settings: SiteSettings) => void
   settings: SiteSettings
   topics: string[]
@@ -2948,6 +2939,10 @@ function AdminPanel({
   const [adminMediaTagQuery, setAdminMediaTagQuery] = useState('')
   const [adminMediaDate, setAdminMediaDate] = useState<AdminDateFilter>('ทั้งหมด')
   const [adminMediaSort, setAdminMediaSort] = useState<AdminMediaSort>('ล่าสุด')
+  const [adminMediaResults, setAdminMediaResults] = useState<MediaItem[]>(mediaItems)
+  const [adminMediaPage, setAdminMediaPage] = useState(1)
+  const [adminMediaTotal, setAdminMediaTotal] = useState(mediaItems.length)
+  const [loadingAdminMedia, setLoadingAdminMedia] = useState(false)
   const [filterNow] = useState(() => Date.now())
   const [newTopicName, setNewTopicName] = useState('')
   const [editingTopic, setEditingTopic] = useState<{ original: string; name: string } | null>(null)
@@ -3005,7 +3000,7 @@ function AdminPanel({
       return map
     }, new Map<string, number>()),
   ).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'th'))
-  const adminFilteredMedia = [...mediaItems].filter((item) => {
+  const adminFilteredMedia = [...adminMediaResults].filter((item) => {
     const linkText = item.links?.map((link) => `${link.label} ${link.type} ${link.url}`).join(' ') ?? ''
     const tagText = item.tags?.join(' ') ?? ''
     const text = `${item.title} ${item.topic} ${item.description} ${linkText} ${tagText}`.toLowerCase()
@@ -3158,6 +3153,37 @@ function AdminPanel({
           timeStyle: 'short',
         }).format(new Date(value))
       : '-'
+
+  const loadAdminMediaPage = async (page: number, append = false) => {
+    setLoadingAdminMedia(true)
+    setError('')
+    try {
+      const params = new URLSearchParams({ page: String(page), pageSize: '50' })
+      params.set('status', adminMediaStatus === 'ทั้งหมด' ? 'all' : adminMediaStatus)
+      if (adminMediaQuery.trim()) params.set('query', adminMediaQuery.trim())
+      if (adminMediaTagQuery.trim()) params.set('tag', adminMediaTagQuery.trim())
+      if (adminMediaTopic !== 'ทั้งหมด') params.set('topic', adminMediaTopic)
+      if (adminMediaAccess !== 'ทั้งหมด') params.set('access', adminMediaAccess)
+      if (adminMediaDate !== 'ทั้งหมด') params.set('days', adminMediaDate === 'วันนี้' ? '1' : adminMediaDate === '7 วัน' ? '7' : '30')
+      if (adminMediaSort !== 'ล่าสุด') {
+        params.set('sort', adminMediaSort === 'ดาวน์โหลดมากสุด' ? 'downloads' : adminMediaSort === 'เข้าชมมากสุด' ? 'views' : 'title')
+      }
+      const response = await fetch(`/api/media?${params}`, { credentials: 'include' })
+      const result = await readJson<{ media?: MediaItem[]; page?: number; total?: number; error?: string }>(response)
+      if (!response.ok) throw new Error(result.error ?? 'โหลดรายการสื่อไม่สำเร็จ')
+      setAdminMediaResults((items) => {
+        if (!append) return result.media ?? []
+        const known = new Set(items.map((item) => item.id))
+        return [...items, ...(result.media ?? []).filter((item) => !known.has(item.id))]
+      })
+      setAdminMediaPage(result.page ?? page)
+      setAdminMediaTotal(result.total ?? 0)
+    } catch (mediaLoadError) {
+      setError(mediaLoadError instanceof Error ? mediaLoadError.message : 'โหลดรายการสื่อไม่สำเร็จ')
+    } finally {
+      setLoadingAdminMedia(false)
+    }
+  }
 
   const loadNotifications = async () => {
     const response = await fetch('/api/admin/notifications', { credentials: 'include' })
@@ -3414,6 +3440,22 @@ function AdminPanel({
     // Initial admin data load only; later refreshes are triggered by explicit actions.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => void loadAdminMediaPage(1), 250)
+    return () => window.clearTimeout(timer)
+    // Reload media from Neon whenever an advanced filter or the parent media set changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    adminMediaAccess,
+    adminMediaDate,
+    adminMediaQuery,
+    adminMediaSort,
+    adminMediaStatus,
+    adminMediaTagQuery,
+    adminMediaTopic,
+    mediaItems.length,
+  ])
 
   const submitMemberAction = async (payload: Record<string, unknown>) => {
     setLoadingMembers(true)
@@ -5439,7 +5481,7 @@ function AdminPanel({
                 </p>
               </div>
               <span className="rounded-xl bg-cyan-300/10 px-3 py-1 text-sm font-bold text-cyan-200">
-                {adminFilteredMedia.length.toLocaleString('th-TH')} รายการ
+                {loadingAdminMedia ? 'กำลังค้นหา...' : `${adminMediaTotal.toLocaleString('th-TH')} รายการ`}
               </span>
             </div>
 
@@ -5603,18 +5645,18 @@ function AdminPanel({
                 </article>
               ))}
             </div>
-            {mediaItems.length < mediaTotal && (
+            {adminMediaResults.length < adminMediaTotal && (
               <div className="mt-5 flex flex-col items-center gap-2 border-t border-white/10 pt-5">
                 <p className="text-xs font-bold text-slate-400">
-                  โหลดแล้ว {mediaItems.length.toLocaleString('th-TH')} จาก {mediaTotal.toLocaleString('th-TH')} รายการ
+                  โหลดแล้ว {adminMediaResults.length.toLocaleString('th-TH')} จาก {adminMediaTotal.toLocaleString('th-TH')} รายการ
                 </p>
                 <button
                   className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-cyan-300 px-5 font-black text-slate-950 disabled:opacity-50"
-                  disabled={loadingMoreMedia}
-                  onClick={onLoadMoreMedia}
+                  disabled={loadingAdminMedia}
+                  onClick={() => void loadAdminMediaPage(adminMediaPage + 1, true)}
                   type="button"
                 >
-                  {loadingMoreMedia ? <Loader2 className="animate-spin" size={18} /> : <Download size={18} />}
+                  {loadingAdminMedia ? <Loader2 className="animate-spin" size={18} /> : <Download size={18} />}
                   โหลดสื่อเพิ่มเติม
                 </button>
               </div>

@@ -7,6 +7,7 @@ import {
   mediaPrice,
   mediaStatus,
   mediaText,
+  MEDIA_ACCESS_LEVELS,
   MEDIA_STATUSES,
   MediaValidationError,
 } from '../../_lib/media-validation'
@@ -149,12 +150,24 @@ export const onRequestGet = async ({ env, request }: { env: Env; request: Reques
   const topic = url.searchParams.get('topic')
   const query = url.searchParams.get('query')?.trim().slice(0, 120) ?? ''
   const pattern = `%${query}%`
+  const adminUser = await requireAdminPermission(env, request, 'media:read')
+  const canReadAll = Boolean(adminUser)
+  const currentUser = adminUser ?? await getCurrentUser(env, request)
+  const requestedAccess = url.searchParams.get('access')?.trim() ?? ''
+  const access = canReadAll && MEDIA_ACCESS_LEVELS.includes(requestedAccess as (typeof MEDIA_ACCESS_LEVELS)[number])
+    ? requestedAccess
+    : ''
+  const tag = canReadAll ? url.searchParams.get('tag')?.trim().slice(0, 60) ?? '' : ''
+  const tagPattern = `%${tag}%`
+  const requestedDays = Number(url.searchParams.get('days') ?? 0)
+  const days = canReadAll && Number.isFinite(requestedDays) && requestedDays > 0 ? Math.min(Math.trunc(requestedDays), 365) : 0
+  const sort = canReadAll && ['downloads', 'views', 'title'].includes(url.searchParams.get('sort') ?? '')
+    ? url.searchParams.get('sort')
+    : 'latest'
   const requestedStatus = url.searchParams.get('status')
   const page = Math.max(1, Math.trunc(Number(url.searchParams.get('page') ?? 1)) || 1)
   const pageSize = Math.min(100, Math.max(10, Math.trunc(Number(url.searchParams.get('pageSize') ?? 40)) || 40))
   const offset = (page - 1) * pageSize
-  const canReadAll = await requireAdminPermission(env, request, 'media:read')
-  const currentUser = await getCurrentUser(env, request)
   const status =
     canReadAll && requestedStatus === 'all'
       ? 'all'
@@ -195,8 +208,20 @@ export const onRequestGet = async ({ env, request }: { env: Env; request: Reques
           ) tagset on true
           where (${isAllStatus} or media.status = any(${statusList}))
             and media.topic = ${topic}
-            and (${query} = '' or media.title ilike ${pattern} or media.description ilike ${pattern})
-          order by updated_at desc, id desc
+            and (${access} = '' or media.access_level = ${access})
+            and (${days} = 0 or media.created_at >= now() - make_interval(days => ${days}))
+            and (${query} = '' or media.title ilike ${pattern} or media.topic ilike ${pattern} or media.description ilike ${pattern}
+              or exists (select 1 from media_links where media_links.media_id = media.id and (label ilike ${pattern} or type ilike ${pattern} or url ilike ${pattern}))
+              or exists (select 1 from media_tags join tags on tags.id = media_tags.tag_id where media_tags.media_id = media.id and tags.name ilike ${pattern}))
+            and (${tag} = '' or exists (
+              select 1 from media_tags join tags on tags.id = media_tags.tag_id
+              where media_tags.media_id = media.id and tags.name ilike ${tagPattern}
+            ))
+          order by
+            case when ${sort} = 'downloads' then media.downloads end desc,
+            case when ${sort} = 'views' then media.views end desc,
+            case when ${sort} = 'title' then media.title end asc,
+            media.updated_at desc, media.id desc
           limit ${pageSize} offset ${offset}
         `
       : await sql`
@@ -227,20 +252,48 @@ export const onRequestGet = async ({ env, request }: { env: Env; request: Reques
             where media_tags.media_id = media.id
           ) tagset on true
           where (${isAllStatus} or media.status = any(${statusList}))
-            and (${query} = '' or media.title ilike ${pattern} or media.description ilike ${pattern})
-          order by updated_at desc, id desc
+            and (${access} = '' or media.access_level = ${access})
+            and (${days} = 0 or media.created_at >= now() - make_interval(days => ${days}))
+            and (${query} = '' or media.title ilike ${pattern} or media.topic ilike ${pattern} or media.description ilike ${pattern}
+              or exists (select 1 from media_links where media_links.media_id = media.id and (label ilike ${pattern} or type ilike ${pattern} or url ilike ${pattern}))
+              or exists (select 1 from media_tags join tags on tags.id = media_tags.tag_id where media_tags.media_id = media.id and tags.name ilike ${pattern}))
+            and (${tag} = '' or exists (
+              select 1 from media_tags join tags on tags.id = media_tags.tag_id
+              where media_tags.media_id = media.id and tags.name ilike ${tagPattern}
+            ))
+          order by
+            case when ${sort} = 'downloads' then media.downloads end desc,
+            case when ${sort} = 'views' then media.views end desc,
+            case when ${sort} = 'title' then media.title end asc,
+            media.updated_at desc, media.id desc
           limit ${pageSize} offset ${offset}
         `
   const [countRow] = topic && topic !== 'ทั้งหมด'
     ? await sql`
         select count(*)::int as total from media
         where (${isAllStatus} or status = any(${statusList})) and topic = ${topic}
-          and (${query} = '' or title ilike ${pattern} or description ilike ${pattern})
+          and (${access} = '' or access_level = ${access})
+          and (${days} = 0 or created_at >= now() - make_interval(days => ${days}))
+          and (${query} = '' or title ilike ${pattern} or topic ilike ${pattern} or description ilike ${pattern}
+            or exists (select 1 from media_links where media_links.media_id = media.id and (label ilike ${pattern} or type ilike ${pattern} or url ilike ${pattern}))
+            or exists (select 1 from media_tags join tags on tags.id = media_tags.tag_id where media_tags.media_id = media.id and tags.name ilike ${pattern}))
+          and (${tag} = '' or exists (
+            select 1 from media_tags join tags on tags.id = media_tags.tag_id
+            where media_tags.media_id = media.id and tags.name ilike ${tagPattern}
+          ))
       `
     : await sql`
         select count(*)::int as total from media
         where (${isAllStatus} or status = any(${statusList}))
-          and (${query} = '' or title ilike ${pattern} or description ilike ${pattern})
+          and (${access} = '' or access_level = ${access})
+          and (${days} = 0 or created_at >= now() - make_interval(days => ${days}))
+          and (${query} = '' or title ilike ${pattern} or topic ilike ${pattern} or description ilike ${pattern}
+            or exists (select 1 from media_links where media_links.media_id = media.id and (label ilike ${pattern} or type ilike ${pattern} or url ilike ${pattern}))
+            or exists (select 1 from media_tags join tags on tags.id = media_tags.tag_id where media_tags.media_id = media.id and tags.name ilike ${pattern}))
+          and (${tag} = '' or exists (
+            select 1 from media_tags join tags on tags.id = media_tags.tag_id
+            where media_tags.media_id = media.id and tags.name ilike ${tagPattern}
+          ))
       `
 
   return Response.json({
