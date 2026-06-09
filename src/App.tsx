@@ -2,7 +2,9 @@ import { type FormEvent, type ReactNode, useEffect, useMemo, useRef, useState } 
 import {
   AlertCircle,
   Archive,
+  ArrowDown,
   ArrowLeft,
+  ArrowUp,
   BarChart3,
   BookmarkCheck,
   BookOpen,
@@ -2863,6 +2865,7 @@ function AdminPanel({
   const [adminMediaSort, setAdminMediaSort] = useState<AdminMediaSort>('ล่าสุด')
   const [filterNow] = useState(() => Date.now())
   const [newTopicName, setNewTopicName] = useState('')
+  const [editingTopic, setEditingTopic] = useState<{ original: string; name: string } | null>(null)
   const [settingsForm, setSettingsForm] = useState({
     ...settings,
     vipPrice: String(settings.vipPrice),
@@ -3348,7 +3351,7 @@ function AdminPanel({
   }
 
   const deleteCategory = async (name: string) => {
-    if (!window.confirm(`ลบหมวดหมู่ "${name}" ใช่ไหม? สื่อเดิมจะยังอยู่แต่จะไม่เห็นหมวดนี้ในตัวเลือกใหม่`)) return
+    if (!window.confirm(`ลบหมวดหมู่ "${name}" ใช่ไหม? ระบบจะไม่อนุญาตหากยังมีสื่ออยู่ในหมวดนี้`)) return
     setCategoryError('')
     try {
       const response = await fetch(`/api/categories?name=${encodeURIComponent(name)}`, {
@@ -3362,6 +3365,28 @@ function AdminPanel({
     } catch (categoryDeleteError) {
       setCategoryError(
         categoryDeleteError instanceof Error ? categoryDeleteError.message : 'ลบหมวดหมู่ไม่สำเร็จ',
+      )
+    }
+  }
+
+  const updateCategory = async (
+    payload: { action: 'rename'; name: string; newName: string } | { action: 'move'; name: string; direction: 'up' | 'down' },
+  ) => {
+    setCategoryError('')
+    try {
+      const response = await fetch('/api/categories', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(payload),
+      })
+      const result = await readJson<{ error?: string }>(response)
+      if (!response.ok) throw new Error(result.error ?? 'แก้ไขหมวดหมู่ไม่สำเร็จ')
+      setEditingTopic(null)
+      onCreated()
+    } catch (categoryUpdateError) {
+      setCategoryError(
+        categoryUpdateError instanceof Error ? categoryUpdateError.message : 'แก้ไขหมวดหมู่ไม่สำเร็จ',
       )
     }
   }
@@ -4309,22 +4334,77 @@ function AdminPanel({
               </div>
             )}
             <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-              {topics.map((topicName) => {
+              {topics.map((topicName, topicIndex) => {
                 const count = mediaItems.filter((item) => item.topic === topicName).length
                 return (
                   <article className="rounded-2xl border border-white/10 bg-black/20 p-4" key={topicName}>
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <p className="truncate font-black text-white">{topicName}</p>
+                        {editingTopic?.original === topicName ? (
+                          <input
+                            autoFocus
+                            className="min-h-10 w-full rounded-xl border border-violet-300/30 bg-black/30 px-3 font-bold text-white outline-none focus:border-violet-300"
+                            maxLength={80}
+                            onChange={(event) => setEditingTopic({ ...editingTopic, name: event.target.value })}
+                            value={editingTopic.name}
+                          />
+                        ) : (
+                          <p className="truncate font-black text-white">{topicName}</p>
+                        )}
                         <p className="mt-1 text-sm font-semibold text-slate-400">{count} สื่อในหมวดนี้</p>
                       </div>
-                      {count === 0 && (
+                      <div className="flex shrink-0 gap-1">
                         <button
-                          className="rounded-xl bg-red-400/10 px-3 py-2 text-xs font-black text-red-200"
+                          aria-label={`เลื่อน ${topicName} ขึ้น`}
+                          className="grid size-10 place-items-center rounded-xl bg-white/5 text-slate-300 disabled:opacity-30"
+                          disabled={topicIndex === 0}
+                          onClick={() => updateCategory({ action: 'move', name: topicName, direction: 'up' })}
+                          type="button"
+                        >
+                          <ArrowUp size={16} />
+                        </button>
+                        <button
+                          aria-label={`เลื่อน ${topicName} ลง`}
+                          className="grid size-10 place-items-center rounded-xl bg-white/5 text-slate-300 disabled:opacity-30"
+                          disabled={topicIndex === topics.length - 1}
+                          onClick={() => updateCategory({ action: 'move', name: topicName, direction: 'down' })}
+                          type="button"
+                        >
+                          <ArrowDown size={16} />
+                        </button>
+                      </div>
+                    </div>
+                    <div className="mt-4 flex flex-wrap gap-2 border-t border-white/10 pt-3">
+                      {editingTopic?.original === topicName ? (
+                        <>
+                          <button
+                            className="min-h-10 rounded-xl bg-violet-300 px-4 text-sm font-black text-slate-950"
+                            onClick={() => updateCategory({ action: 'rename', name: topicName, newName: editingTopic.name })}
+                            type="button"
+                          >
+                            บันทึกชื่อ
+                          </button>
+                          <button className="min-h-10 rounded-xl bg-white/5 px-4 text-sm font-black text-slate-300" onClick={() => setEditingTopic(null)} type="button">
+                            ยกเลิก
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-violet-300/10 px-4 text-sm font-black text-violet-200"
+                          onClick={() => setEditingTopic({ original: topicName, name: topicName })}
+                          type="button"
+                        >
+                          <Pencil size={15} />
+                          เปลี่ยนชื่อ
+                        </button>
+                      )}
+                      {count === 0 && editingTopic?.original !== topicName && (
+                        <button
+                          className="min-h-10 rounded-xl bg-red-400/10 px-4 text-sm font-black text-red-200"
                           onClick={() => deleteCategory(topicName)}
                           type="button"
                         >
-                          ลบ
+                          ลบหมวด
                         </button>
                       )}
                     </div>

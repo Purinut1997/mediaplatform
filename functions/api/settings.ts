@@ -2,6 +2,7 @@ import { getCurrentUser } from '../_lib/auth'
 import { writeAuditLog, writeErrorLog } from '../_lib/admin'
 import { ensureSchema, getSql, type Env } from '../_lib/db'
 import { writeNotification } from '../_lib/notifications'
+import { boundedInteger, boundedText, InputValidationError } from '../_lib/input'
 import { optionalHttpUrl, safeHttpUrl, UrlValidationError } from '../_lib/url'
 
 type SiteSettings = {
@@ -55,15 +56,42 @@ const defaultSettings: SiteSettings = {
 }
 
 function normalizeSettings(value?: Partial<SiteSettings>) {
+  const legacyPrice = Number(value?.vipPrice ?? defaultSettings.vipPrice)
   return {
     ...defaultSettings,
     ...(value ?? {}),
     vipRegistrationEnabled: Boolean(value?.vipRegistrationEnabled),
     maintenanceEnabled: Boolean(value?.maintenanceEnabled),
-    vipPrice: Number(value?.vipPrice ?? defaultSettings.vipPrice),
+    vipPrice: Number.isInteger(legacyPrice) && legacyPrice >= 0 && legacyPrice <= 10_000_000 ? legacyPrice : 0,
     heroImageUrl: safeHttpUrl(value?.heroImageUrl, defaultSettings.heroImageUrl),
     vipQrUrl: safeHttpUrl(value?.vipQrUrl),
   }
+}
+
+function readSettings(body: Partial<SiteSettings>): SiteSettings {
+  return normalizeSettings({
+    heroEyebrow: boundedText(body.heroEyebrow ?? defaultSettings.heroEyebrow, 'ข้อความเหนือหัวข้อ', { max: 100 }),
+    heroTitle: boundedText(body.heroTitle ?? defaultSettings.heroTitle, 'หัวข้อหน้าแรก', { min: 1, max: 180 }),
+    heroDescription: boundedText(body.heroDescription ?? defaultSettings.heroDescription, 'คำอธิบายหน้าแรก', { max: 800 }),
+    heroImageUrl: optionalHttpUrl(body.heroImageUrl, 'ลิงก์ภาพหน้าแรก') || defaultSettings.heroImageUrl,
+    heroPrimaryLabel: boundedText(body.heroPrimaryLabel ?? defaultSettings.heroPrimaryLabel, 'ข้อความปุ่มหลัก', { min: 1, max: 60 }),
+    heroSecondaryLabel: boundedText(body.heroSecondaryLabel ?? defaultSettings.heroSecondaryLabel, 'ข้อความปุ่มรอง', { min: 1, max: 60 }),
+    announcementText: boundedText(body.announcementText, 'ข้อความประกาศ', { max: 500 }),
+    maintenanceEnabled: Boolean(body.maintenanceEnabled),
+    maintenanceTitle: boundedText(body.maintenanceTitle ?? defaultSettings.maintenanceTitle, 'หัวข้อปิดปรับปรุง', { min: 1, max: 120 }),
+    maintenanceMessage: boundedText(body.maintenanceMessage ?? defaultSettings.maintenanceMessage, 'ข้อความปิดปรับปรุง', { max: 500 }),
+    vipRegistrationEnabled: Boolean(body.vipRegistrationEnabled),
+    vipPrice: boundedInteger(body.vipPrice ?? defaultSettings.vipPrice, 'ราคา VIP', { max: 10_000_000 }),
+    vipQrUrl: optionalHttpUrl(body.vipQrUrl, 'ลิงก์ QR Code'),
+    vipBankName: boundedText(body.vipBankName ?? defaultSettings.vipBankName, 'ชื่อช่องทางชำระเงิน', { max: 120 }),
+    vipAccountNumber: boundedText(body.vipAccountNumber, 'เลขบัญชี', { max: 80 }),
+    vipAccountName: boundedText(body.vipAccountName ?? defaultSettings.vipAccountName, 'ชื่อบัญชี', { max: 120 }),
+    vipPaymentTitle: boundedText(body.vipPaymentTitle ?? defaultSettings.vipPaymentTitle, 'หัวข้อชำระเงิน', { max: 120 }),
+    vipPaymentSubtitle: boundedText(body.vipPaymentSubtitle ?? defaultSettings.vipPaymentSubtitle, 'คำอธิบายชำระเงิน', { max: 300 }),
+    vipSlipLabel: boundedText(body.vipSlipLabel ?? defaultSettings.vipSlipLabel, 'ข้อความแนบสลิป', { max: 100 }),
+    vipAgreementLabel: boundedText(body.vipAgreementLabel ?? defaultSettings.vipAgreementLabel, 'ข้อความยอมรับเงื่อนไข', { max: 300 }),
+    vipSubmitLabel: boundedText(body.vipSubmitLabel ?? defaultSettings.vipSubmitLabel, 'ข้อความปุ่มสมัคร VIP', { max: 100 }),
+  })
 }
 
 export const onRequestGet = async ({ env }: { env: Env }) => {
@@ -87,29 +115,7 @@ export const onRequestPut = async ({ env, request }: { env: Env; request: Reques
 
   try {
     const body = (await request.json().catch(() => ({}))) as Partial<SiteSettings>
-    const settings: SiteSettings = normalizeSettings({
-      heroEyebrow: String(body.heroEyebrow ?? defaultSettings.heroEyebrow),
-      heroTitle: String(body.heroTitle ?? defaultSettings.heroTitle),
-      heroDescription: String(body.heroDescription ?? defaultSettings.heroDescription),
-      heroImageUrl: optionalHttpUrl(body.heroImageUrl, 'ลิงก์ภาพหน้าแรก') || defaultSettings.heroImageUrl,
-      heroPrimaryLabel: String(body.heroPrimaryLabel ?? defaultSettings.heroPrimaryLabel),
-      heroSecondaryLabel: String(body.heroSecondaryLabel ?? defaultSettings.heroSecondaryLabel),
-      announcementText: String(body.announcementText ?? ''),
-      maintenanceEnabled: Boolean(body.maintenanceEnabled),
-      maintenanceTitle: String(body.maintenanceTitle ?? defaultSettings.maintenanceTitle),
-      maintenanceMessage: String(body.maintenanceMessage ?? defaultSettings.maintenanceMessage),
-      vipRegistrationEnabled: Boolean(body.vipRegistrationEnabled),
-      vipPrice: Number(body.vipPrice ?? defaultSettings.vipPrice),
-      vipQrUrl: optionalHttpUrl(body.vipQrUrl, 'ลิงก์ QR Code'),
-      vipBankName: String(body.vipBankName ?? defaultSettings.vipBankName),
-      vipAccountNumber: String(body.vipAccountNumber ?? ''),
-      vipAccountName: String(body.vipAccountName ?? defaultSettings.vipAccountName),
-      vipPaymentTitle: String(body.vipPaymentTitle ?? defaultSettings.vipPaymentTitle),
-      vipPaymentSubtitle: String(body.vipPaymentSubtitle ?? defaultSettings.vipPaymentSubtitle),
-      vipSlipLabel: String(body.vipSlipLabel ?? defaultSettings.vipSlipLabel),
-      vipAgreementLabel: String(body.vipAgreementLabel ?? defaultSettings.vipAgreementLabel),
-      vipSubmitLabel: String(body.vipSubmitLabel ?? defaultSettings.vipSubmitLabel),
-    })
+    const settings = readSettings(body)
 
     const sql = getSql(env)
     await sql`
@@ -138,7 +144,7 @@ export const onRequestPut = async ({ env, request }: { env: Env; request: Reques
 
     return Response.json({ ok: true, settings })
   } catch (error) {
-    if (error instanceof UrlValidationError) {
+    if (error instanceof UrlValidationError || error instanceof InputValidationError) {
       return Response.json({ ok: false, error: error.message }, { status: 400 })
     }
     await writeErrorLog(env, 'settings.update', error)

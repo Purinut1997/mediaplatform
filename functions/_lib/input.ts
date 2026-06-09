@@ -23,3 +23,15 @@ export function normalizedEmail(value: unknown) {
 export function passwordInput(value: unknown, min = 8) {
   return boundedText(value, 'รหัสผ่าน', { min, max: 200, trim: false })
 }
+
+export function boundedInteger(
+  value: unknown,
+  label: string,
+  { min = 0, max }: { min?: number; max: number },
+) {
+  const number = Number(value)
+  if (!Number.isInteger(number) || number < min || number > max) {
+    throw new InputValidationError(`${label}ต้องเป็นจำนวนเต็มตั้งแต่ ${min.toLocaleString()} ถึง ${max.toLocaleString()}`)
+  }
+  return number
+}
