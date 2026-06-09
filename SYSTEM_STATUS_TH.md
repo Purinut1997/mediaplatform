@@ -255,7 +255,8 @@
    - หน้าสมาชิกหลังบ้านรองรับค้นหาและแบ่งหน้าจาก API แล้ว
    - รายการสื่อและ Logs ยังโหลดหรือจำกัดจำนวนแบบเดิม
 2. แยก Database Migration ออกจาก `ensureSchema`
-   - ปัจจุบัน Worker ใหม่ยังตรวจ schema, cleanup และ seed ตอน request แรก
+   - เพิ่ม Schema Version Guard แล้ว ทำให้ Worker ใหม่ไม่รัน schema, cleanup และ seed ซ้ำเมื่อเวอร์ชันตรงกัน
+   - ระยะยาวยังควรแยก migration เป็นคำสั่ง deploy โดยเฉพาะ
 3. ทำ Backup/Restore สำหรับข้อมูลขนาดใหญ่แบบ Background Job หรือใช้ Neon Restore
    - JSON Backup ปัจจุบันยังโหลดทุกตารางใน request เดียว
    - Restore แบบ Merge เปิดใช้งานได้
@@ -324,5 +325,6 @@
 - เมื่อ API โหลดข้อมูลล้มเหลว หน้า Production จะแสดง Empty/Error state แทนข้อมูลตัวอย่าง
 - หน้าสมาชิกหลังบ้านรองรับค้นหาชื่อ/อีเมลและแบ่งหน้า 50 บัญชีต่อหน้า
 - Restore แบบ Replace ถูกปิดทั้ง API/UI จนกว่าจะมีวิธี restore แบบ atomic หรือใช้ Neon Restore
+- เพิ่ม Schema Version Guard ลด cold-start จากการรัน DDL/seed ซ้ำใน Worker ใหม่
 - วันที่ 7 มิถุนายน 2026 ยืนยันว่า production ใช้ Functions และ static frontend รุ่นล่าสุดแล้ว มี `app-version` สำหรับตรวจ deployment และ asset production มี UI หลายลิงก์ครบ
 - ฟีเจอร์ที่เพิ่มล่าสุด: จัดการหมวดหมู่ครบ, ตรวจค่าตั้งค่าเว็บก่อนบันทึก และป้องกันการอนุมัติ VIP/แก้สมาชิกซ้ำหรือสำเร็จลวง

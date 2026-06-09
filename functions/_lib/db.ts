@@ -19,6 +19,7 @@ export type Env = {
 }
 
 let schemaReady = false
+const SCHEMA_VERSION = '2026.06.09.1'
 
 export function getSql(env: Env) {
   if (!env.DATABASE_URL) {
@@ -32,6 +33,20 @@ export async function ensureSchema(env: Env) {
   if (schemaReady) return
 
   const sql = getSql(env)
+  try {
+    const [state] = await sql`
+      select value->>'version' as version
+      from app_settings
+      where key = 'schema_version'
+      limit 1
+    `
+    if (state?.version === SCHEMA_VERSION) {
+      schemaReady = true
+      return
+    }
+  } catch {
+    // First deployment continues into the idempotent schema bootstrap below.
+  }
 
   await sql`
     create table if not exists categories (
@@ -385,6 +400,11 @@ export async function ensureSchema(env: Env) {
   } catch (error) {
     console.error('Bootstrap admin failed', error)
   }
+  await sql`
+    insert into app_settings (key, value, updated_at)
+    values ('schema_version', ${JSON.stringify({ version: SCHEMA_VERSION })}::jsonb, now())
+    on conflict (key) do update set value = excluded.value, updated_at = now()
+  `
 
   schemaReady = true
 }
