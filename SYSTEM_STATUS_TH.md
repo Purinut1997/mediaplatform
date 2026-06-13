@@ -282,6 +282,9 @@
    - Restore แบบ Merge เปิดใช้งานได้
    - Restore แบบ Replace ถูกปิดเพื่อป้องกันข้อมูลหายจากคำสั่งที่หยุดกลางทาง
 4. ทยอยแยก `src/App.tsx` เป็นหน้าและ component ย่อย เพื่อลดความเสี่ยงเวลาแก้ระบบระยะยาว
+   - แยก type contract กลางไปที่ `src/types.ts` แล้ว
+   - แยก helper สำหรับ API response, สิทธิ์สื่อ, workflow status และ preview URL ไปที่ `src/lib` แล้ว
+   - `src/App.tsx` ลดจากประมาณ 6,064 เหลือประมาณ 5,766 บรรทัด โดยพฤติกรรมหน้าเว็บเดิมยังคงเดิม
 5. เพิ่ม Integration Test สำหรับ Login, สมัครสมาชิก, Workflow สื่อ, VIP และ Backup/Restore
    - ตอนนี้มี Unit Test ด้าน URL และสิทธิ์สื่อ พร้อม GitHub Actions แล้ว
 
@@ -296,6 +299,9 @@
 ## ไฟล์หลักที่ควรดูเมื่อทำงานต่อ
 
 - `src/App.tsx`
+- `src/types.ts`
+- `src/lib/api.ts`
+- `src/lib/media.ts`
 - `functions/_lib/db.ts`
 - `functions/_lib/admin.ts`
 - `functions/_lib/notify.ts`
@@ -335,7 +341,7 @@
 
 - `npm run lint` ผ่าน
 - `npm run build` ผ่าน
-- `npm test` ผ่าน 23 tests ครอบคลุม URL, สิทธิ์สื่อ, validation บัญชี, validation workflow สื่อ, ความพร้อม/ความปลอดภัยของอีเมล, session cookie และ API middleware
+- `npm test` ผ่าน 29 tests ครอบคลุม URL, สิทธิ์สื่อทั้ง frontend/backend, preview URL, การอ่าน API response, validation บัญชี, validation workflow สื่อ, ความพร้อม/ความปลอดภัยของอีเมล, session cookie และ API middleware
 - Functions TypeScript ผ่าน
 - มี GitHub Actions ตรวจ `lint`, `test` และ `build` ทุก push/PR
 - มี Production Smoke Check ตรวจหน้าเว็บ, Security Headers, Cloudflare Functions, Neon, Turnstile config, session ผู้เยี่ยมชม, settings, media API และการซ่อนสื่อ/ลิงก์ที่ไม่มีสิทธิ์ทุก 6 ชั่วโมงผ่าน GitHub Actions โดยไม่แก้ข้อมูลจริง
@@ -361,3 +367,4 @@
 - ฟีเจอร์ที่เพิ่มล่าสุด: จัดการหมวดหมู่ครบ, ตรวจค่าตั้งค่าเว็บก่อนบันทึก และป้องกันการอนุมัติ VIP/แก้สมาชิกซ้ำหรือสำเร็จลวง
 - สิทธิ์ผู้ใช้บนหน้าเว็บอ้างอิงจาก session cookie/API เท่านั้น ไม่อ่านหรือบันทึก role/access ใน `localStorage` เพื่อป้องกันการปลอมสถานะผู้ดูแลจากเบราว์เซอร์
 - API middleware ป้องกัน cross-site mutation/request ขนาดเกินกำหนด และกำหนด CSP/Permissions Policy สำหรับ API responses
+- เริ่มแยกโครงสร้าง frontend แล้ว โดยย้าย type contract และ helper ที่ทดสอบได้ออกจาก `src/App.tsx`

@@ -46,6 +46,44 @@ import {
   Users,
   X,
 } from 'lucide-react'
+import type {
+  AccessLevel,
+  AdminAnalytics,
+  AdminDateFilter,
+  AdminMediaSort,
+  AdminNotification,
+  AdminSection,
+  AdminUser,
+  AnalyticsPoint,
+  AuditLog,
+  CurrentUser,
+  EmailStatus,
+  ErrorLog,
+  LinkCheckResult,
+  MediaFormState,
+  MediaItem,
+  MediaLink,
+  MediaSource,
+  MediaStatus,
+  MemberLibrary,
+  RestorePreview,
+  SiteSettings,
+  SystemHealth,
+  TelegramStatus,
+  Theme,
+  View,
+  VipRequest,
+} from './types'
+import { readJson } from './lib/api'
+import {
+  canAccessAdmin,
+  canViewAccess,
+  canViewMedia,
+  createEmptyMediaForm,
+  createEmptyMediaLink,
+  getPreviewUrl,
+  normalizeMediaStatus,
+} from './lib/media'
 import './App.css'
 
 const LOGO_URL =
@@ -59,253 +97,6 @@ declare global {
       render: (element: HTMLElement, options: { sitekey: string; callback: (token: string) => void; 'expired-callback': () => void }) => string
     }
   }
-}
-
-type Theme = 'light' | 'dark'
-type View = 'home' | 'media' | 'detail' | 'account' | 'admin' | 'login' | 'register' | 'forgot' | 'reset'
-type AdminSection =
-  | 'dashboard'
-  | 'media'
-  | 'members'
-  | 'taxonomy'
-  | 'links'
-  | 'activity'
-  | 'health'
-  | 'backup'
-  | 'errors'
-  | 'settings'
-type AccessLevel = 'สาธารณะ' | 'สมาชิก' | 'VIP' | 'ซื้อแยก'
-type MediaStatus = 'ฉบับร่าง' | 'รอตรวจสอบ' | 'เผยแพร่แล้ว' | 'ซ่อนชั่วคราว' | 'ถูกปฏิเสธ'
-type MediaSource = 'Google Drive' | 'Google Sheet' | 'YouTube' | 'External Link'
-type AdminDateFilter = 'ทั้งหมด' | 'วันนี้' | '7 วัน' | '30 วัน'
-type AdminMediaSort = 'ล่าสุด' | 'ดาวน์โหลดมากสุด' | 'เข้าชมมากสุด' | 'ชื่อ A-Z'
-
-type MediaLink = {
-  id?: number
-  label: string
-  type: MediaSource
-  url: string
-  previewUrl: string
-  access: AccessLevel
-}
-
-type MediaItem = {
-  id: number
-  slug?: string
-  title: string
-  topic: string
-  access: AccessLevel
-  status: MediaStatus | 'เผยแพร่' | 'แบบร่าง' | 'ซ่อน'
-  price: number
-  downloads: number
-  views: number
-  rating: number
-  cover: string
-  source: MediaSource
-  description: string
-  resourceUrl?: string
-  previewUrl?: string
-  links?: MediaLink[]
-  tags?: string[]
-  createdAt?: string
-  updatedAt?: string
-}
-
-type CurrentUser = {
-  name: string
-  email: string
-  role: 'superadmin' | 'admin' | 'member'
-  access: 'VIP' | 'สมาชิก'
-}
-
-type MemberLibrary = {
-  profile: CurrentUser & { createdAt: string }
-  favorites: Array<{ media: MediaItem; savedAt: string }>
-  history: Array<{ media: MediaItem; lastDownloadedAt: string; downloadCount: number }>
-}
-
-type AdminUser = {
-  id: number
-  name: string
-  email: string
-  role: CurrentUser['role']
-  access: CurrentUser['access']
-  status: 'active' | 'disabled'
-  createdAt: string
-}
-
-type VipRequest = {
-  id: number
-  userId: number | null
-  name: string
-  email: string
-  phone: string
-  slipName: string
-  status: 'pending' | 'approved' | 'rejected'
-  createdAt: string
-}
-
-type AuditLog = {
-  id: number
-  actor: string
-  action: string
-  targetType: string
-  targetId: string | null
-  detail: Record<string, unknown>
-  createdAt: string
-}
-
-type ErrorLog = {
-  id: number
-  source: string
-  message: string
-  stack: string
-  detail: Record<string, unknown>
-  createdAt: string
-}
-
-type SystemHealth = {
-  cloudflare: string
-  neon: string
-  api: string
-  storage: string
-  responseTimeMs: number
-  lastBackupAt: string | null
-  lastLinkCheckAt?: string | null
-  lastError: { source: string; message: string; createdAt: string } | null
-  integrations?: {
-    passwordResetEmail: boolean
-    turnstile: boolean
-    cron: boolean
-    telegram: boolean
-  }
-  counts: {
-    media: number
-    users: number
-    pendingVip: number
-    links: number
-    errors24h: number
-    unreadNotifications?: number
-    activeRateLimits?: number
-  }
-}
-
-type TelegramStatus = {
-  botTokenConfigured: boolean
-  chatIdConfigured: boolean
-  ready: boolean
-}
-
-type EmailStatus = {
-  configured: boolean
-  apiKeyConfigured: boolean
-  fromConfigured: boolean
-  appUrlConfigured: boolean
-}
-
-type AdminNotification = {
-  id: number
-  audience: 'superadmin' | 'admin' | 'all'
-  type: string
-  title: string
-  detail: string
-  tone: 'sky' | 'amber' | 'red' | 'emerald'
-  targetType: string | null
-  targetId: string | null
-  readAt: string | null
-  createdAt: string
-}
-
-type AnalyticsPoint = {
-  label: string
-  value: number
-}
-
-type AdminAnalytics = {
-  downloadsDaily: AnalyticsPoint[]
-  viewsDaily: AnalyticsPoint[]
-  membersMonthly: AnalyticsPoint[]
-  vipWeekly: AnalyticsPoint[]
-  topDownloads: AnalyticsPoint[]
-  accessBreakdown: AnalyticsPoint[]
-  statusBreakdown: AnalyticsPoint[]
-  sourceBreakdown: AnalyticsPoint[]
-  engagement: {
-    views30d: number
-    downloads30d: number
-    activeUsers: number
-    vipUsers: number
-  }
-}
-
-type LinkCheckResult = {
-  mediaId: number
-  mediaTitle: string
-  linkId: number
-  label: string
-  type: string
-  url: string
-  status: 'ok' | 'warning' | 'error'
-  statusCode: number | null
-  message: string
-}
-
-type RestorePreview = {
-  categories: number
-  media: number
-  mediaLinks: number
-  mediaEvents: number
-  mediaReviews: number
-  userFavorites: number
-  tags: number
-  mediaTags: number
-  users: number
-  vipRequests: number
-  notifications: number
-  settings: number
-  mode?: 'merge' | 'replace'
-  replaceTables?: string[]
-  skippedUsers?: number
-  warnings: string[]
-}
-
-type MediaFormState = {
-  title: string
-  topic: string
-  access: AccessLevel
-  status: MediaStatus
-  price: string
-  source: MediaSource
-  cover: string
-  resourceUrl: string
-  previewUrl: string
-  links: MediaLink[]
-  tags: string
-  description: string
-}
-
-type SiteSettings = {
-  heroEyebrow: string
-  heroTitle: string
-  heroDescription: string
-  heroImageUrl: string
-  heroPrimaryLabel: string
-  heroSecondaryLabel: string
-  announcementText: string
-  maintenanceEnabled: boolean
-  maintenanceTitle: string
-  maintenanceMessage: string
-  vipRegistrationEnabled: boolean
-  vipPrice: number
-  vipQrUrl: string
-  vipBankName: string
-  vipAccountNumber: string
-  vipAccountName: string
-  vipPaymentTitle: string
-  vipPaymentSubtitle: string
-  vipSlipLabel: string
-  vipAgreementLabel: string
-  vipSubmitLabel: string
 }
 
 const mediaItems: MediaItem[] = [
@@ -385,13 +176,6 @@ const sourceOptions: MediaSource[] = [
   'External Link',
 ]
 
-function normalizeMediaStatus(status: string): MediaStatus {
-  if (status === 'เผยแพร่') return 'เผยแพร่แล้ว'
-  if (status === 'แบบร่าง') return 'ฉบับร่าง'
-  if (status === 'ซ่อน') return 'ซ่อนชั่วคราว'
-  return statusOptions.includes(status as MediaStatus) ? (status as MediaStatus) : 'ฉบับร่าง'
-}
-
 const defaultSiteSettings: SiteSettings = {
   heroEyebrow: 'AI / Cyber / School Operations',
   heroTitle: 'ศูนย์กลางสื่อการเรียนรู้ที่สดใส ล้ำสมัย และใช้งานง่าย',
@@ -417,54 +201,12 @@ const defaultSiteSettings: SiteSettings = {
   vipSubmitLabel: 'ลงทะเบียนสมาชิก',
 }
 
-function createEmptyMediaForm(topic = 'โรงเรียน'): MediaFormState {
-  return {
-    title: '',
-    topic,
-    access: 'สาธารณะ',
-    status: 'เผยแพร่แล้ว',
-    price: '0',
-    source: 'Google Drive',
-    cover: '',
-    resourceUrl: '',
-    previewUrl: '',
-    links: [createEmptyMediaLink()],
-    tags: '',
-    description: '',
-  }
-}
-
-function createEmptyMediaLink(): MediaLink {
-  return {
-    label: 'ไฟล์หลัก',
-    type: 'Google Drive',
-    url: '',
-    previewUrl: '',
-    access: 'สาธารณะ',
-  }
-}
 const portalTiles = [
   { label: 'คลังสื่อ', detail: 'ไฟล์ เอกสาร วิดีโอ', icon: Archive, view: 'media' as View },
   { label: 'AI Lab', detail: 'Prompt และคู่มือ AI', icon: BrainCircuit, view: 'media' as View },
   { label: 'ห้องอบรม', detail: 'บทเรียนและวิดีโอ', icon: GraduationCap, view: 'media' as View },
   { label: 'VIP Preview', detail: 'ดูสิ่งที่จะปลดล็อก', icon: ShieldCheck, view: 'media' as View },
 ]
-
-function canViewMedia(user: CurrentUser | null, item: MediaItem) {
-  return canViewAccess(user, item.access)
-}
-
-function canViewAccess(user: CurrentUser | null, access: AccessLevel) {
-  if (user?.role === 'superadmin' || user?.role === 'admin') return true
-  if (access === 'สาธารณะ') return true
-  if (user?.access === 'VIP') return access !== 'ซื้อแยก'
-  if (user?.access === 'สมาชิก') return access === 'สมาชิก'
-  return false
-}
-
-function canAccessAdmin(user: CurrentUser | null) {
-  return user?.role === 'superadmin' || user?.role === 'admin'
-}
 
 function trackMediaEvent(mediaId: number, eventType: 'view') {
   void fetch('/api/media/track', {
@@ -473,46 +215,6 @@ function trackMediaEvent(mediaId: number, eventType: 'view') {
     credentials: 'include',
     body: JSON.stringify({ mediaId, eventType }),
   }).catch(() => undefined)
-}
-
-function getPreviewUrl(item: MediaItem) {
-  const primaryLink = item.links?.[0]
-  const link = primaryLink?.previewUrl || primaryLink?.url || item.previewUrl || item.resourceUrl || ''
-  if (!link) return ''
-
-  const source = primaryLink?.type || item.source
-
-  if (source === 'YouTube') {
-    const id =
-      link.match(/[?&]v=([^&]+)/)?.[1] ||
-      link.match(/youtu\.be\/([^?&]+)/)?.[1] ||
-      link.match(/youtube\.com\/embed\/([^?&]+)/)?.[1]
-    return id ? `https://www.youtube.com/embed/${id}` : link
-  }
-
-  if (source === 'Google Drive') {
-    const id = link.match(/\/d\/([^/]+)/)?.[1] || link.match(/[?&]id=([^&]+)/)?.[1]
-    return id ? `https://drive.google.com/file/d/${id}/preview` : link
-  }
-
-  if (source === 'Google Sheet') {
-    return link.replace(/\/edit.*$/, '/preview')
-  }
-
-  return link
-}
-
-async function readJson<T>(response: Response): Promise<T> {
-  const text = await response.text()
-  try {
-    return JSON.parse(text) as T
-  } catch {
-    throw new Error(
-      response.ok
-        ? 'API ส่งข้อมูลกลับมาไม่ถูกต้อง'
-        : 'API ยังไม่พร้อมใช้งาน กรุณาลองใหม่อีกครั้ง',
-    )
-  }
 }
 
 function App() {
