@@ -335,7 +335,7 @@
 
 - `npm run lint` ผ่าน
 - `npm run build` ผ่าน
-- `npm test` ผ่าน 17 tests ครอบคลุม URL, สิทธิ์สื่อ, validation บัญชี, validation workflow สื่อ และความพร้อม/ความปลอดภัยของอีเมล
+- `npm test` ผ่าน 20 tests ครอบคลุม URL, สิทธิ์สื่อ, validation บัญชี, validation workflow สื่อ, ความพร้อม/ความปลอดภัยของอีเมล และความปลอดภัยของ session cookie
 - Functions TypeScript ผ่าน
 - มี GitHub Actions ตรวจ `lint`, `test` และ `build` ทุก push/PR
 - มี Production Smoke Check ตรวจหน้าเว็บ, Security Headers, Cloudflare Functions, Neon, Turnstile config, session ผู้เยี่ยมชม, settings, media API และการซ่อนสื่อ/ลิงก์ที่ไม่มีสิทธิ์ทุก 6 ชั่วโมงผ่าน GitHub Actions โดยไม่แก้ข้อมูลจริง
@@ -359,3 +359,4 @@
 - Media API ฝั่งผู้ดูแลรองรับค้นชื่อ หมวดหมู่ คำอธิบาย แท็ก และลิงก์ รวมถึงกรองสิทธิ์ สถานะ วันที่ และเรียงตามยอดดาวน์โหลด/เข้าชม/ชื่อ
 - วันที่ 7 มิถุนายน 2026 ยืนยันว่า production ใช้ Functions และ static frontend รุ่นล่าสุดแล้ว มี `app-version` สำหรับตรวจ deployment และ asset production มี UI หลายลิงก์ครบ
 - ฟีเจอร์ที่เพิ่มล่าสุด: จัดการหมวดหมู่ครบ, ตรวจค่าตั้งค่าเว็บก่อนบันทึก และป้องกันการอนุมัติ VIP/แก้สมาชิกซ้ำหรือสำเร็จลวง
+- สิทธิ์ผู้ใช้บนหน้าเว็บอ้างอิงจาก session cookie/API เท่านั้น ไม่อ่านหรือบันทึก role/access ใน `localStorage` เพื่อป้องกันการปลอมสถานะผู้ดูแลจากเบราว์เซอร์

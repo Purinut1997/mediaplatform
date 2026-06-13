@@ -520,11 +520,8 @@ function App() {
     if (typeof window === 'undefined') return 'light'
     return (window.localStorage.getItem('theme') as Theme | null) ?? 'light'
   })
-  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(() => {
-    if (typeof window === 'undefined') return null
-    const saved = window.localStorage.getItem('currentUser')
-    return saved ? (JSON.parse(saved) as CurrentUser) : null
-  })
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null)
+  const [sessionReady, setSessionReady] = useState(false)
   const [mediaRecords, setMediaRecords] = useState<MediaItem[]>(mediaItems)
   const [mediaPage, setMediaPage] = useState(1)
   const [mediaTotal, setMediaTotal] = useState(0)
@@ -558,26 +555,20 @@ function App() {
   }, [theme])
 
   useEffect(() => {
-    if (currentUser) {
-      window.localStorage.setItem('currentUser', JSON.stringify(currentUser))
-    } else {
-      window.localStorage.removeItem('currentUser')
-    }
-  }, [currentUser])
-
-  useEffect(() => {
     let active = true
 
     async function loadCurrentUser() {
       try {
         const response = await fetch('/api/auth/me', { credentials: 'include' })
-        if (!response.ok) return
+        if (!response.ok) throw new Error('Session request failed')
         const result = (await response.json()) as { user?: CurrentUser | null }
         if (!active) return
         setCurrentUser(result.user ?? null)
       } catch {
         if (!active) return
         setCurrentUser(null)
+      } finally {
+        if (active) setSessionReady(true)
       }
     }
 
@@ -794,6 +785,7 @@ function App() {
 
   const maintenanceAuthViews: View[] = ['login', 'forgot', 'reset']
   const showMaintenance =
+    sessionReady &&
     siteSettings.maintenanceEnabled &&
     !canAccessAdmin(currentUser) &&
     !maintenanceAuthViews.includes(view)
@@ -801,7 +793,7 @@ function App() {
   return (
     <div className="relative min-h-screen overflow-hidden bg-[#f2fbff] text-slate-900 transition-colors duration-300 dark:bg-[#06111d] dark:text-slate-100">
       <TechBackground />
-      {loading && <LoadingOverlay />}
+      {(loading || !sessionReady) && <LoadingOverlay />}
 
       <div className="relative z-10">
         <Header
