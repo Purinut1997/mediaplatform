@@ -15,17 +15,25 @@ export async function validateBotCheck(
   }
 
   if (secret) {
-    const response = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        secret,
-        response: String(body.turnstileToken ?? ''),
-        remoteip: remoteIp || undefined,
-      }),
-    })
-    const result = (await response.json().catch(() => ({}))) as { success?: boolean }
-    return result.success ? '' : 'การตรวจสอบความปลอดภัยไม่สำเร็จ กรุณาลองใหม่'
+    const token = String(body.turnstileToken ?? '').trim()
+    if (!token) return 'กรุณายืนยันการตรวจสอบความปลอดภัย'
+
+    try {
+      const response = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          secret,
+          response: token,
+          remoteip: remoteIp || undefined,
+        }),
+        signal: AbortSignal.timeout(8000),
+      })
+      const result = (await response.json().catch(() => ({}))) as { success?: boolean }
+      return response.ok && result.success ? '' : 'การตรวจสอบความปลอดภัยไม่สำเร็จ กรุณาลองใหม่'
+    } catch {
+      return 'ระบบตรวจสอบความปลอดภัยไม่พร้อม กรุณาลองใหม่อีกครั้ง'
+    }
   }
 
   if (!body.botVerified) {
