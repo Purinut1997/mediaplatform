@@ -47,6 +47,7 @@ describe('email readiness', () => {
   it('requires every password-reset email setting', () => {
     expect(emailStatus({})).toEqual({
       configured: false,
+      apiKeyConfigured: false,
       fromConfigured: false,
       appUrlConfigured: false,
     })

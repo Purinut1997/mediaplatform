@@ -196,6 +196,13 @@ type TelegramStatus = {
   ready: boolean
 }
 
+type EmailStatus = {
+  configured: boolean
+  apiKeyConfigured: boolean
+  fromConfigured: boolean
+  appUrlConfigured: boolean
+}
+
 type AdminNotification = {
   id: number
   audience: 'superadmin' | 'admin' | 'all'
@@ -3001,6 +3008,7 @@ function AdminPanel({
   const [analytics, setAnalytics] = useState<AdminAnalytics | null>(null)
   const [systemHealth, setSystemHealth] = useState<SystemHealth | null>(null)
   const [telegramStatus, setTelegramStatus] = useState<TelegramStatus | null>(null)
+  const [emailStatus, setEmailStatus] = useState<EmailStatus | null>(null)
   const [linkChecks, setLinkChecks] = useState<LinkCheckResult[]>([])
   const [restoreText, setRestoreText] = useState('')
   const [restoreMode, setRestoreMode] = useState<'merge' | 'replace'>('merge')
@@ -3263,20 +3271,25 @@ function AdminPanel({
       if (!healthResponse.ok) throw new Error(health.error ?? 'โหลด System Health ไม่สำเร็จ')
 
       if (isSuperAdmin) {
-        const [, , telegramResponse] = await Promise.all([
+        const [, , telegramResponse, emailResponse] = await Promise.all([
           loadActivity(),
           loadErrors(),
           fetch('/api/admin/telegram', { credentials: 'include' }),
+          fetch('/api/admin/email', { credentials: 'include' }),
         ])
         const telegram = await readJson<{ telegram?: TelegramStatus; error?: string }>(telegramResponse)
         if (!telegramResponse.ok) throw new Error(telegram.error ?? 'โหลดสถานะ Telegram ไม่สำเร็จ')
+        const email = await readJson<{ email?: EmailStatus; error?: string }>(emailResponse)
+        if (!emailResponse.ok) throw new Error(email.error ?? 'โหลดสถานะอีเมลไม่สำเร็จ')
         setTelegramStatus(telegram.telegram ?? null)
+        setEmailStatus(email.email ?? null)
       } else {
         setAuditLogs([])
         setActivityTotal(0)
         setErrorLogs([])
         setErrorTotal(0)
         setTelegramStatus(null)
+        setEmailStatus(null)
       }
       setSystemHealth(health.health ?? null)
     } catch (opsLoadError) {
@@ -3778,6 +3791,23 @@ function AdminPanel({
       setSettingsError(
         telegramError instanceof Error ? telegramError.message : 'ส่งข้อความทดสอบ Telegram ไม่สำเร็จ',
       )
+    } finally {
+      setLoadingOps(false)
+    }
+  }
+
+  const testEmail = async () => {
+    setLoadingOps(true)
+    setSettingsError('')
+    setSettingsNotice('')
+    try {
+      const response = await fetch('/api/admin/email', { method: 'POST', credentials: 'include' })
+      const result = await readJson<{ email?: EmailStatus; recipient?: string; error?: string }>(response)
+      if (!response.ok) throw new Error(result.error ?? 'ส่งอีเมลทดสอบไม่สำเร็จ')
+      setEmailStatus(result.email ?? null)
+      setSettingsNotice(`ส่งอีเมลทดสอบไปยัง ${result.recipient ?? currentUser.email} แล้ว`)
+    } catch (emailError) {
+      setSettingsError(emailError instanceof Error ? emailError.message : 'ส่งอีเมลทดสอบไม่สำเร็จ')
     } finally {
       setLoadingOps(false)
     }
@@ -4475,6 +4505,59 @@ function AdminPanel({
               {savingSettings ? 'กำลังบันทึก...' : 'บันทึกตั้งค่า VIP'}
             </button>
           </form>
+
+          <section className="rounded-2xl border border-sky-300/20 bg-white/[0.07] p-4 ring-1 ring-white/[0.03]">
+            <div className="mb-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+              <div>
+                <h3 className="flex items-center gap-2 text-xl font-black">
+                  <Mail className="text-sky-300" size={22} />
+                  อีเมลลืมรหัสผ่าน
+                </h3>
+                <p className="mt-1 text-sm font-semibold text-slate-400">
+                  ตรวจความพร้อม Resend และส่งอีเมลทดสอบไปยังบัญชี Super Admin ที่กำลังใช้งาน
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-white/10 px-4 font-black text-white disabled:opacity-60"
+                  disabled={loadingOps}
+                  onClick={loadOpsData}
+                  type="button"
+                >
+                  {loadingOps ? <Loader2 className="animate-spin" size={18} /> : <Database size={18} />}
+                  รีเฟรช
+                </button>
+                <button
+                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-sky-300 px-4 font-black text-slate-950 disabled:opacity-60"
+                  disabled={loadingOps || !emailStatus?.configured}
+                  onClick={testEmail}
+                  type="button"
+                >
+                  {loadingOps ? <Loader2 className="animate-spin" size={18} /> : <Mail size={18} />}
+                  ส่งอีเมลทดสอบ
+                </button>
+              </div>
+            </div>
+            <div className="grid gap-3 md:grid-cols-3">
+              {[
+                ['Resend API Key', emailStatus?.apiKeyConfigured],
+                ['อีเมลผู้ส่ง', emailStatus?.fromConfigured],
+                ['URL เว็บไซต์', emailStatus?.appUrlConfigured],
+              ].map(([label, enabled]) => (
+                <article className="rounded-2xl border border-white/10 bg-black/20 p-4" key={label as string}>
+                  <p className="text-sm font-bold text-slate-400">{label as string}</p>
+                  <p className={`mt-2 text-lg font-black ${enabled ? 'text-emerald-200' : 'text-amber-200'}`}>
+                    {emailStatus ? (enabled ? 'พร้อมใช้งาน' : 'ยังไม่ได้ตั้งค่า') : 'รอโหลดสถานะ'}
+                  </p>
+                </article>
+              ))}
+            </div>
+            <div className="mt-4 rounded-2xl border border-white/10 bg-black/20 p-4 text-sm font-semibold leading-6 text-slate-300">
+              ตั้งค่า <code className="font-black text-sky-100">RESEND_API_KEY</code>,{' '}
+              <code className="font-black text-sky-100">EMAIL_FROM</code> และ{' '}
+              <code className="font-black text-sky-100">APP_URL</code> ใน Cloudflare แล้วกดรีเฟรช/ส่งทดสอบได้ทันที
+            </div>
+          </section>
 
           <section className="rounded-2xl border border-violet-300/20 bg-white/[0.07] p-4 ring-1 ring-white/[0.03]">
             <div className="mb-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">

@@ -3,6 +3,7 @@ import type { Env } from './db'
 export function emailStatus(env: Env) {
   return {
     configured: Boolean(env.RESEND_API_KEY && env.EMAIL_FROM && env.APP_URL),
+    apiKeyConfigured: Boolean(env.RESEND_API_KEY),
     fromConfigured: Boolean(env.EMAIL_FROM),
     appUrlConfigured: Boolean(env.APP_URL),
   }

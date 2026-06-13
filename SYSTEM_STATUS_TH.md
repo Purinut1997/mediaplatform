@@ -218,6 +218,10 @@
   - กดส่งข้อความทดสอบได้จากหลังบ้าน
   - ไม่แสดง token หรือ chat id จริงบนหน้าเว็บ
   - บันทึก audit action เป็น `telegram_test`
+- มีหน้าตรวจสอบอีเมล Resend ในเมนูตั้งค่าเว็บ
+  - แสดงสถานะ API Key, อีเมลผู้ส่ง และ URL เว็บไซต์โดยไม่เปิดเผยค่าจริง
+  - Super Admin ส่งอีเมลทดสอบไปยังบัญชีตนเองได้
+  - บันทึก audit action เป็น `email_test` และบันทึก Error Log เมื่อ Resend ล้มเหลว
 
 ### Dashboard
 
@@ -336,6 +340,7 @@
 - มี GitHub Actions ตรวจ `lint`, `test` และ `build` ทุก push/PR
 - มี Production Smoke Check ตรวจหน้าเว็บ, Security Headers, Cloudflare Functions, Neon, Turnstile config, session ผู้เยี่ยมชม, settings, media API และการซ่อนสื่อ/ลิงก์ที่ไม่มีสิทธิ์ทุก 6 ชั่วโมงผ่าน GitHub Actions โดยไม่แก้ข้อมูลจริง
 - System Health แสดงสถานะพร้อมใช้งานของ Turnstile, อีเมลลืมรหัสผ่าน, Cron และ Telegram โดยไม่เปิดเผยค่า Secret
+- หลังบ้านมีปุ่มส่งอีเมล Resend ทดสอบไปยัง Super Admin โดยไม่ต้องแก้โค้ด
 - วันที่ 9 มิถุนายน 2026 ตรวจหน้าเว็บบนเครื่องทั้ง desktop/mobile แล้ว ไม่พบ horizontal overflow หรือ console error
 - เพิ่ม Transaction สำหรับการเพิ่ม/แก้สื่อ, สมัคร VIP และอนุมัติ VIP เพื่อลดข้อมูลค้างครึ่งชุด
 - สมาชิกไม่สามารถบันทึกรายการโปรดหรือรีวิวสื่อที่ยังไม่เผยแพร่/ไม่มีสิทธิ์ได้
