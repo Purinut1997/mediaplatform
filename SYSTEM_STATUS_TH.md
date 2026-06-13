@@ -287,7 +287,8 @@
    - แยก helper สำหรับ API response, สิทธิ์สื่อ, workflow status และ preview URL ไปที่ `src/lib` แล้ว
    - แยกค่ากลางแบรนด์, ค่าเริ่มต้น, พื้นหลังเทคโนโลยี, Portal Tiles, Turnstile widget, UI แจ้งสถานะ และ Public Shell ไปที่ `src/brand.ts`, `src/defaults.ts` และ `src/components` แล้ว
    - Public Shell รวม Header, Hero, Brand Showcase และหน้า Maintenance ไว้ที่ `src/components/PublicShell.tsx`
-   - `src/App.tsx` ลดจากประมาณ 6,064 เหลือประมาณ 4,928 บรรทัด โดยพฤติกรรมหน้าเว็บเดิมยังคงเดิม
+   - แยกหน้าคลังสมาชิกและการจัดการความปลอดภัยบัญชีไว้ที่ `src/components/MemberLibrary.tsx`
+   - `src/App.tsx` ลดจากประมาณ 6,064 เหลือประมาณ 4,663 บรรทัด โดยพฤติกรรมหน้าเว็บเดิมยังคงเดิม
    - ปรับฟอร์มบัญชีให้รองรับ Password Manager/Browser Autofill ด้วย `autocomplete` ที่ถูกต้อง และตัดตัวเลือกจำการเข้าสู่ระบบที่ยังไม่มีพฤติกรรมจริงออก
 5. เพิ่ม Integration Test สำหรับ Login, สมัครสมาชิก, Workflow สื่อ, VIP และ Backup/Restore
    - ตอนนี้มี Unit Test ด้าน URL และสิทธิ์สื่อ พร้อม GitHub Actions แล้ว
@@ -311,6 +312,7 @@
 - `src/components/AuthBotCheck.tsx`
 - `src/components/PortalTiles.tsx`
 - `src/components/PublicShell.tsx`
+- `src/components/MemberLibrary.tsx`
 - `src/components/SharedUI.tsx`
 - `src/components/TechBackground.tsx`
 - `functions/_lib/db.ts`
@@ -382,3 +384,4 @@
 - เริ่มแยกโครงสร้าง frontend แล้ว โดยย้าย type contract และ helper ที่ทดสอบได้ออกจาก `src/App.tsx`
 - วันที่ 13 มิถุนายน 2026 ตรวจ frontend หลังแยก component บน desktop/mobile แล้ว ไม่พบ horizontal overflow หรือ console error และเครดิต MIKPURINUT ยังแสดงครบ
 - วันที่ 13 มิถุนายน 2026 แยก Public Shell ออกจาก `src/App.tsx`, ปรับฟอร์มบัญชีให้ทำงานกับ Password Manager ได้ถูกต้อง และตัดช่องจำการเข้าสู่ระบบที่ยังไม่มีผลจริงออก
+- วันที่ 13 มิถุนายน 2026 แยกหน้าคลังสมาชิกและความปลอดภัยบัญชีออกจาก `src/App.tsx` พร้อมปรับช่องเปลี่ยนรหัสผ่านให้รองรับ Password Manager
