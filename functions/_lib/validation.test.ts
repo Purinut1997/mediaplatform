@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { boundedInteger, boundedText, normalizedEmail, passwordInput } from './input'
+import { emailHtmlText, emailStatus } from './email'
 import { mediaAccess, mediaPrice, mediaStatus, mediaText } from './media-validation'
 
 describe('account input validation', () => {
@@ -39,5 +40,24 @@ describe('media validation', () => {
   it('trims media text and enforces its maximum length', () => {
     expect(mediaText('  คู่มือ AI  ', 'ชื่อสื่อ', 50)).toBe('คู่มือ AI')
     expect(() => mediaText('abcdef', 'ชื่อสื่อ', 5)).toThrow()
+  })
+})
+
+describe('email readiness', () => {
+  it('requires every password-reset email setting', () => {
+    expect(emailStatus({})).toEqual({
+      configured: false,
+      fromConfigured: false,
+      appUrlConfigured: false,
+    })
+    expect(emailStatus({
+      RESEND_API_KEY: 're_test',
+      EMAIL_FROM: 'MIKPURINUT <noreply@example.com>',
+      APP_URL: 'https://example.com',
+    }).configured).toBe(true)
+  })
+
+  it('escapes user-controlled email HTML', () => {
+    expect(emailHtmlText('<b>"MIK" & team</b>')).toBe('&lt;b&gt;&quot;MIK&quot; &amp; team&lt;/b&gt;')
   })
 })

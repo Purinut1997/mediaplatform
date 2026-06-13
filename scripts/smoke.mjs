@@ -15,7 +15,11 @@ const checks = [
   { path: '/api/db-check', validate: (data) => data.ok === true && data.database === 'neon' },
   {
     path: '/api/auth/config',
-    validate: (data) => data.ok === true && typeof data.turnstileSiteKey === 'string' && data.turnstileSiteKey.length > 10,
+    validate: (data) =>
+      data.ok === true &&
+      typeof data.turnstileSiteKey === 'string' &&
+      data.turnstileSiteKey.length > 10 &&
+      typeof data.passwordResetEnabled === 'boolean',
   },
   { path: '/api/auth/me', validate: (data) => data.ok === true && data.user === null },
   { path: '/api/settings', validate: (data) => data.ok === true && typeof data.settings === 'object' },

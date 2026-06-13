@@ -173,6 +173,12 @@ type SystemHealth = {
   lastBackupAt: string | null
   lastLinkCheckAt?: string | null
   lastError: { source: string; message: string; createdAt: string } | null
+  integrations?: {
+    passwordResetEmail: boolean
+    turnstile: boolean
+    cron: boolean
+    telegram: boolean
+  }
   counts: {
     media: number
     users: number
@@ -2478,25 +2484,48 @@ function ForgotPasswordPanel({ setView }: { setView: (view: View) => void }) {
   const [botVerified, setBotVerified] = useState(false)
   const [turnstileToken, setTurnstileToken] = useState('')
   const [message, setMessage] = useState('')
+  const [passwordResetEnabled, setPasswordResetEnabled] = useState<boolean | null>(null)
+  const [submitting, setSubmitting] = useState(false)
   const [startedAt] = useState(() => Date.now())
+
+  useEffect(() => {
+    void fetch('/api/auth/config')
+      .then((response) => response.json() as Promise<{ passwordResetEnabled?: boolean }>)
+      .then((config) => setPasswordResetEnabled(Boolean(config.passwordResetEnabled)))
+      .catch(() => setPasswordResetEnabled(false))
+  }, [])
+
   return (
     <AuthActionPanel title="ลืมรหัสผ่าน" detail="ระบบจะส่งลิงก์ตั้งรหัสผ่านใหม่ไปยังอีเมลที่ลงทะเบียน">
       <form
         onSubmit={async (event) => {
           event.preventDefault()
-          const response = await fetch('/api/auth/forgot-password', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, botVerified, botStartedAt: startedAt, turnstileToken, website: '' }),
-          })
-          const result = await readJson<{ message?: string; error?: string }>(response)
-          setMessage(result.message || result.error || 'ส่งคำขอแล้ว')
+          setSubmitting(true)
+          setMessage('')
+          try {
+            const response = await fetch('/api/auth/forgot-password', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ email, botVerified, botStartedAt: startedAt, turnstileToken, website: '' }),
+            })
+            const result = await readJson<{ message?: string; error?: string }>(response)
+            setMessage(result.message || result.error || 'ส่งคำขอแล้ว')
+          } finally {
+            setSubmitting(false)
+          }
         }}
       >
         <input className="min-h-14 w-full rounded-2xl border border-slate-200 bg-white px-4 outline-none focus:border-cyan-400 dark:border-white/10 dark:bg-white/10" onChange={(event) => setEmail(event.target.value)} placeholder="อีเมลของคุณ" type="email" value={email} />
         <AuthBotCheck botVerified={botVerified} setBotVerified={setBotVerified} setTurnstileToken={setTurnstileToken} />
+        {passwordResetEnabled === false && (
+          <p className="mt-4 rounded-2xl border border-amber-300/60 bg-amber-50 p-4 text-sm font-bold text-amber-800 dark:border-amber-300/20 dark:bg-amber-300/10 dark:text-amber-100">
+            ระบบส่งอีเมลยังไม่พร้อมใช้งาน กรุณาติดต่อผู้ดูแลระบบ
+          </p>
+        )}
         {message && <p className="mt-4 rounded-2xl bg-cyan-50 p-4 text-sm font-bold text-cyan-900 dark:bg-cyan-300/10 dark:text-cyan-100">{message}</p>}
-        <button className="mt-5 min-h-14 w-full rounded-2xl bg-gradient-to-r from-cyan-400 to-blue-500 font-black text-slate-950" type="submit">ส่งลิงก์ตั้งรหัสผ่านใหม่</button>
+        <button className="mt-5 min-h-14 w-full rounded-2xl bg-gradient-to-r from-cyan-400 to-blue-500 font-black text-slate-950 disabled:cursor-not-allowed disabled:opacity-50" disabled={passwordResetEnabled !== true || submitting} type="submit">
+          {submitting ? 'กำลังส่งอีเมล...' : 'ส่งลิงก์ตั้งรหัสผ่านใหม่'}
+        </button>
         <button className="mt-3 min-h-12 w-full font-black text-blue-600" onClick={() => setView('login')} type="button">กลับไปเข้าสู่ระบบ</button>
       </form>
     </AuthActionPanel>
@@ -4799,6 +4828,10 @@ function AdminPanel({
                   ['Response Time', `${systemHealth.responseTimeMs} ms`],
                   ['Last Backup', formatAdminDate(systemHealth.lastBackupAt)],
                   ['Last Link Check', formatAdminDate(systemHealth.lastLinkCheckAt)],
+                  ['Turnstile', systemHealth.integrations?.turnstile ? 'พร้อมใช้งาน' : 'ยังไม่พร้อม'],
+                  ['อีเมลลืมรหัสผ่าน', systemHealth.integrations?.passwordResetEmail ? 'พร้อมใช้งาน' : 'ยังไม่พร้อม'],
+                  ['Cron ตรวจลิงก์', systemHealth.integrations?.cron ? 'พร้อมใช้งาน' : 'ยังไม่พร้อม'],
+                  ['Telegram', systemHealth.integrations?.telegram ? 'พร้อมใช้งาน' : 'ยังไม่พร้อม'],
                   ['สื่อทั้งหมด', systemHealth.counts.media.toLocaleString('th-TH')],
                   ['Error 24 ชม.', systemHealth.counts.errors24h.toLocaleString('th-TH')],
                   ['แจ้งเตือนยังไม่อ่าน', (systemHealth.counts.unreadNotifications ?? unreadNotifications).toLocaleString('th-TH')],

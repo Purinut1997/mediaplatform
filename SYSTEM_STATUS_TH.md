@@ -58,6 +58,8 @@
 - มีระบบลืมรหัสผ่าน/ตั้งรหัสผ่านใหม่ผ่าน token อายุ 30 นาที
   - ส่งอีเมลผ่าน Resend เมื่อกำหนด `RESEND_API_KEY` และ `EMAIL_FROM`
   - ตอบกลับแบบไม่เปิดเผยว่าอีเมลมีบัญชีหรือไม่
+  - หน้าเว็บและ API ตรวจความพร้อมของ `RESEND_API_KEY`, `EMAIL_FROM` และ `APP_URL` ก่อนสร้าง token จึงไม่ตอบว่าส่งสำเร็จลวง
+  - หาก Resend ปฏิเสธอีเมล ระบบลบ reset token ที่ใช้ไม่ได้ทันที
 - มีระบบรีวิวและให้คะแนนจริงต่อสื่อ สมาชิกหนึ่งบัญชีแก้คะแนนของตัวเองได้
 
 ### Super Admin
@@ -328,10 +330,11 @@
 
 - `npm run lint` ผ่าน
 - `npm run build` ผ่าน
-- `npm test` ผ่าน 15 tests ครอบคลุม URL, สิทธิ์สื่อ, validation บัญชี และ validation workflow สื่อ
+- `npm test` ผ่าน 17 tests ครอบคลุม URL, สิทธิ์สื่อ, validation บัญชี, validation workflow สื่อ และความพร้อม/ความปลอดภัยของอีเมล
 - Functions TypeScript ผ่าน
 - มี GitHub Actions ตรวจ `lint`, `test` และ `build` ทุก push/PR
 - มี Production Smoke Check ตรวจหน้าเว็บ, Security Headers, Cloudflare Functions, Neon, Turnstile config, session ผู้เยี่ยมชม, settings, media API และการซ่อนสื่อ/ลิงก์ที่ไม่มีสิทธิ์ทุก 6 ชั่วโมงผ่าน GitHub Actions โดยไม่แก้ข้อมูลจริง
+- System Health แสดงสถานะพร้อมใช้งานของ Turnstile, อีเมลลืมรหัสผ่าน, Cron และ Telegram โดยไม่เปิดเผยค่า Secret
 - วันที่ 9 มิถุนายน 2026 ตรวจหน้าเว็บบนเครื่องทั้ง desktop/mobile แล้ว ไม่พบ horizontal overflow หรือ console error
 - เพิ่ม Transaction สำหรับการเพิ่ม/แก้สื่อ, สมัคร VIP และอนุมัติ VIP เพื่อลดข้อมูลค้างครึ่งชุด
 - สมาชิกไม่สามารถบันทึกรายการโปรดหรือรีวิวสื่อที่ยังไม่เผยแพร่/ไม่มีสิทธิ์ได้

@@ -1,5 +1,6 @@
 import { requireAdminPermission } from '../../_lib/admin'
 import { ensureSchema, getSql, type Env } from '../../_lib/db'
+import { emailStatus } from '../../_lib/email'
 
 export const onRequestGet = async ({ env, request }: { env: Env; request: Request }) => {
   if (!(await requireAdminPermission(env, request, 'system:read'))) {
@@ -59,6 +60,12 @@ export const onRequestGet = async ({ env, request }: { env: Env; request: Reques
             createdAt: lastError.created_at,
           }
         : null,
+      integrations: {
+        passwordResetEmail: emailStatus(env).configured,
+        turnstile: Boolean(env.TURNSTILE_SITE_KEY && env.TURNSTILE_SECRET_KEY),
+        cron: Boolean(env.CRON_SECRET),
+        telegram: Boolean(env.TELEGRAM_BOT_TOKEN && env.TELEGRAM_CHAT_ID),
+      },
       counts: {
         media: counts?.media_count ?? 0,
         users: counts?.user_count ?? 0,

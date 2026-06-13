@@ -1,7 +1,7 @@
 import { writeAuditLog, writeErrorLog } from '../../_lib/admin'
 import { validateBotCheck, type BotCheckPayload } from '../../_lib/bot'
 import { ensureSchema, getSql, randomHex, sha256Hex, type Env } from '../../_lib/db'
-import { sendEmail } from '../../_lib/email'
+import { emailHtmlText, emailStatus, sendEmail } from '../../_lib/email'
 import { normalizedEmail } from '../../_lib/input'
 import { enforceRateLimits, rateLimitResponse, requestIp } from '../../_lib/rate-limit'
 
@@ -9,6 +9,12 @@ type Payload = BotCheckPayload & { email?: string }
 
 export const onRequestPost = async ({ env, request }: { env: Env; request: Request }) => {
   try {
+    if (!emailStatus(env).configured) {
+      return Response.json(
+        { ok: false, error: 'ระบบส่งอีเมลยังไม่พร้อมใช้งาน กรุณาติดต่อผู้ดูแลระบบ' },
+        { status: 503 },
+      )
+    }
     await ensureSchema(env)
     const body = (await request.json().catch(() => ({}))) as Payload
     let email = ''
@@ -41,13 +47,17 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
         insert into password_reset_tokens (user_id, token_hash, expires_at)
         values (${user.id}, ${await sha256Hex(token)}, now() + interval '30 minutes')
       `
-      const appUrl = env.APP_URL || new URL(request.url).origin
-      await sendEmail(
+      const appUrl = String(env.APP_URL).replace(/\/+$/, '')
+      const sent = await sendEmail(
         env,
         String(user.email),
         'ตั้งรหัสผ่านใหม่ - MIKPURINUT Nexus',
-        `<p>สวัสดี ${String(user.name)}</p><p>กดลิงก์นี้เพื่อตั้งรหัสผ่านใหม่ภายใน 30 นาที:</p><p><a href="${appUrl}/?reset=${token}">ตั้งรหัสผ่านใหม่</a></p><p>หากคุณไม่ได้ส่งคำขอ สามารถละเว้นอีเมลนี้ได้</p>`,
+        `<p>สวัสดี ${emailHtmlText(user.name)}</p><p>กดลิงก์นี้เพื่อตั้งรหัสผ่านใหม่ภายใน 30 นาที:</p><p><a href="${emailHtmlText(`${appUrl}/?reset=${token}`)}">ตั้งรหัสผ่านใหม่</a></p><p>หากคุณไม่ได้ส่งคำขอ สามารถละเว้นอีเมลนี้ได้</p>`,
       )
+      if (!sent) {
+        await sql`delete from password_reset_tokens where user_id = ${user.id}`
+        throw new Error('Resend rejected password reset email')
+      }
       await writeAuditLog(env, email, 'request_password_reset', 'user', user.id)
     }
     return Response.json({ ok: true, message: 'หากอีเมลนี้มีบัญชี ระบบจะส่งลิงก์ตั้งรหัสผ่านใหม่ให้' })
