@@ -4,7 +4,7 @@
 
 ## ภาพรวมความคืบหน้า
 
-- ระบบพร้อมใช้งานหลักประมาณ **89%**
+- ระบบพร้อมใช้งานหลักประมาณ **90%**
 - งานหลักสำหรับหน้าเว็บผู้ใช้, สมาชิก, Super Admin, workflow สื่อ, รายงาน, log, backup และ security มีแล้ว
 - งานที่เหลือส่วนใหญ่เป็นการรองรับข้อมูลขนาดใหญ่มาก, แยกโครงสร้างโค้ด และการตั้งค่า Secret/บริการภายนอกจากบัญชีเจ้าของ
 
@@ -193,6 +193,7 @@
   - ใช้เรียก `/api/cron/link-checks` ทุก 6 ชั่วโมงตามค่าเริ่มต้น
   - มีคำสั่ง `npm run cron:secret`, `npm run cron:deploy` และ `npm run cron:tail`
   - ไม่เก็บค่า `CRON_SECRET` จริงใน GitHub
+  - การสั่ง Worker แบบ manual ต้องส่ง `x-cron-secret` หรือ `Authorization: Bearer` เพื่อป้องกันบุคคลภายนอกกระตุ้นงานซ้ำ
 - มี Backup Export เป็น JSON ทั้งระบบ และ CSV แยกตาราง
 - Backup/Restore รองรับ `tags` และ `media_tags`
 - Backup/Restore รองรับ `notifications`
