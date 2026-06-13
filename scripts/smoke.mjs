@@ -13,6 +13,10 @@ const checks = [
   },
   { path: '/api/health', validate: (data) => data.ok === true },
   { path: '/api/db-check', validate: (data) => data.ok === true && data.database === 'neon' },
+  {
+    path: '/api/auth/config',
+    validate: (data) => data.ok === true && typeof data.turnstileSiteKey === 'string' && data.turnstileSiteKey.length > 10,
+  },
   { path: '/api/auth/me', validate: (data) => data.ok === true && data.user === null },
   { path: '/api/settings', validate: (data) => data.ok === true && typeof data.settings === 'object' },
   {
