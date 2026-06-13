@@ -779,8 +779,11 @@ function App() {
     setView('home')
   }
 
+  const maintenanceAuthViews: View[] = ['login', 'forgot', 'reset']
   const showMaintenance =
-    siteSettings.maintenanceEnabled && !canAccessAdmin(currentUser)
+    siteSettings.maintenanceEnabled &&
+    !canAccessAdmin(currentUser) &&
+    !maintenanceAuthViews.includes(view)
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-[#f2fbff] text-slate-900 transition-colors duration-300 dark:bg-[#06111d] dark:text-slate-100">
