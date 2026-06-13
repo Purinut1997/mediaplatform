@@ -5,6 +5,7 @@ import {
   googleOAuthConfigured,
   googleRedirectUri,
   googleStateCookie,
+  oauthRedirect,
   readGoogleState,
 } from './google-oauth'
 
@@ -36,5 +37,16 @@ describe('Google OAuth configuration', () => {
     expect(cookie).toContain('SameSite=Lax')
     expect(readGoogleState(new Request('https://example.com', { headers: { Cookie: cookie } }))).toBe('state-token')
     expect(clearGoogleStateCookie()).toContain('Max-Age=0')
+  })
+
+  it('creates mutable Cloudflare-compatible redirects with cookies', () => {
+    const response = oauthRedirect('https://accounts.google.com/login', {
+      cookies: [googleStateCookie('state-token')],
+      headers: { 'Retry-After': '30' },
+    })
+    expect(response.status).toBe(302)
+    expect(response.headers.get('Location')).toBe('https://accounts.google.com/login')
+    expect(response.headers.get('Set-Cookie')).toContain('mp_google_state=state-token')
+    expect(response.headers.get('Retry-After')).toBe('30')
   })
 })

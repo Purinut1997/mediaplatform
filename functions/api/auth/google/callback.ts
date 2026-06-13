@@ -5,6 +5,7 @@ import {
   clearGoogleStateCookie,
   exchangeGoogleCode,
   googleOAuthConfigured,
+  oauthRedirect,
   readGoogleState,
 } from '../../../_lib/google-oauth'
 import { normalizedEmail } from '../../../_lib/input'
@@ -12,10 +13,9 @@ import { enforceRateLimits, requestIp } from '../../../_lib/rate-limit'
 
 function redirect(env: Env, request: Request, result: string, session?: string) {
   const appUrl = env.APP_URL ? String(env.APP_URL).replace(/\/+$/, '') : new URL(request.url).origin
-  const response = Response.redirect(`${appUrl}/?oauth=${result}`, 302)
-  response.headers.append('Set-Cookie', clearGoogleStateCookie())
-  if (session) response.headers.append('Set-Cookie', sessionCookie(session))
-  return response
+  return oauthRedirect(`${appUrl}/?oauth=${result}`, {
+    cookies: [clearGoogleStateCookie(), ...(session ? [sessionCookie(session)] : [])],
+  })
 }
 
 export const onRequestGet = async ({ env, request }: { env: Env; request: Request }) => {
@@ -35,9 +35,11 @@ export const onRequestGet = async ({ env, request }: { env: Env; request: Reques
     blockSeconds: 900,
   }])
   if (!rateLimit.allowed) {
-    const response = redirect(env, request, 'rate_limited')
-    response.headers.set('Retry-After', String(rateLimit.retryAfter))
-    return response
+    const appUrl = env.APP_URL ? String(env.APP_URL).replace(/\/+$/, '') : new URL(request.url).origin
+    return oauthRedirect(`${appUrl}/?oauth=rate_limited`, {
+      cookies: [clearGoogleStateCookie()],
+      headers: { 'Retry-After': String(rateLimit.retryAfter) },
+    })
   }
 
   try {

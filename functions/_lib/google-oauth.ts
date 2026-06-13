@@ -49,6 +49,15 @@ export function clearGoogleStateCookie() {
   return `${GOOGLE_STATE_COOKIE}=; Path=/api/auth/google/callback; HttpOnly; Secure; SameSite=Lax; Max-Age=0`
 }
 
+export function oauthRedirect(
+  location: string,
+  { cookies = [], headers: extraHeaders = {} }: { cookies?: string[]; headers?: Record<string, string> } = {},
+) {
+  const headers = new Headers({ Location: location, ...extraHeaders })
+  cookies.forEach((cookie) => headers.append('Set-Cookie', cookie))
+  return new Response(null, { status: 302, headers })
+}
+
 export function readGoogleState(request: Request) {
   return request.headers
     .get('Cookie')
