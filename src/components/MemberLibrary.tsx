@@ -216,7 +216,7 @@ function AccountSecurity({
         </div>
         <div className="mt-4 flex flex-wrap gap-3">
           <button className="min-h-12 rounded-2xl bg-slate-950 px-5 font-black text-cyan-200 disabled:opacity-60 dark:bg-cyan-300 dark:text-slate-950" disabled={busy} type="submit">เปลี่ยนรหัสผ่าน</button>
-          <button className="min-h-12 rounded-2xl border border-red-200 px-5 font-black text-red-600 dark:border-red-400/20 dark:text-red-300" onClick={() => void updateAccount({ action: 'logoutAll' })} type="button">ออกจากระบบทุกอุปกรณ์</button>
+          <button className="min-h-12 rounded-2xl border border-red-200 px-5 font-black text-red-600 disabled:opacity-60 dark:border-red-400/20 dark:text-red-300" disabled={busy} onClick={() => void updateAccount({ action: 'logoutAll' })} type="button">ออกจากระบบทุกอุปกรณ์</button>
         </div>
       </form>
       {notice && <div className="rounded-2xl border border-cyan-200 bg-cyan-50 p-4 font-bold text-cyan-900 dark:border-cyan-300/20 dark:bg-cyan-300/10 dark:text-cyan-100 lg:col-span-2">{notice}</div>}

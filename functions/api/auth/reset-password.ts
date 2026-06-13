@@ -39,9 +39,33 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
       limit 1
     `
     if (!reset) return Response.json({ ok: false, error: 'ลิงก์หมดอายุหรือถูกใช้งานแล้ว' }, { status: 400 })
-    await sql`update users set password_hash = ${await hashPassword(password)}, updated_at = now() where id = ${reset.user_id}`
-    await sql`update password_reset_tokens set used_at = now() where id = ${reset.id}`
-    await sql`delete from sessions where user_id = ${reset.user_id}`
+    const passwordHash = await hashPassword(password)
+    const [result] = await sql`
+      with claimed as (
+        update password_reset_tokens
+        set used_at = now()
+        where id = ${reset.id} and used_at is null and expires_at > now()
+        returning user_id
+      ),
+      updated as (
+        update users
+        set password_hash = ${passwordHash}, updated_at = now()
+        where id in (select user_id from claimed)
+        returning id
+      ),
+      cleared as (
+        delete from sessions
+        where user_id in (select id from updated)
+        returning user_id
+      )
+      select
+        (select count(*)::int from claimed) as claimed,
+        (select count(*)::int from updated) as updated,
+        (select count(*)::int from cleared) as sessions_cleared
+    `
+    if (Number(result?.claimed) !== 1 || Number(result?.updated) !== 1) {
+      return Response.json({ ok: false, error: 'ลิงก์หมดอายุหรือถูกใช้งานแล้ว' }, { status: 400 })
+    }
     await writeAuditLog(env, String(reset.email), 'reset_password', 'user', reset.user_id)
     return Response.json({ ok: true })
   } catch (error) {

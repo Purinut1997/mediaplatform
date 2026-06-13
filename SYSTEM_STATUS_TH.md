@@ -154,8 +154,11 @@
 - มี Rate Limit ฝั่ง Neon แบบ atomic ใช้งานร่วมกันได้ทุก Cloudflare instance
   - จำกัดการยิง Login แยกตามต้นทางและบัญชี
   - จำกัดการสมัครสมาชิก ลืมรหัสผ่าน และรีเซ็ตรหัสผ่าน
+  - จำกัดการแก้บัญชีและการลองรหัสผ่านปัจจุบันซ้ำจากหน้าสมาชิก
   - เก็บเฉพาะ hash ของตัวระบุ ไม่เก็บ IP หรืออีเมลดิบในตาราง rate limit
   - ตอบกลับ HTTP `429` และ `Retry-After` เมื่อถูกจำกัด
+- การเปลี่ยนรหัสผ่านไม่อนุญาตให้ใช้รหัสเดิม และบันทึก Error Log เมื่อตรวจรหัสผ่านปัจจุบันไม่ผ่าน
+- การรีเซ็ตรหัสผ่านจากอีเมล claim token, เปลี่ยนรหัส และล้าง session ในคำสั่งฐานข้อมูลแบบ atomic ป้องกัน token เดียวถูกใช้พร้อมกัน
 - ล้าง session หมดอายุ, reset token เก่า และข้อมูล rate limit เก่าอัตโนมัติระหว่างเตรียม schema
 - มี API middleware ป้องกันคำขอแก้ไขข้อมูลจากเว็บไซต์อื่น และบังคับไม่ให้ cache ข้อมูล API
 - มี Security Headers สำหรับหน้าเว็บ เช่น CSP, Permissions Policy, Referrer Policy, `nosniff` และป้องกันการฝังเว็บใน iframe
@@ -354,7 +357,7 @@
 
 - `npm run lint` ผ่าน
 - `npm run build` ผ่าน
-- `npm test` ผ่าน 34 tests ครอบคลุม URL, สิทธิ์สื่อทั้ง frontend/backend, preview URL, การอ่าน API response, bot/Turnstile, validation บัญชี, validation workflow สื่อ, ความพร้อม/ความปลอดภัยของอีเมล, session cookie และ API middleware
+- `npm test` ผ่าน 36 tests ครอบคลุม URL, สิทธิ์สื่อทั้ง frontend/backend, preview URL, การอ่าน API response, bot/Turnstile, validation บัญชี, validation workflow สื่อ, ความพร้อม/ความปลอดภัยของอีเมล, session cookie, rate-limit response และ API middleware
 - Functions TypeScript ผ่าน
 - มี GitHub Actions ตรวจ `lint`, `test` และ `build` ทุก push/PR
 - มี Production Smoke Check ตรวจหน้าเว็บ, Security Headers, Cloudflare Functions, Neon, Turnstile config, session ผู้เยี่ยมชม, settings, media API และการซ่อนสื่อ/ลิงก์ที่ไม่มีสิทธิ์ทุก 6 ชั่วโมงผ่าน GitHub Actions โดยไม่แก้ข้อมูลจริง
@@ -385,3 +388,4 @@
 - วันที่ 13 มิถุนายน 2026 ตรวจ frontend หลังแยก component บน desktop/mobile แล้ว ไม่พบ horizontal overflow หรือ console error และเครดิต MIKPURINUT ยังแสดงครบ
 - วันที่ 13 มิถุนายน 2026 แยก Public Shell ออกจาก `src/App.tsx`, ปรับฟอร์มบัญชีให้ทำงานกับ Password Manager ได้ถูกต้อง และตัดช่องจำการเข้าสู่ระบบที่ยังไม่มีผลจริงออก
 - วันที่ 13 มิถุนายน 2026 แยกหน้าคลังสมาชิกและความปลอดภัยบัญชีออกจาก `src/App.tsx` พร้อมปรับช่องเปลี่ยนรหัสผ่านให้รองรับ Password Manager
+- วันที่ 13 มิถุนายน 2026 เพิ่ม rate limit สำหรับการจัดการบัญชี ป้องกันใช้รหัสเดิมซ้ำ และทำการรีเซ็ตรหัสผ่านด้วย token เป็น atomic operation

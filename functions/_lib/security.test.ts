@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { onRequest as apiMiddleware } from '../api/_middleware'
 import { canAccessLevel, hideProtectedLinks } from './media-access'
+import { rateLimitResponse, requestIp } from './rate-limit'
 import { safeHttpUrl } from './url'
 
 const member = { name: 'Member', email: 'member@example.com', role: 'member' as const, access: 'สมาชิก' }
@@ -100,5 +101,23 @@ describe('API middleware', () => {
     expect(response.headers.get('Permissions-Policy')).toContain('camera=()')
     expect(response.headers.get('X-Content-Type-Options')).toBe('nosniff')
     expect(response.headers.get('X-Frame-Options')).toBe('DENY')
+  })
+})
+
+describe('rate-limit responses', () => {
+  it('prefers Cloudflare IP and falls back to the first forwarded IP', () => {
+    expect(requestIp(new Request('https://example.com', {
+      headers: { 'CF-Connecting-IP': '203.0.113.7', 'X-Forwarded-For': '198.51.100.4, 198.51.100.5' },
+    }))).toBe('203.0.113.7')
+    expect(requestIp(new Request('https://example.com', {
+      headers: { 'X-Forwarded-For': '198.51.100.4, 198.51.100.5' },
+    }))).toBe('198.51.100.4')
+  })
+
+  it('returns a hardened 429 response with Retry-After', async () => {
+    const response = rateLimitResponse(42)
+    expect(response.status).toBe(429)
+    expect(response.headers.get('Retry-After')).toBe('42')
+    await expect(response.json()).resolves.toMatchObject({ ok: false, retryAfter: 42 })
   })
 })
