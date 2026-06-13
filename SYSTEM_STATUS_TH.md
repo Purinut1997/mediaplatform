@@ -406,3 +406,4 @@
 - วันที่ 14 มิถุนายน 2026 แก้ Google OAuth redirect ให้สร้าง headers/cookies แบบ Cloudflare Workers รองรับ ปิด Error 1101 จาก immutable `Response.redirect()` headers
 - วันที่ 14 มิถุนายน 2026 ตรวจ Production ยืนยันว่า Google Login และ Turnstile พร้อมใช้งาน ส่วน Password Reset Email ยังรอ Resend
 - วันที่ 14 มิถุนายน 2026 เพิ่ม Production smoke ตรวจ Google OAuth state cookie/callback และแยกหน้ารายละเอียดสื่อกับรีวิวออกจาก `src/App.tsx`
+- วันที่ 14 มิถุนายน 2026 ตรวจ Production เวอร์ชัน `2026.06.14.2` หลังแยกหน้ารายละเอียดสื่อแล้ว ทั้ง desktop/mobile ไม่มี horizontal overflow หรือ console error และ Production smoke ผ่านครบ
