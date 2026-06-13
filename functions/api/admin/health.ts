@@ -1,6 +1,7 @@
 import { requireAdminPermission } from '../../_lib/admin'
 import { ensureSchema, getSql, type Env } from '../../_lib/db'
 import { emailStatus } from '../../_lib/email'
+import { googleOAuthConfigured } from '../../_lib/google-oauth'
 
 export const onRequestGet = async ({ env, request }: { env: Env; request: Request }) => {
   if (!(await requireAdminPermission(env, request, 'system:read'))) {
@@ -65,6 +66,7 @@ export const onRequestGet = async ({ env, request }: { env: Env; request: Reques
         turnstile: Boolean(env.TURNSTILE_SITE_KEY && env.TURNSTILE_SECRET_KEY),
         cron: Boolean(env.CRON_SECRET),
         telegram: Boolean(env.TELEGRAM_BOT_TOKEN && env.TELEGRAM_CHAT_ID),
+        googleLogin: googleOAuthConfigured(env),
       },
       counts: {
         media: counts?.media_count ?? 0,

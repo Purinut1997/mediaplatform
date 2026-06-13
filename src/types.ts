@@ -116,6 +116,7 @@ export type SystemHealth = {
     turnstile: boolean
     cron: boolean
     telegram: boolean
+    googleLogin?: boolean
   }
   counts: {
     media: number

@@ -54,7 +54,7 @@ export async function loginWithPassword(env: Env, email: string, password: strin
   return createSession(sql, user)
 }
 
-async function createSession(sql: ReturnType<typeof getSql>, user: UserRow) {
+export async function createSession(sql: ReturnType<typeof getSql>, user: UserRow) {
   const token = randomHex(32)
   const tokenHash = await sha256Hex(token)
   await sql`

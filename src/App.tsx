@@ -93,6 +93,8 @@ function trackMediaEvent(mediaId: number, eventType: 'view') {
 }
 
 function App() {
+  const oauthResult =
+    typeof window === 'undefined' ? '' : new URLSearchParams(window.location.search).get('oauth') ?? ''
   const [theme, setTheme] = useState<Theme>(() => {
     if (typeof window === 'undefined') return 'light'
     return (window.localStorage.getItem('theme') as Theme | null) ?? 'light'
@@ -112,12 +114,19 @@ function App() {
   const [view, setView] = useState<View>(() =>
     typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('reset')
       ? 'reset'
-      : 'home',
+      : oauthResult && oauthResult !== 'success'
+        ? 'login'
+        : 'home',
   )
   const [selected, setSelected] = useState<MediaItem>(mediaItems[0])
   const [query, setQuery] = useState('')
   const [topic, setTopic] = useState('ทั้งหมด')
-  const [toast, setToast] = useState('ระบบเชื่อมต่อ Cloudflare + Neon สำเร็จ')
+  const [toast, setToast] = useState(() => {
+    if (oauthResult === 'success') return 'เข้าสู่ระบบด้วย Google สำเร็จ'
+    if (oauthResult === 'not_configured') return 'Google Login ยังไม่ได้ตั้งค่าครบ'
+    if (oauthResult) return 'เข้าสู่ระบบด้วย Google ไม่สำเร็จ กรุณาลองใหม่'
+    return 'ระบบเชื่อมต่อ Cloudflare + Neon สำเร็จ'
+  })
   const [showSuccess, setShowSuccess] = useState(false)
   const [showError, setShowError] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -130,6 +139,11 @@ function App() {
     document.documentElement.classList.toggle('dark', theme === 'dark')
     window.localStorage.setItem('theme', theme)
   }, [theme])
+
+  useEffect(() => {
+    if (!oauthResult) return
+    window.history.replaceState({}, '', window.location.pathname)
+  }, [oauthResult])
 
   useEffect(() => {
     let active = true
@@ -3815,6 +3829,7 @@ function AdminPanel({
                   ['อีเมลลืมรหัสผ่าน', systemHealth.integrations?.passwordResetEmail ? 'พร้อมใช้งาน' : 'ยังไม่พร้อม'],
                   ['Cron ตรวจลิงก์', systemHealth.integrations?.cron ? 'พร้อมใช้งาน' : 'ยังไม่พร้อม'],
                   ['Telegram', systemHealth.integrations?.telegram ? 'พร้อมใช้งาน' : 'ยังไม่พร้อม'],
+                  ['Google Login', systemHealth.integrations?.googleLogin ? 'พร้อมใช้งาน' : 'ยังไม่พร้อม'],
                   ['สื่อทั้งหมด', systemHealth.counts.media.toLocaleString('th-TH')],
                   ['Error 24 ชม.', systemHealth.counts.errors24h.toLocaleString('th-TH')],
                   ['แจ้งเตือนยังไม่อ่าน', (systemHealth.counts.unreadNotifications ?? unreadNotifications).toLocaleString('th-TH')],

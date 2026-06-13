@@ -26,7 +26,17 @@ const checks = [
       data.ok === true &&
       typeof data.turnstileSiteKey === 'string' &&
       data.turnstileSiteKey.length > 10 &&
-      typeof data.passwordResetEnabled === 'boolean',
+      typeof data.passwordResetEnabled === 'boolean' &&
+      typeof data.googleEnabled === 'boolean',
+  },
+  {
+    path: '/api/auth/google',
+    expectedStatus: 302,
+    redirect: 'manual',
+    validate: (_body, response) => {
+      const location = response.headers.get('location') || ''
+      return location.includes('accounts.google.com/o/oauth2') || location.includes('oauth=not_configured')
+    },
   },
   { path: '/api/auth/me', validate: (data) => data.ok === true && data.user === null },
   { path: '/api/settings', validate: (data) => data.ok === true && typeof data.settings === 'object' },
@@ -60,6 +70,7 @@ for (const check of checks) {
   try {
     const response = await fetch(`${baseUrl}${check.path}`, {
       headers: { 'user-agent': 'MIKPURINUT-production-smoke/1.0' },
+      redirect: check.redirect || 'follow',
       signal: AbortSignal.timeout(timeoutMs),
     })
     const contentType = response.headers.get('content-type') || ''

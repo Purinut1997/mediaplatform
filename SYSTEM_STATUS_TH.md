@@ -42,6 +42,12 @@
   - แต่ละปุ่มตรวจสิทธิ์ของลิงก์นั้นผ่าน backend ก่อนเปิดจริง
 - รองรับแท็กจริงต่อสื่อผ่านตาราง `tags` และ `media_tags`
 - มีหน้า Login และ Register พร้อม bot check แบบพื้นฐาน
+- รองรับ Google Login แบบ OAuth จริง
+  - เชื่อมบัญชี Neon เดิมจากอีเมล Google ที่ยืนยันแล้ว โดยคง role/access เดิม
+  - สร้างบัญชีสมาชิกทั่วไปอัตโนมัติเมื่อเป็น Gmail ใหม่
+  - ใช้ state cookie แบบ HttpOnly/Secure/SameSite และ Rate Limit ป้องกัน callback
+  - ปุ่ม Google ซ่อนอัตโนมัติจนกว่าจะตั้ง `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` และ `APP_URL` ครบ
+  - มีคู่มือตั้งค่าที่ `GOOGLE_LOGIN_SETUP_TH.md`
 - API สมัครสมาชิกเคารพสวิตช์เปิด/ปิดรับ VIP จากหลังบ้านจริง ผู้ใช้เรียก API ตรงเพื่อส่งคำขอ VIP ขณะปิดไม่ได้
 - Login, Register, ลืมรหัสผ่าน, ตั้งรหัสผ่านใหม่ และบัญชีสมาชิกจำกัดรูปแบบ/ความยาวข้อมูลก่อนใช้ฐานข้อมูลหรือคำนวณรหัสผ่าน
 - มีหน้า Maintenance Mode สำหรับผู้ใช้ทั่วไป เมื่อเปิดจากหลังบ้าน
@@ -261,9 +267,10 @@
    - เปลี่ยน `ADMIN_BOOTSTRAP_PASSWORD` เป็นรหัสใหม่ที่ไม่เคยอยู่ใน Git history
    - ตั้งค่า `TURNSTILE_SITE_KEY` และ `TURNSTILE_SECRET_KEY` แล้ว Production ใช้ Turnstile จริงสำหรับ Login/Register/ลืมรหัสผ่าน
    - `RESEND_API_KEY`, `EMAIL_FROM` และ `APP_URL` สำหรับส่งอีเมลลืมรหัสผ่าน
-3. Google/Facebook OAuth ยังปิดอยู่
-   - หน้าเว็บซ่อนปุ่มไว้เพื่อไม่แสดงฟังก์ชันจำลอง
-   - ต้องมี OAuth Client ID/Secret และตั้งค่า redirect URL จากบัญชีเจ้าของก่อนเชื่อมจริง
+3. Google OAuth เขียนระบบเสร็จแล้ว แต่ยังรอค่าจากบัญชีเจ้าของ
+   - ตั้ง `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` และ `APP_URL` ตาม `GOOGLE_LOGIN_SETUP_TH.md`
+   - Authorized redirect URI คือ `https://mediaplatform.pages.dev/api/auth/google/callback`
+   - Facebook OAuth ยังปิดและหน้าเว็บซ่อนปุ่มไว้
 4. ระบบซื้อสื่อแยกและวันหมดอายุ VIP ยังปิดไว้
    - ต้องกำหนดราคา วิธีรับชำระ อายุ VIP และเงื่อนไขคืนเงินก่อนสร้าง workflow จริง
 
@@ -298,7 +305,7 @@
 
 ## ลำดับงานแนะนำต่อไป
 
-1. ตั้งค่า Turnstile และ Resend Secrets บน Cloudflare Pages
+1. ตั้งค่า Google Login, Turnstile และ Resend Secrets บน Cloudflare Pages
 2. Login Wrangler แล้วตั้ง `CRON_SECRET` ให้ตรงกันทั้ง Cloudflare Pages และ Worker จากนั้นรัน `npm run cron:secret` + `npm run cron:deploy`
 3. ทยอยแยก `src/App.tsx` และเพิ่ม Integration Test สำหรับ workflow สำคัญ
 4. แยก Migration และปรับ Backup/Restore ขนาดใหญ่
@@ -318,6 +325,7 @@
 - `src/components/MemberLibrary.tsx`
 - `src/components/SharedUI.tsx`
 - `src/components/TechBackground.tsx`
+- `GOOGLE_LOGIN_SETUP_TH.md`
 - `functions/_lib/db.ts`
 - `functions/_lib/admin.ts`
 - `functions/_lib/notify.ts`
@@ -327,6 +335,7 @@
 - `functions/_lib/media-validation.ts`
 - `functions/_lib/input.ts`
 - `functions/_lib/url.ts`
+- `functions/_lib/google-oauth.ts`
 - `functions/api/_middleware.ts`
 - `functions/api/media/index.ts`
 - `functions/api/media/[id].ts`
@@ -337,6 +346,8 @@
 - `functions/api/member/account.ts`
 - `functions/api/auth/forgot-password.ts`
 - `functions/api/auth/reset-password.ts`
+- `functions/api/auth/google.ts`
+- `functions/api/auth/google/callback.ts`
 - `functions/api/admin/analytics.ts`
 - `functions/api/admin/users.ts`
 - `functions/api/admin/activity.ts`
@@ -357,7 +368,7 @@
 
 - `npm run lint` ผ่าน
 - `npm run build` ผ่าน
-- `npm test` ผ่าน 36 tests ครอบคลุม URL, สิทธิ์สื่อทั้ง frontend/backend, preview URL, การอ่าน API response, bot/Turnstile, validation บัญชี, validation workflow สื่อ, ความพร้อม/ความปลอดภัยของอีเมล, session cookie, rate-limit response และ API middleware
+- `npm test` ผ่าน 39 tests ครอบคลุม URL, สิทธิ์สื่อทั้ง frontend/backend, preview URL, การอ่าน API response, bot/Turnstile, Google OAuth state/config, validation บัญชี, validation workflow สื่อ, ความพร้อม/ความปลอดภัยของอีเมล, session cookie, rate-limit response และ API middleware
 - Functions TypeScript ผ่าน
 - มี GitHub Actions ตรวจ `lint`, `test` และ `build` ทุก push/PR
 - มี Production Smoke Check ตรวจหน้าเว็บ, Security Headers, Cloudflare Functions, Neon, Turnstile config, session ผู้เยี่ยมชม, settings, media API และการซ่อนสื่อ/ลิงก์ที่ไม่มีสิทธิ์ทุก 6 ชั่วโมงผ่าน GitHub Actions โดยไม่แก้ข้อมูลจริง
@@ -389,3 +400,4 @@
 - วันที่ 13 มิถุนายน 2026 แยก Public Shell ออกจาก `src/App.tsx`, ปรับฟอร์มบัญชีให้ทำงานกับ Password Manager ได้ถูกต้อง และตัดช่องจำการเข้าสู่ระบบที่ยังไม่มีผลจริงออก
 - วันที่ 13 มิถุนายน 2026 แยกหน้าคลังสมาชิกและความปลอดภัยบัญชีออกจาก `src/App.tsx` พร้อมปรับช่องเปลี่ยนรหัสผ่านให้รองรับ Password Manager
 - วันที่ 13 มิถุนายน 2026 เพิ่ม rate limit สำหรับการจัดการบัญชี ป้องกันใช้รหัสเดิมซ้ำ และทำการรีเซ็ตรหัสผ่านด้วย token เป็น atomic operation
+- วันที่ 13 มิถุนายน 2026 เพิ่ม Google OAuth Login จริง พร้อมเชื่อมอีเมลเดิม/สร้างสมาชิกใหม่, state cookie, rate limit, System Health และ Production smoke
