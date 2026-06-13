@@ -11,7 +11,14 @@ const checks = [
       response.headers.get('x-content-type-options') === 'nosniff' &&
       Boolean(response.headers.get('content-security-policy')),
   },
-  { path: '/api/health', validate: (data) => data.ok === true },
+  {
+    path: '/api/health',
+    validate: (data, response) =>
+      data.ok === true &&
+      response.headers.get('cache-control') === 'no-store' &&
+      Boolean(response.headers.get('content-security-policy')) &&
+      Boolean(response.headers.get('permissions-policy')),
+  },
   { path: '/api/db-check', validate: (data) => data.ok === true && data.database === 'neon' },
   {
     path: '/api/auth/config',
@@ -35,6 +42,16 @@ const checks = [
       data.media.every((item) => ['เผยแพร่', 'เผยแพร่แล้ว'].includes(item.status)) &&
       data.media.every((item) => item.resourceUrl === '' && item.previewUrl === '' && item.links.length === 0),
   },
+  {
+    path: '/api/admin/email',
+    expectedStatus: 401,
+    validate: (data) => data.ok === false && data.error === 'Unauthorized',
+  },
+  {
+    path: '/api/admin/health',
+    expectedStatus: 401,
+    validate: (data) => data.ok === false && data.error === 'Unauthorized',
+  },
 ]
 
 let failed = false
@@ -47,7 +64,7 @@ for (const check of checks) {
     })
     const contentType = response.headers.get('content-type') || ''
     const body = contentType.includes('application/json') ? await response.json() : await response.text()
-    const valid = response.ok && check.validate(body, response)
+    const valid = response.status === (check.expectedStatus ?? 200) && check.validate(body, response)
     console.log(`${valid ? 'PASS' : 'FAIL'} ${check.path} ${response.status} ${Date.now() - started}ms`)
     failed ||= !valid
   } catch (error) {
