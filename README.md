@@ -17,9 +17,14 @@ Pages Functions, and Neon Postgres.
 npm install
 npm run dev
 npm run build
+npm run smoke
 npm run cron:secret
 npm run cron:deploy
 ```
+
+`npm run smoke` checks the live production homepage, Cloudflare Functions, Neon
+connection, settings, and published-media API without writing data. GitHub
+Actions also runs this check every six hours.
 
 ## Cloudflare Pages Settings
 

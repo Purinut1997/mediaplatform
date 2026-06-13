@@ -8,6 +8,7 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "test": "vitest run",
+    "smoke": "node scripts/smoke.mjs",
     "preview": "vite preview",
     "cron:deploy": "npx --yes wrangler deploy -c workers/link-check-cron/wrangler.toml",
     "cron:secret": "npx --yes wrangler secret put CRON_SECRET -c workers/link-check-cron/wrangler.toml",
