@@ -35,8 +35,18 @@ const checks = [
     redirect: 'manual',
     validate: (_body, response) => {
       const location = response.headers.get('location') || ''
-      return location.includes('accounts.google.com/o/oauth2') || location.includes('oauth=not_configured')
+      const stateCookie = response.headers.get('set-cookie') || ''
+      return (
+        location.includes('oauth=not_configured') ||
+        (location.includes('accounts.google.com/o/oauth2') && stateCookie.includes('mp_google_state='))
+      )
     },
+  },
+  {
+    path: '/api/auth/google/callback',
+    expectedStatus: 302,
+    redirect: 'manual',
+    validate: (_body, response) => (response.headers.get('location') || '').includes('oauth=invalid_state'),
   },
   { path: '/api/auth/me', validate: (data) => data.ok === true && data.user === null },
   { path: '/api/settings', validate: (data) => data.ok === true && typeof data.settings === 'object' },

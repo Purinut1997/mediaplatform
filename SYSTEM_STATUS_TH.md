@@ -298,7 +298,8 @@
    - แยกค่ากลางแบรนด์, ค่าเริ่มต้น, พื้นหลังเทคโนโลยี, Portal Tiles, Turnstile widget, UI แจ้งสถานะ และ Public Shell ไปที่ `src/brand.ts`, `src/defaults.ts` และ `src/components` แล้ว
    - Public Shell รวม Header, Hero, Brand Showcase และหน้า Maintenance ไว้ที่ `src/components/PublicShell.tsx`
    - แยกหน้าคลังสมาชิกและการจัดการความปลอดภัยบัญชีไว้ที่ `src/components/MemberLibrary.tsx`
-   - `src/App.tsx` ลดจากประมาณ 6,064 เหลือประมาณ 4,677 บรรทัด โดยพฤติกรรมหน้าเว็บเดิมยังคงเดิม
+   - แยกหน้ารายละเอียดสื่อ, preview, ลิงก์ในชุด และรีวิวไว้ที่ `src/components/MediaDetail.tsx`
+   - `src/App.tsx` ลดจากประมาณ 6,064 เหลือประมาณ 4,415 บรรทัด โดยพฤติกรรมหน้าเว็บเดิมยังคงเดิม
    - ปรับฟอร์มบัญชีให้รองรับ Password Manager/Browser Autofill ด้วย `autocomplete` ที่ถูกต้อง และตัดตัวเลือกจำการเข้าสู่ระบบที่ยังไม่มีพฤติกรรมจริงออก
 5. เพิ่ม Integration Test สำหรับ Login, สมัครสมาชิก, Workflow สื่อ, VIP และ Backup/Restore
    - ตอนนี้มี Unit Test ด้าน URL และสิทธิ์สื่อ พร้อม GitHub Actions แล้ว
@@ -323,6 +324,7 @@
 - `src/components/PortalTiles.tsx`
 - `src/components/PublicShell.tsx`
 - `src/components/MemberLibrary.tsx`
+- `src/components/MediaDetail.tsx`
 - `src/components/SharedUI.tsx`
 - `src/components/TechBackground.tsx`
 - `GOOGLE_LOGIN_SETUP_TH.md`
@@ -403,3 +405,4 @@
 - วันที่ 13 มิถุนายน 2026 เพิ่ม Google OAuth Login จริง พร้อมเชื่อมอีเมลเดิม/สร้างสมาชิกใหม่, state cookie, rate limit, System Health และ Production smoke
 - วันที่ 14 มิถุนายน 2026 แก้ Google OAuth redirect ให้สร้าง headers/cookies แบบ Cloudflare Workers รองรับ ปิด Error 1101 จาก immutable `Response.redirect()` headers
 - วันที่ 14 มิถุนายน 2026 ตรวจ Production ยืนยันว่า Google Login และ Turnstile พร้อมใช้งาน ส่วน Password Reset Email ยังรอ Resend
+- วันที่ 14 มิถุนายน 2026 เพิ่ม Production smoke ตรวจ Google OAuth state cookie/callback และแยกหน้ารายละเอียดสื่อกับรีวิวออกจาก `src/App.tsx`
