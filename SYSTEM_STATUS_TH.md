@@ -265,10 +265,10 @@
    - ตรวจล่าสุดพบว่า Wrangler บนเครื่องยังไม่ได้ login บัญชี Cloudflare จึงยัง deploy อัตโนมัติไม่ได้
 2. ตั้งค่า Secret ภายนอกก่อนเปิดใช้ฟีเจอร์เต็ม
    - เปลี่ยน `ADMIN_BOOTSTRAP_PASSWORD` เป็นรหัสใหม่ที่ไม่เคยอยู่ใน Git history
-   - ตั้งค่า `TURNSTILE_SITE_KEY` และ `TURNSTILE_SECRET_KEY` แล้ว Production ใช้ Turnstile จริงสำหรับ Login/Register/ลืมรหัสผ่าน
+   - Production ตั้งค่า `TURNSTILE_SITE_KEY` และ `TURNSTILE_SECRET_KEY` แล้ว ใช้ Turnstile จริงสำหรับ Login/Register/ลืมรหัสผ่าน
    - `RESEND_API_KEY`, `EMAIL_FROM` และ `APP_URL` สำหรับส่งอีเมลลืมรหัสผ่าน
-3. Google OAuth เขียนระบบเสร็จแล้ว แต่ยังรอค่าจากบัญชีเจ้าของ
-   - ตั้ง `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` และ `APP_URL` ตาม `GOOGLE_LOGIN_SETUP_TH.md`
+3. Google OAuth เปิดใช้งานบน Production แล้ว
+   - ปุ่ม Google, OAuth callback, การเชื่อมบัญชีเดิม และการสร้างสมาชิกใหม่ทำงานแล้ว
    - Authorized redirect URI คือ `https://mediaplatform.pages.dev/api/auth/google/callback`
    - Facebook OAuth ยังปิดและหน้าเว็บซ่อนปุ่มไว้
 4. ระบบซื้อสื่อแยกและวันหมดอายุ VIP ยังปิดไว้
@@ -298,14 +298,14 @@
    - แยกค่ากลางแบรนด์, ค่าเริ่มต้น, พื้นหลังเทคโนโลยี, Portal Tiles, Turnstile widget, UI แจ้งสถานะ และ Public Shell ไปที่ `src/brand.ts`, `src/defaults.ts` และ `src/components` แล้ว
    - Public Shell รวม Header, Hero, Brand Showcase และหน้า Maintenance ไว้ที่ `src/components/PublicShell.tsx`
    - แยกหน้าคลังสมาชิกและการจัดการความปลอดภัยบัญชีไว้ที่ `src/components/MemberLibrary.tsx`
-   - `src/App.tsx` ลดจากประมาณ 6,064 เหลือประมาณ 4,663 บรรทัด โดยพฤติกรรมหน้าเว็บเดิมยังคงเดิม
+   - `src/App.tsx` ลดจากประมาณ 6,064 เหลือประมาณ 4,677 บรรทัด โดยพฤติกรรมหน้าเว็บเดิมยังคงเดิม
    - ปรับฟอร์มบัญชีให้รองรับ Password Manager/Browser Autofill ด้วย `autocomplete` ที่ถูกต้อง และตัดตัวเลือกจำการเข้าสู่ระบบที่ยังไม่มีพฤติกรรมจริงออก
 5. เพิ่ม Integration Test สำหรับ Login, สมัครสมาชิก, Workflow สื่อ, VIP และ Backup/Restore
    - ตอนนี้มี Unit Test ด้าน URL และสิทธิ์สื่อ พร้อม GitHub Actions แล้ว
 
 ## ลำดับงานแนะนำต่อไป
 
-1. ตั้งค่า Google Login, Turnstile และ Resend Secrets บน Cloudflare Pages
+1. ตั้งค่า Resend Secrets บน Cloudflare Pages เพื่อเปิดระบบลืมรหัสผ่านผ่านอีเมล
 2. Login Wrangler แล้วตั้ง `CRON_SECRET` ให้ตรงกันทั้ง Cloudflare Pages และ Worker จากนั้นรัน `npm run cron:secret` + `npm run cron:deploy`
 3. ทยอยแยก `src/App.tsx` และเพิ่ม Integration Test สำหรับ workflow สำคัญ
 4. แยก Migration และปรับ Backup/Restore ขนาดใหญ่
@@ -402,3 +402,4 @@
 - วันที่ 13 มิถุนายน 2026 เพิ่ม rate limit สำหรับการจัดการบัญชี ป้องกันใช้รหัสเดิมซ้ำ และทำการรีเซ็ตรหัสผ่านด้วย token เป็น atomic operation
 - วันที่ 13 มิถุนายน 2026 เพิ่ม Google OAuth Login จริง พร้อมเชื่อมอีเมลเดิม/สร้างสมาชิกใหม่, state cookie, rate limit, System Health และ Production smoke
 - วันที่ 14 มิถุนายน 2026 แก้ Google OAuth redirect ให้สร้าง headers/cookies แบบ Cloudflare Workers รองรับ ปิด Error 1101 จาก immutable `Response.redirect()` headers
+- วันที่ 14 มิถุนายน 2026 ตรวจ Production ยืนยันว่า Google Login และ Turnstile พร้อมใช้งาน ส่วน Password Reset Email ยังรอ Resend
