@@ -1,0 +1,91 @@
+import { BRAND_HERO_URL } from './brand'
+import type { AccessLevel, MediaItem, MediaSource, MediaStatus, SiteSettings } from './types'
+
+export const mediaItems: MediaItem[] = [
+  {
+    id: 1,
+    title: 'ชุดเอกสารอบรม AI สำหรับครู',
+    topic: 'AI',
+    access: 'สาธารณะ',
+    status: 'เผยแพร่แล้ว',
+    price: 0,
+    downloads: 428,
+    views: 2460,
+    rating: 4.9,
+    source: 'Google Drive',
+    cover: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=1200&q=80',
+    description: 'ไฟล์ PDF สำหรับใช้ประกอบการอบรม พร้อมตัวอย่างกิจกรรมและเอกสารแจกในห้องเรียน',
+  },
+  {
+    id: 2,
+    title: 'Google Sheet ระบบเช็กชื่อออนไลน์',
+    topic: 'AppScript',
+    access: 'สมาชิก',
+    status: 'เผยแพร่แล้ว',
+    price: 0,
+    downloads: 189,
+    views: 1120,
+    rating: 4.8,
+    source: 'Google Sheet',
+    cover: 'https://images.unsplash.com/photo-1554224155-6726b3ff858f?auto=format&fit=crop&w=1200&q=80',
+    description: 'เทมเพลต Google Sheet พร้อมแนวทางต่อยอด AppScript สำหรับงานโรงเรียน',
+  },
+  {
+    id: 3,
+    title: 'วิดีโอสอนติดตั้งระบบคลังสื่อ',
+    topic: 'อบรม',
+    access: 'VIP',
+    status: 'เผยแพร่แล้ว',
+    price: 0,
+    downloads: 76,
+    views: 890,
+    rating: 5,
+    source: 'YouTube',
+    cover: 'https://images.unsplash.com/photo-1498050108023-c5249f4df085?auto=format&fit=crop&w=1200&q=80',
+    description: 'วิดีโอแนะนำการติดตั้ง ใช้งาน และดูแลระบบสำหรับผู้ดูแลเว็บไซต์',
+  },
+  {
+    id: 4,
+    title: 'Prompt Pack สำหรับงานบริหารโรงเรียน',
+    topic: 'งานเอกสาร',
+    access: 'ซื้อแยก',
+    status: 'ฉบับร่าง',
+    price: 499,
+    downloads: 32,
+    views: 510,
+    rating: 4.7,
+    source: 'Google Drive',
+    cover: 'https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=1200&q=80',
+    description: 'ชุดคำสั่งพร้อมตัวอย่างการใช้งานสำหรับจัดทำเอกสาร แผนงาน และรายงาน',
+  },
+]
+
+export const topics = ['ทั้งหมด', 'AI', 'AppScript', 'โรงเรียน', 'งานเอกสาร', 'อบรม']
+export const accessOptions: AccessLevel[] = ['สาธารณะ', 'สมาชิก', 'VIP', 'ซื้อแยก']
+export const statusOptions: MediaStatus[] = ['ฉบับร่าง', 'รอตรวจสอบ', 'เผยแพร่แล้ว', 'ซ่อนชั่วคราว', 'ถูกปฏิเสธ']
+export const sourceOptions: MediaSource[] = ['Google Drive', 'Google Sheet', 'YouTube', 'External Link']
+
+export const defaultSiteSettings: SiteSettings = {
+  heroEyebrow: 'AI / Cyber / School Operations',
+  heroTitle: 'ศูนย์กลางสื่อการเรียนรู้ที่สดใส ล้ำสมัย และใช้งานง่าย',
+  heroDescription:
+    'ออกแบบเป็น portal โรงเรียนยุคใหม่ มีคลังสื่อแบบ dashboard, แยกสิทธิ์ Public / Member / VIP และเชื่อมสื่อจาก Drive, Sheet, YouTube ได้ในที่เดียว',
+  heroImageUrl: BRAND_HERO_URL,
+  heroPrimaryLabel: 'เปิดคลังสื่อ',
+  heroSecondaryLabel: 'ดูสิทธิ์ VIP',
+  announcementText: '',
+  maintenanceEnabled: false,
+  maintenanceTitle: 'ระบบกำลังปรับปรุง',
+  maintenanceMessage: 'กรุณากลับมาใหม่ภายหลัง',
+  vipRegistrationEnabled: false,
+  vipPrice: 0,
+  vipQrUrl: '',
+  vipBankName: 'พร้อมเพย์ (PromptPay)',
+  vipAccountNumber: '',
+  vipAccountName: 'MIKPURINUT',
+  vipPaymentTitle: 'ข้อมูลการชำระเงิน VIP',
+  vipPaymentSubtitle: 'กรุณาโอนเงินและแนบสลิปเพื่อยืนยันสิทธิ์',
+  vipSlipLabel: 'แนบสลิปโอนเงิน',
+  vipAgreementLabel: 'ข้อมูลถูกต้องและยอมรับเงื่อนไขการใช้งาน',
+  vipSubmitLabel: 'ลงทะเบียนสมาชิก',
+}

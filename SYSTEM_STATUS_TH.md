@@ -4,7 +4,7 @@
 
 ## ภาพรวมความคืบหน้า
 
-- ระบบพร้อมใช้งานหลักประมาณ **90%**
+- ระบบพร้อมใช้งานหลักประมาณ **92%**
 - งานหลักสำหรับหน้าเว็บผู้ใช้, สมาชิก, Super Admin, workflow สื่อ, รายงาน, log, backup และ security มีแล้ว
 - งานที่เหลือส่วนใหญ่เป็นการรองรับข้อมูลขนาดใหญ่มาก, แยกโครงสร้างโค้ด และการตั้งค่า Secret/บริการภายนอกจากบัญชีเจ้าของ
 
@@ -285,7 +285,8 @@
 4. ทยอยแยก `src/App.tsx` เป็นหน้าและ component ย่อย เพื่อลดความเสี่ยงเวลาแก้ระบบระยะยาว
    - แยก type contract กลางไปที่ `src/types.ts` แล้ว
    - แยก helper สำหรับ API response, สิทธิ์สื่อ, workflow status และ preview URL ไปที่ `src/lib` แล้ว
-   - `src/App.tsx` ลดจากประมาณ 6,064 เหลือประมาณ 5,766 บรรทัด โดยพฤติกรรมหน้าเว็บเดิมยังคงเดิม
+   - แยกค่ากลางแบรนด์, ค่าเริ่มต้น, พื้นหลังเทคโนโลยี, Portal Tiles, Turnstile widget และ UI แจ้งสถานะไปที่ `src/brand.ts`, `src/defaults.ts` และ `src/components` แล้ว
+   - `src/App.tsx` ลดจากประมาณ 6,064 เหลือประมาณ 5,400 บรรทัด โดยพฤติกรรมหน้าเว็บเดิมยังคงเดิม
 5. เพิ่ม Integration Test สำหรับ Login, สมัครสมาชิก, Workflow สื่อ, VIP และ Backup/Restore
    - ตอนนี้มี Unit Test ด้าน URL และสิทธิ์สื่อ พร้อม GitHub Actions แล้ว
 
@@ -303,6 +304,12 @@
 - `src/types.ts`
 - `src/lib/api.ts`
 - `src/lib/media.ts`
+- `src/brand.ts`
+- `src/defaults.ts`
+- `src/components/AuthBotCheck.tsx`
+- `src/components/PortalTiles.tsx`
+- `src/components/SharedUI.tsx`
+- `src/components/TechBackground.tsx`
 - `functions/_lib/db.ts`
 - `functions/_lib/admin.ts`
 - `functions/_lib/notify.ts`
@@ -370,3 +377,4 @@
 - สิทธิ์ผู้ใช้บนหน้าเว็บอ้างอิงจาก session cookie/API เท่านั้น ไม่อ่านหรือบันทึก role/access ใน `localStorage` เพื่อป้องกันการปลอมสถานะผู้ดูแลจากเบราว์เซอร์
 - API middleware ป้องกัน cross-site mutation/request ขนาดเกินกำหนด และกำหนด CSP/Permissions Policy สำหรับ API responses
 - เริ่มแยกโครงสร้าง frontend แล้ว โดยย้าย type contract และ helper ที่ทดสอบได้ออกจาก `src/App.tsx`
+- วันที่ 13 มิถุนายน 2026 ตรวจ frontend หลังแยก component บน desktop/mobile แล้ว ไม่พบ horizontal overflow หรือ console error และเครดิต MIKPURINUT ยังแสดงครบ

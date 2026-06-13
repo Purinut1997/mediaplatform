@@ -1,4 +1,4 @@
-import { type FormEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
+import { type FormEvent, type ReactNode, useEffect, useMemo, useState } from 'react'
 import {
   AlertCircle,
   Archive,
@@ -20,7 +20,6 @@ import {
   EyeOff,
   FileText,
   Gauge,
-  GraduationCap,
   Heart,
   Layers3,
   Link2,
@@ -63,7 +62,6 @@ import type {
   MediaFormState,
   MediaItem,
   MediaLink,
-  MediaSource,
   MediaStatus,
   MemberLibrary,
   RestorePreview,
@@ -84,129 +82,13 @@ import {
   getPreviewUrl,
   normalizeMediaStatus,
 } from './lib/media'
+import { BRAND_HERO_URL, LOGO_URL } from './brand'
+import { TechBackground } from './components/TechBackground'
+import { CreditBadge, EmptyState, Footer, LoadingOverlay, Popup, Toast } from './components/SharedUI'
+import { PortalTiles } from './components/PortalTiles'
+import { AuthBotCheck } from './components/AuthBotCheck'
+import { accessOptions, defaultSiteSettings, mediaItems, sourceOptions, statusOptions, topics } from './defaults'
 import './App.css'
-
-const LOGO_URL =
-  'https://raw.githubusercontent.com/Purinut1997/web-images/ab67fea68788dc5db9514475e8f2b8cb1c32d8b3/ChatGPT%20Image%2023%20%E0%B8%9E.%E0%B8%84.%202569%2008_05_56.png'
-const BRAND_HERO_URL =
-  'https://raw.githubusercontent.com/Purinut1997/web-images/c70597729a1ba58a7b7b672d2bcace2f673a5a49/bdbeb65d-b4f5-4f65-a388-e95d950eac84%20%281%29.png'
-
-declare global {
-  interface Window {
-    turnstile?: {
-      render: (element: HTMLElement, options: { sitekey: string; callback: (token: string) => void; 'expired-callback': () => void }) => string
-    }
-  }
-}
-
-const mediaItems: MediaItem[] = [
-  {
-    id: 1,
-    title: 'ชุดเอกสารอบรม AI สำหรับครู',
-    topic: 'AI',
-    access: 'สาธารณะ',
-    status: 'เผยแพร่แล้ว',
-    price: 0,
-    downloads: 428,
-    views: 2460,
-    rating: 4.9,
-    source: 'Google Drive',
-    cover:
-      'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=1200&q=80',
-    description:
-      'ไฟล์ PDF สำหรับใช้ประกอบการอบรม พร้อมตัวอย่างกิจกรรมและเอกสารแจกในห้องเรียน',
-  },
-  {
-    id: 2,
-    title: 'Google Sheet ระบบเช็กชื่อออนไลน์',
-    topic: 'AppScript',
-    access: 'สมาชิก',
-    status: 'เผยแพร่แล้ว',
-    price: 0,
-    downloads: 189,
-    views: 1120,
-    rating: 4.8,
-    source: 'Google Sheet',
-    cover:
-      'https://images.unsplash.com/photo-1554224155-6726b3ff858f?auto=format&fit=crop&w=1200&q=80',
-    description:
-      'เทมเพลต Google Sheet พร้อมแนวทางต่อยอด AppScript สำหรับงานโรงเรียน',
-  },
-  {
-    id: 3,
-    title: 'วิดีโอสอนติดตั้งระบบคลังสื่อ',
-    topic: 'อบรม',
-    access: 'VIP',
-    status: 'เผยแพร่แล้ว',
-    price: 0,
-    downloads: 76,
-    views: 890,
-    rating: 5,
-    source: 'YouTube',
-    cover:
-      'https://images.unsplash.com/photo-1498050108023-c5249f4df085?auto=format&fit=crop&w=1200&q=80',
-    description:
-      'วิดีโอแนะนำการติดตั้ง ใช้งาน และดูแลระบบสำหรับผู้ดูแลเว็บไซต์',
-  },
-  {
-    id: 4,
-    title: 'Prompt Pack สำหรับงานบริหารโรงเรียน',
-    topic: 'งานเอกสาร',
-    access: 'ซื้อแยก',
-    status: 'ฉบับร่าง',
-    price: 499,
-    downloads: 32,
-    views: 510,
-    rating: 4.7,
-    source: 'Google Drive',
-    cover:
-      'https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=1200&q=80',
-    description:
-      'ชุดคำสั่งพร้อมตัวอย่างการใช้งานสำหรับจัดทำเอกสาร แผนงาน และรายงาน',
-  },
-]
-
-const topics = ['ทั้งหมด', 'AI', 'AppScript', 'โรงเรียน', 'งานเอกสาร', 'อบรม']
-const accessOptions: AccessLevel[] = ['สาธารณะ', 'สมาชิก', 'VIP', 'ซื้อแยก']
-const statusOptions: MediaStatus[] = ['ฉบับร่าง', 'รอตรวจสอบ', 'เผยแพร่แล้ว', 'ซ่อนชั่วคราว', 'ถูกปฏิเสธ']
-const sourceOptions: MediaSource[] = [
-  'Google Drive',
-  'Google Sheet',
-  'YouTube',
-  'External Link',
-]
-
-const defaultSiteSettings: SiteSettings = {
-  heroEyebrow: 'AI / Cyber / School Operations',
-  heroTitle: 'ศูนย์กลางสื่อการเรียนรู้ที่สดใส ล้ำสมัย และใช้งานง่าย',
-  heroDescription:
-    'ออกแบบเป็น portal โรงเรียนยุคใหม่ มีคลังสื่อแบบ dashboard, แยกสิทธิ์ Public / Member / VIP และเชื่อมสื่อจาก Drive, Sheet, YouTube ได้ในที่เดียว',
-  heroImageUrl: BRAND_HERO_URL,
-  heroPrimaryLabel: 'เปิดคลังสื่อ',
-  heroSecondaryLabel: 'ดูสิทธิ์ VIP',
-  announcementText: '',
-  maintenanceEnabled: false,
-  maintenanceTitle: 'ระบบกำลังปรับปรุง',
-  maintenanceMessage: 'กรุณากลับมาใหม่ภายหลัง',
-  vipRegistrationEnabled: false,
-  vipPrice: 0,
-  vipQrUrl: '',
-  vipBankName: 'พร้อมเพย์ (PromptPay)',
-  vipAccountNumber: '',
-  vipAccountName: 'MIKPURINUT',
-  vipPaymentTitle: 'ข้อมูลการชำระเงิน VIP',
-  vipPaymentSubtitle: 'กรุณาโอนเงินและแนบสลิปเพื่อยืนยันสิทธิ์',
-  vipSlipLabel: 'แนบสลิปโอนเงิน',
-  vipAgreementLabel: 'ข้อมูลถูกต้องและยอมรับเงื่อนไขการใช้งาน',
-  vipSubmitLabel: 'ลงทะเบียนสมาชิก',
-}
-
-const portalTiles = [
-  { label: 'คลังสื่อ', detail: 'ไฟล์ เอกสาร วิดีโอ', icon: Archive, view: 'media' as View },
-  { label: 'AI Lab', detail: 'Prompt และคู่มือ AI', icon: BrainCircuit, view: 'media' as View },
-  { label: 'ห้องอบรม', detail: 'บทเรียนและวิดีโอ', icon: GraduationCap, view: 'media' as View },
-  { label: 'VIP Preview', detail: 'ดูสิ่งที่จะปลดล็อก', icon: ShieldCheck, view: 'media' as View },
-]
 
 function trackMediaEvent(mediaId: number, eventType: 'view') {
   void fetch('/api/media/track', {
@@ -658,55 +540,6 @@ function App() {
   )
 }
 
-function TechBackground() {
-  return (
-    <div aria-hidden="true" className="pointer-events-none fixed inset-0 z-0">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_12%_8%,rgba(125,211,252,.42),transparent_30%),radial-gradient(circle_at_82%_12%,rgba(56,189,248,.30),transparent_32%),radial-gradient(circle_at_52%_86%,rgba(191,219,254,.42),transparent_36%),linear-gradient(180deg,rgba(255,255,255,.92),rgba(226,246,255,.78))] dark:bg-[radial-gradient(circle_at_15%_10%,rgba(34,211,238,.18),transparent_30%),radial-gradient(circle_at_80%_18%,rgba(59,130,246,.18),transparent_32%),linear-gradient(180deg,rgba(6,17,29,.98),rgba(8,22,38,.96))]" />
-      <div className="academy-grid absolute inset-0" />
-      <div className="ai-orbit left-[8%] top-[17%]" />
-      <div className="ai-orbit ai-orbit-alt right-[10%] top-[12%]" />
-      <CodeRain />
-      <div className="particle-field absolute inset-0">
-        {Array.from({ length: 18 }).map((_, index) => (
-          <span
-            key={index}
-            style={
-              {
-                '--x': `${(index * 37) % 100}%`,
-                '--y': `${(index * 61) % 100}%`,
-                '--delay': `${index * 0.32}s`,
-              } as React.CSSProperties
-            }
-          />
-        ))}
-      </div>
-    </div>
-  )
-}
-
-function CodeRain() {
-  const columns = ['AI', '01', '</>', 'DATA', 'MIX', '{}', 'NEXUS', 'MEDIA', 'VIP', 'SYNC']
-
-  return (
-    <div className="code-rain absolute inset-0">
-      {columns.map((text, index) => (
-        <span
-          key={`${text}-${index}`}
-          style={
-            {
-              '--left': `${(index * 11 + 3) % 100}%`,
-              '--delay': `${index * 0.55}s`,
-              '--speed': `${7 + (index % 4)}s`,
-            } as React.CSSProperties
-          }
-        >
-          {text}
-        </span>
-      ))}
-    </div>
-  )
-}
-
 function Header({
   currentUser,
   theme,
@@ -983,29 +816,6 @@ function BrandShowcase({ imageUrl }: { imageUrl: string }) {
         ))}
       </div>
     </div>
-  )
-}
-
-function PortalTiles({ setView }: { setView: (view: View) => void }) {
-  return (
-    <section className="mx-auto max-w-7xl px-4 py-4 sm:px-6">
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {portalTiles.map((tile) => (
-          <button
-            className="group min-h-28 rounded-3xl border border-white/70 bg-white/74 p-5 text-left shadow-lg shadow-slate-950/5 backdrop-blur-xl transition hover:-translate-y-1 hover:border-cyan-300 dark:border-white/10 dark:bg-white/[0.06]"
-            key={tile.label}
-            onClick={() => setView(tile.view)}
-            type="button"
-          >
-            <tile.icon className="mb-4 text-cyan-600 transition group-hover:scale-110 dark:text-cyan-300" />
-            <p className="text-lg font-black text-slate-950 dark:text-white">{tile.label}</p>
-            <p className="mt-1 text-sm font-semibold text-slate-500 dark:text-slate-400">
-              {tile.detail}
-            </p>
-          </button>
-        ))}
-      </div>
-    </section>
   )
 }
 
@@ -1862,66 +1672,6 @@ function InfoTile({
       <p className="text-sm font-bold text-slate-500 dark:text-slate-400">{label}</p>
       <p className="mt-1 text-lg font-black text-slate-950 dark:text-white">{value}</p>
     </div>
-  )
-}
-
-function AuthBotCheck({
-  botVerified,
-  setBotVerified,
-  setTurnstileToken,
-}: {
-  botVerified: boolean
-  setBotVerified: (value: boolean) => void
-  setTurnstileToken: (value: string) => void
-}) {
-  const container = useRef<HTMLDivElement>(null)
-  const [siteKey, setSiteKey] = useState('')
-
-  useEffect(() => {
-    void fetch('/api/auth/config')
-      .then((response) => response.json() as Promise<{ turnstileSiteKey?: string }>)
-      .then((config) => setSiteKey(config.turnstileSiteKey ?? ''))
-      .catch(() => setSiteKey(''))
-  }, [])
-
-  useEffect(() => {
-    if (!siteKey || !container.current) return
-    const render = () => {
-      if (!window.turnstile || !container.current || container.current.childElementCount) return
-      window.turnstile.render(container.current, {
-        sitekey: siteKey,
-        callback: (token) => {
-          setTurnstileToken(token)
-          setBotVerified(true)
-        },
-        'expired-callback': () => {
-          setTurnstileToken('')
-          setBotVerified(false)
-        },
-      })
-    }
-    const existing = document.querySelector<HTMLScriptElement>('script[data-mik-turnstile]')
-    if (existing) {
-      existing.addEventListener('load', render)
-      render()
-      return () => existing.removeEventListener('load', render)
-    }
-    const script = document.createElement('script')
-    script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit'
-    script.async = true
-    script.defer = true
-    script.dataset.mikTurnstile = 'true'
-    script.addEventListener('load', render)
-    document.head.appendChild(script)
-    return () => script.removeEventListener('load', render)
-  }, [setBotVerified, setTurnstileToken, siteKey])
-
-  if (siteKey) return <div className="mt-4 flex min-h-16 items-center justify-center" ref={container} />
-  return (
-    <label className="mt-4 flex min-h-12 items-center justify-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-black text-slate-600 dark:border-white/10 dark:bg-white/10 dark:text-slate-200">
-      <input checked={botVerified} className="h-4 w-4" onChange={(event) => setBotVerified(event.target.checked)} type="checkbox" />
-      ฉันไม่ใช่โปรแกรมอัตโนมัติ
-    </label>
   )
 }
 
@@ -5644,122 +5394,6 @@ function AnalyticsBars({
         </div>
       )}
     </article>
-  )
-}
-
-function EmptyState() {
-  return (
-    <div className="mt-6 grid min-h-72 place-items-center rounded-3xl border border-dashed border-slate-300 bg-white/76 p-8 text-center backdrop-blur dark:border-white/10 dark:bg-white/[0.06]">
-      <div>
-        <Search className="mx-auto mb-4 text-slate-400" size={42} />
-        <h3 className="text-xl font-black text-slate-950 dark:text-white">
-          ไม่พบสื่อที่ตรงกับเงื่อนไข
-        </h3>
-        <p className="mt-2 text-slate-500 dark:text-slate-400">
-          ลองเปลี่ยนคำค้นหรือเลือกหมวดหมู่ทั้งหมด
-        </p>
-      </div>
-    </div>
-  )
-}
-
-function LoadingOverlay() {
-  return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/92 text-white backdrop-blur">
-      <div className="text-center">
-        <img
-          alt="MIKPURINUT"
-          className="mx-auto mb-5 h-20 w-20 rounded-2xl border border-white/20 object-cover shadow-2xl"
-          src={LOGO_URL}
-        />
-        <Loader2 className="mx-auto mb-4 animate-spin text-cyan-300" size={34} />
-        <p className="text-xl font-black">กำลังเตรียม AI School Media Portal</p>
-        <p className="mt-2 text-sm text-slate-300">Created by MIKPURINUT</p>
-      </div>
-    </div>
-  )
-}
-
-function Toast({ message }: { message: string }) {
-  return (
-    <div className="fixed bottom-5 left-1/2 z-50 w-[calc(100%-24px)] max-w-md -translate-x-1/2 rounded-2xl border border-cyan-200 bg-white p-4 shadow-2xl dark:border-cyan-400/20 dark:bg-slate-900">
-      <div className="flex items-center gap-3">
-        <CheckCircle2 className="shrink-0 text-cyan-500" />
-        <p className="font-bold text-slate-700 dark:text-slate-100">{message}</p>
-      </div>
-    </div>
-  )
-}
-
-function Popup({
-  title,
-  message,
-  tone,
-  onClose,
-}: {
-  title: string
-  message: string
-  tone: 'success' | 'error'
-  onClose: () => void
-}) {
-  const Icon = tone === 'success' ? CheckCircle2 : AlertCircle
-  return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/50 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-3xl bg-white p-6 text-center shadow-2xl dark:bg-slate-900">
-        <Icon
-          className={`mx-auto mb-4 ${tone === 'success' ? 'text-cyan-500' : 'text-red-500'}`}
-          size={46}
-        />
-        <h3 className="text-2xl font-black text-slate-950 dark:text-white">{title}</h3>
-        <p className="mt-3 leading-7 text-slate-600 dark:text-slate-300">{message}</p>
-        <button
-          className="mt-6 min-h-12 w-full rounded-2xl bg-slate-950 px-5 font-black text-cyan-200 dark:bg-cyan-300 dark:text-slate-950"
-          onClick={onClose}
-          type="button"
-        >
-          ตกลง
-        </button>
-      </div>
-    </div>
-  )
-}
-
-function Footer() {
-  return (
-    <footer className="mt-10 bg-slate-950 px-4 py-10 text-white sm:px-6">
-      <div className="mx-auto grid max-w-7xl gap-8 md:grid-cols-[1.2fr_1fr_1fr]">
-        <div>
-          <div className="mb-4 flex items-center gap-3">
-            <img
-              alt="MIKPURINUT"
-              className="h-12 w-12 rounded-xl object-cover"
-              src={LOGO_URL}
-            />
-            <p className="font-black">MIKPURINUT Nexus</p>
-          </div>
-          <p className="max-w-md leading-7 text-slate-300">
-            ระบบคลังสื่อสมาชิกสำหรับโรงเรียนและผู้จัดอบรม รองรับลิงก์ Drive,
-            Sheet, YouTube และหลังบ้านผู้ดูแล
-          </p>
-        </div>
-        <div>
-          <p className="mb-3 font-black">ระบบ</p>
-          <p className="text-slate-300">Public · Member · VIP · Admin</p>
-        </div>
-        <div>
-          <p className="mb-3 font-black">เครดิต</p>
-          <p className="text-slate-300">Created by MIKPURINUT</p>
-        </div>
-      </div>
-    </footer>
-  )
-}
-
-function CreditBadge() {
-  return (
-    <div className="pointer-events-none fixed bottom-3 right-3 z-30 rounded-xl border border-slate-200 bg-white/90 px-3 py-1.5 text-[11px] font-black text-slate-500 shadow-lg backdrop-blur dark:border-white/10 dark:bg-slate-900/90 dark:text-slate-300">
-      Created by MIKPURINUT
-    </div>
   )
 }
 
