@@ -231,6 +231,10 @@ export type SiteSettings = {
   heroPrimaryLabel: string
   heroSecondaryLabel: string
   announcementText: string
+  footerBrandName: string
+  footerDescription: string
+  footerSystemTitle: string
+  footerSystemText: string
   maintenanceEnabled: boolean
   maintenanceTitle: string
   maintenanceMessage: string

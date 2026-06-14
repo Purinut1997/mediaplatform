@@ -13,6 +13,10 @@ type SiteSettings = {
   heroPrimaryLabel: string
   heroSecondaryLabel: string
   announcementText: string
+  footerBrandName: string
+  footerDescription: string
+  footerSystemTitle: string
+  footerSystemText: string
   maintenanceEnabled: boolean
   maintenanceTitle: string
   maintenanceMessage: string
@@ -39,6 +43,10 @@ const defaultSettings: SiteSettings = {
   heroPrimaryLabel: 'เปิดคลังสื่อ',
   heroSecondaryLabel: 'ดูสิทธิ์ VIP',
   announcementText: '',
+  footerBrandName: 'MIKPURINUT Nexus',
+  footerDescription: 'ระบบคลังสื่อสมาชิกสำหรับโรงเรียนและผู้จัดอบรม รองรับลิงก์ Drive, Sheet, YouTube และหลังบ้านผู้ดูแล',
+  footerSystemTitle: 'ระบบ',
+  footerSystemText: 'Public · Member · VIP · Admin',
   maintenanceEnabled: false,
   maintenanceTitle: 'ระบบกำลังปรับปรุง',
   maintenanceMessage: 'กรุณากลับมาใหม่ภายหลัง',
@@ -77,6 +85,10 @@ function readSettings(body: Partial<SiteSettings>): SiteSettings {
     heroPrimaryLabel: boundedText(body.heroPrimaryLabel ?? defaultSettings.heroPrimaryLabel, 'ข้อความปุ่มหลัก', { min: 1, max: 60 }),
     heroSecondaryLabel: boundedText(body.heroSecondaryLabel ?? defaultSettings.heroSecondaryLabel, 'ข้อความปุ่มรอง', { min: 1, max: 60 }),
     announcementText: boundedText(body.announcementText, 'ข้อความประกาศ', { max: 500 }),
+    footerBrandName: boundedText(body.footerBrandName ?? defaultSettings.footerBrandName, 'ชื่อแบรนด์ Footer', { min: 1, max: 100 }),
+    footerDescription: boundedText(body.footerDescription ?? defaultSettings.footerDescription, 'คำอธิบาย Footer', { max: 500 }),
+    footerSystemTitle: boundedText(body.footerSystemTitle ?? defaultSettings.footerSystemTitle, 'หัวข้อระบบ Footer', { min: 1, max: 80 }),
+    footerSystemText: boundedText(body.footerSystemText ?? defaultSettings.footerSystemText, 'ข้อความระบบ Footer', { max: 300 }),
     maintenanceEnabled: Boolean(body.maintenanceEnabled),
     maintenanceTitle: boundedText(body.maintenanceTitle ?? defaultSettings.maintenanceTitle, 'หัวข้อปิดปรับปรุง', { min: 1, max: 120 }),
     maintenanceMessage: boundedText(body.maintenanceMessage ?? defaultSettings.maintenanceMessage, 'ข้อความปิดปรับปรุง', { max: 500 }),

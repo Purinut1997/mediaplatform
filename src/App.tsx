@@ -514,7 +514,7 @@ function App() {
               }}
               onSettingsSaved={(settings) => {
                 setSiteSettings(settings)
-                notifySuccess('บันทึกการตั้งค่า VIP แล้ว')
+                notifySuccess('บันทึกการตั้งค่าเว็บไซต์แล้ว')
               }}
               settings={siteSettings}
               topics={topicOptions.filter((item) => item !== 'ทั้งหมด')}
@@ -527,7 +527,7 @@ function App() {
           )}
         </main>
 
-        <Footer />
+        <Footer settings={siteSettings} />
       </div>
 
       <CreditBadge />
@@ -1760,19 +1760,24 @@ function AdminPanel({
     const matchQuery = !query || text.includes(query)
     return matchDate && matchSeverity && matchQuery
   })
-  const allAdminMenu: Array<{ id: AdminSection; label: string; icon: typeof BarChart3; detail: string; ownerOnly?: boolean }> = [
-    { id: 'dashboard', label: 'Dashboard', icon: BarChart3, detail: 'ภาพรวมระบบ' },
-    { id: 'media', label: 'จัดการสื่อ', icon: Layers3, detail: 'เพิ่ม แก้ไข ลบ' },
-    { id: 'members', label: 'สมาชิกและ VIP', icon: Users, detail: `${pendingVipRequests.length} รอตรวจ`, ownerOnly: true },
-    { id: 'taxonomy', label: 'หมวดหมู่และแท็ก', icon: Tag, detail: `${topics.length} หมวด / ${tagStats.length} แท็ก` },
-    { id: 'links', label: 'ลิงก์ภายนอก', icon: Link2, detail: `${linkedMedia.length} ลิงก์` },
-    { id: 'activity', label: 'Activity Log', icon: FileText, detail: `${activityTotal} รายการ`, ownerOnly: true },
-    { id: 'health', label: 'System Health', icon: Gauge, detail: systemHealth ? `${systemHealth.responseTimeMs} ms` : 'ตรวจระบบ' },
-    { id: 'backup', label: 'Backup', icon: Database, detail: 'JSON / CSV', ownerOnly: true },
-    { id: 'errors', label: 'Error Log', icon: AlertCircle, detail: `${errorTotal} รายการ`, ownerOnly: true },
-    { id: 'settings', label: 'ตั้งค่าเว็บ', icon: Settings, detail: 'หน้าแรกและ VIP', ownerOnly: true },
+  type AdminMenuGroup = 'ภาพรวม' | 'เนื้อหาและคลังสื่อ' | 'สมาชิกและสิทธิ์' | 'ระบบและการตั้งค่า'
+  const allAdminMenu: Array<{ id: AdminSection; label: string; icon: typeof BarChart3; detail: string; group: AdminMenuGroup; ownerOnly?: boolean }> = [
+    { id: 'dashboard', label: 'Dashboard', icon: BarChart3, detail: 'ภาพรวมและงานสำคัญ', group: 'ภาพรวม' },
+    { id: 'media', label: 'จัดการสื่อ', icon: Layers3, detail: 'เพิ่ม แก้ไข และ workflow', group: 'เนื้อหาและคลังสื่อ' },
+    { id: 'taxonomy', label: 'หมวดหมู่และแท็ก', icon: Tag, detail: `${topics.length} หมวด / ${tagStats.length} แท็ก`, group: 'เนื้อหาและคลังสื่อ' },
+    { id: 'links', label: 'ตรวจสุขภาพลิงก์', icon: Link2, detail: `${linkedMedia.length} ลิงก์`, group: 'เนื้อหาและคลังสื่อ' },
+    { id: 'members', label: 'สมาชิกและ VIP', icon: Users, detail: `${pendingVipRequests.length} รอตรวจ`, group: 'สมาชิกและสิทธิ์', ownerOnly: true },
+    { id: 'activity', label: 'ประวัติการทำงาน', icon: FileText, detail: `${activityTotal} รายการ`, group: 'ระบบและการตั้งค่า', ownerOnly: true },
+    { id: 'health', label: 'สถานะระบบ', icon: Gauge, detail: systemHealth ? `${systemHealth.responseTimeMs} ms` : 'ตรวจระบบ', group: 'ระบบและการตั้งค่า' },
+    { id: 'errors', label: 'บันทึกข้อผิดพลาด', icon: AlertCircle, detail: `${errorTotal} รายการ`, group: 'ระบบและการตั้งค่า', ownerOnly: true },
+    { id: 'backup', label: 'สำรองและกู้คืน', icon: Database, detail: 'JSON / CSV', group: 'ระบบและการตั้งค่า', ownerOnly: true },
+    { id: 'settings', label: 'ตั้งค่าหน้าเว็บ', icon: Settings, detail: 'หน้าแรก Footer และ VIP', group: 'ระบบและการตั้งค่า', ownerOnly: true },
   ]
   const adminMenu = allAdminMenu.filter((item) => isSuperAdmin || !item.ownerOnly)
+  const adminMenuGroups = Array.from(new Set(adminMenu.map((item) => item.group))).map((group) => ({
+    group,
+    items: adminMenu.filter((item) => item.group === group),
+  }))
   const adminMetrics = [
     { label: 'สมาชิกทั้งหมด', value: memberTotal.toLocaleString('th-TH'), icon: Users },
     { label: 'สื่อเผยแพร่', value: publishedMediaCount.toLocaleString('th-TH'), icon: Layers3 },
@@ -2403,6 +2408,10 @@ function AdminPanel({
       }
 
       onSettingsSaved(result.settings)
+      setSettingsForm({
+        ...result.settings,
+        vipPrice: String(result.settings.vipPrice),
+      })
       setSettingsNotice('บันทึกการตั้งค่าเรียบร้อยแล้ว')
     } catch (saveError) {
       setSettingsError(
@@ -2494,30 +2503,35 @@ function AdminPanel({
 
         <div className="mt-5 grid gap-5 lg:grid-cols-[230px_1fr]">
           <aside className="h-max rounded-2xl border border-white/10 bg-black/25 p-3 lg:sticky lg:top-24">
-            {adminMenu.map((item) => {
-              const MenuIcon = item.icon
-              const isActive = adminSection === item.id
-              return (
-                <button
-                  className={`mb-1 flex min-h-12 w-full items-center gap-3 rounded-xl px-3 text-left text-sm font-black transition ${
-                    isActive
-                      ? 'bg-cyan-300 text-slate-950 shadow-lg shadow-cyan-500/15'
-                      : 'text-slate-300 hover:bg-cyan-300/10 hover:text-cyan-100'
-                  }`}
-                  key={item.id}
-                  onClick={() => setAdminSection(item.id)}
-                  type="button"
-                >
-                  <MenuIcon size={19} />
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate">{item.label}</span>
-                    <span className={`block truncate text-xs ${isActive ? 'text-slate-700' : 'text-slate-500'}`}>
-                      {item.detail}
-                    </span>
-                  </span>
-                </button>
-              )
-            })}
+            {adminMenuGroups.map(({ group, items }, groupIndex) => (
+              <div className={groupIndex ? 'mt-4 border-t border-white/10 pt-4' : ''} key={group}>
+                <p className="mb-2 px-3 text-[11px] font-black uppercase tracking-widest text-cyan-200/60">{group}</p>
+                {items.map((item) => {
+                  const MenuIcon = item.icon
+                  const isActive = adminSection === item.id
+                  return (
+                    <button
+                      className={`mb-1 flex min-h-12 w-full items-center gap-3 rounded-xl px-3 text-left text-sm font-black transition ${
+                        isActive
+                          ? 'bg-cyan-300 text-slate-950 shadow-lg shadow-cyan-500/15'
+                          : 'text-slate-300 hover:bg-cyan-300/10 hover:text-cyan-100'
+                      }`}
+                      key={item.id}
+                      onClick={() => setAdminSection(item.id)}
+                      type="button"
+                    >
+                      <MenuIcon size={19} />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate">{item.label}</span>
+                        <span className={`block truncate text-xs ${isActive ? 'text-slate-700' : 'text-slate-500'}`}>
+                          {item.detail}
+                        </span>
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+            ))}
           </aside>
 
           <div className="grid gap-6">
@@ -3031,6 +3045,63 @@ function AdminPanel({
             >
               {savingSettings ? <Loader2 className="animate-spin" size={20} /> : <Settings size={20} />}
               {savingSettings ? 'กำลังบันทึก...' : 'บันทึกหน้าแรก'}
+            </button>
+          </form>
+
+          <form
+            className="rounded-2xl border border-cyan-300/20 bg-white/[0.07] p-4 ring-1 ring-white/[0.03]"
+            onSubmit={submitSettings}
+          >
+            <div className="mb-4">
+              <h3 className="text-xl font-black">ตั้งค่า Footer และข้อมูลท้ายเว็บไซต์</h3>
+              <p className="mt-1 text-sm font-semibold text-slate-400">
+                แก้ชื่อแบรนด์ คำอธิบาย และข้อความระบบด้านล่างเว็บ โดยเครดิตผู้จัดทำจะคงอยู่เสมอ
+              </p>
+            </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              <AdminField
+                label="ชื่อแบรนด์ใน Footer"
+                name="footerBrandName"
+                onChange={updateSettings}
+                placeholder="MIKPURINUT Nexus"
+                value={settingsForm.footerBrandName}
+              />
+              <AdminField
+                label="หัวข้อคอลัมน์ระบบ"
+                name="footerSystemTitle"
+                onChange={updateSettings}
+                placeholder="ระบบ"
+                value={settingsForm.footerSystemTitle}
+              />
+              <label className="md:col-span-2">
+                <span className="text-sm font-black text-slate-200">คำอธิบาย Footer</span>
+                <textarea
+                  className="mt-2 min-h-24 w-full rounded-2xl border border-white/10 bg-black/24 px-4 py-3 text-base text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-300 focus:ring-4 focus:ring-cyan-300/10"
+                  onChange={(event) => updateSettings('footerDescription', event.target.value)}
+                  placeholder="อธิบายหน้าที่ของเว็บไซต์โดยย่อ"
+                  value={settingsForm.footerDescription}
+                />
+              </label>
+              <label className="md:col-span-2">
+                <span className="text-sm font-black text-slate-200">ข้อความคอลัมน์ระบบ</span>
+                <textarea
+                  className="mt-2 min-h-20 w-full rounded-2xl border border-white/10 bg-black/24 px-4 py-3 text-base text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-300 focus:ring-4 focus:ring-cyan-300/10"
+                  onChange={(event) => updateSettings('footerSystemText', event.target.value)}
+                  placeholder="Public · Member · VIP · Admin"
+                  value={settingsForm.footerSystemText}
+                />
+              </label>
+              <div className="md:col-span-2 rounded-2xl border border-emerald-300/20 bg-emerald-300/10 p-4 text-sm font-semibold leading-6 text-emerald-100">
+                เครดิต <strong>Created by MIKPURINUT</strong> และโลโก้ระบบถูกล็อกไว้ตามข้อกำหนด จึงไม่สามารถลบผ่านหลังบ้านได้
+              </div>
+            </div>
+            <button
+              className="mt-5 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-cyan-300 px-5 font-black text-slate-950 shadow-lg shadow-cyan-500/20 disabled:opacity-60 sm:w-auto"
+              disabled={savingSettings}
+              type="submit"
+            >
+              {savingSettings ? <Loader2 className="animate-spin" size={20} /> : <Settings size={20} />}
+              {savingSettings ? 'กำลังบันทึก...' : 'บันทึก Footer'}
             </button>
           </form>
 

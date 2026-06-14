@@ -1,5 +1,6 @@
 import { AlertCircle, CheckCircle2, Loader2, Search } from 'lucide-react'
 import { CREDIT_TEXT, LOGO_URL } from '../brand'
+import type { SiteSettings } from '../types'
 
 export function EmptyState() {
   return (
@@ -78,23 +79,22 @@ export function Popup({
   )
 }
 
-export function Footer() {
+export function Footer({ settings }: { settings: SiteSettings }) {
   return (
     <footer className="mt-10 bg-slate-950 px-4 py-10 text-white sm:px-6">
       <div className="mx-auto grid max-w-7xl gap-8 md:grid-cols-[1.2fr_1fr_1fr]">
         <div>
           <div className="mb-4 flex items-center gap-3">
             <img alt="MIKPURINUT" className="h-12 w-12 rounded-xl object-cover" src={LOGO_URL} />
-            <p className="font-black">MIKPURINUT Nexus</p>
+            <p className="font-black">{settings.footerBrandName}</p>
           </div>
           <p className="max-w-md leading-7 text-slate-300">
-            ระบบคลังสื่อสมาชิกสำหรับโรงเรียนและผู้จัดอบรม รองรับลิงก์ Drive,
-            Sheet, YouTube และหลังบ้านผู้ดูแล
+            {settings.footerDescription}
           </p>
         </div>
         <div>
-          <p className="mb-3 font-black">ระบบ</p>
-          <p className="text-slate-300">Public · Member · VIP · Admin</p>
+          <p className="mb-3 font-black">{settings.footerSystemTitle}</p>
+          <p className="text-slate-300">{settings.footerSystemText}</p>
         </div>
         <div>
           <p className="mb-3 font-black">เครดิต</p>
