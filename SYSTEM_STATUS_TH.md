@@ -430,3 +430,4 @@
 - วันที่ 14 มิถุนายน 2026 เพิ่ม Server-side Pagination ให้ Notification Center พร้อม helper pagination กลางและ Unit Test
 - วันที่ 14 มิถุนายน 2026 ตรวจ Production เวอร์ชัน `2026.06.14.10` หลังแบ่งหน้า Notification Center แล้ว Production smoke ผ่านครบ
 - วันที่ 14 มิถุนายน 2026 รวมกติกา pagination ของ Media, Members, Activity, Error และ Notification ไว้ที่ helper กลาง พร้อมขยาย Production smoke ตรวจสิทธิ์ API หลังบ้าน
+- วันที่ 14 มิถุนายน 2026 ตรวจ Production เวอร์ชัน `2026.06.14.11` หลังรวม pagination กลางแล้ว หน้าเว็บไม่ล้น ไม่มี console error และ Production smoke ผ่านครบ
