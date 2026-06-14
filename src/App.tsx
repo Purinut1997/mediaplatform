@@ -123,7 +123,7 @@ function App() {
     if (oauthResult === 'success') return 'เข้าสู่ระบบด้วย Google สำเร็จ'
     if (oauthResult === 'not_configured') return 'Google Login ยังไม่ได้ตั้งค่าครบ'
     if (oauthResult) return 'เข้าสู่ระบบด้วย Google ไม่สำเร็จ กรุณาลองใหม่'
-    return 'ระบบเชื่อมต่อ Cloudflare + Neon สำเร็จ'
+    return ''
   })
   const [showSuccess, setShowSuccess] = useState(false)
   const [showError, setShowError] = useState(false)
