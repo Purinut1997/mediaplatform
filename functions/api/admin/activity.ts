@@ -1,5 +1,6 @@
 import { requireSuperAdmin } from '../../_lib/admin'
 import { ensureSchema, getSql, type Env } from '../../_lib/db'
+import { readPagination } from '../../_lib/pagination'
 
 export const onRequestGet = async ({ env, request }: { env: Env; request: Request }) => {
   if (!(await requireSuperAdmin(env, request))) {
@@ -8,10 +9,7 @@ export const onRequestGet = async ({ env, request }: { env: Env; request: Reques
 
   await ensureSchema(env)
   const sql = getSql(env)
-  const url = new URL(request.url)
-  const page = Math.max(1, Math.trunc(Number(url.searchParams.get('page') ?? 1)) || 1)
-  const pageSize = Math.min(100, Math.max(10, Math.trunc(Number(url.searchParams.get('pageSize') ?? 50)) || 50))
-  const offset = (page - 1) * pageSize
+  const { page, pageSize, offset } = readPagination(new URL(request.url))
   const logs = await sql`
     select id, actor, action, target_type, target_id, detail, created_at
     from audit_logs

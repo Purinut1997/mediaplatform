@@ -12,6 +12,7 @@ import {
   MediaValidationError,
 } from '../../_lib/media-validation'
 import { optionalHttpUrl, safeHttpUrl, UrlValidationError } from '../../_lib/url'
+import { readPagination } from '../../_lib/pagination'
 
 const DEFAULT_COVER_URL =
   'https://raw.githubusercontent.com/Purinut1997/web-images/ab67fea68788dc5db9514475e8f2b8cb1c32d8b3/ChatGPT%20Image%2023%20%E0%B8%9E.%E0%B8%84.%202569%2008_05_56.png'
@@ -165,9 +166,7 @@ export const onRequestGet = async ({ env, request }: { env: Env; request: Reques
     ? url.searchParams.get('sort')
     : 'latest'
   const requestedStatus = url.searchParams.get('status')
-  const page = Math.max(1, Math.trunc(Number(url.searchParams.get('page') ?? 1)) || 1)
-  const pageSize = Math.min(100, Math.max(10, Math.trunc(Number(url.searchParams.get('pageSize') ?? 40)) || 40))
-  const offset = (page - 1) * pageSize
+  const { page, pageSize, offset } = readPagination(url, { defaultPageSize: 40 })
   const status =
     canReadAll && requestedStatus === 'all'
       ? 'all'

@@ -77,6 +77,11 @@ const checks = [
     expectedStatus: 401,
     validate: (data) => data.ok === false && data.error === 'Unauthorized',
   },
+  ...['/api/admin/activity?page=1', '/api/admin/errors?page=1', '/api/admin/users?page=1'].map((path) => ({
+    path,
+    expectedStatus: 401,
+    validate: (data) => data.ok === false && data.error === 'Unauthorized',
+  })),
   {
     path: '/api/media/bulk',
     method: 'POST',
