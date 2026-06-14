@@ -155,7 +155,7 @@
 - การเปิดลิงก์/ดาวน์โหลดจริงต้องผ่าน `/api/media/access` เพื่อตรวจทั้งสิทธิ์สื่อและสิทธิ์ลิงก์ก่อน
 - ไม่มีอีเมล ชื่อผู้ใช้ หรือรหัสผ่าน Super Admin ฝังคงที่ในโค้ดแล้ว
 - Bootstrap Super Admin ทำงานเมื่อกำหนด `ADMIN_BOOTSTRAP_EMAIL` และ `ADMIN_BOOTSTRAP_PASSWORD` ผ่าน Secret เท่านั้น
-- การเปลี่ยน `ADMIN_BOOTSTRAP_PASSWORD` จะหมุนรหัสบัญชีเจ้าของใน Neon เมื่อ Functions ทำงานครั้งถัดไป
+- `ADMIN_BOOTSTRAP_PASSWORD` ใช้สำหรับสร้างบัญชีเจ้าของครั้งแรกเท่านั้น การเปลี่ยนรหัสบัญชีที่มีอยู่แล้วต้องทำผ่านหน้าความปลอดภัยบัญชีหรือระบบลืมรหัสผ่าน
 - บัญชี Super Admin แบบชื่อผู้ใช้เดิม `admin` จะถูกปิดอัตโนมัติ เหลือการเข้าใช้ผ่านอีเมล Secret เท่านั้น
 - รองรับ Cloudflare Turnstile จริงเมื่อกำหนด `TURNSTILE_SITE_KEY` และ `TURNSTILE_SECRET_KEY`
   - หากยังไม่กำหนด จะใช้ bot check พื้นฐานเดิม
@@ -267,9 +267,9 @@
    - เหลือ deploy Worker และใส่ `CRON_SECRET` จริงใน Cloudflare Variables and Secrets ก่อนใช้งานจริง
    - ตรวจล่าสุดพบว่า Wrangler บนเครื่องยังไม่ได้ login บัญชี Cloudflare จึงยัง deploy อัตโนมัติไม่ได้
 2. ตั้งค่า Secret ภายนอกก่อนเปิดใช้ฟีเจอร์เต็ม
-   - เปลี่ยน `ADMIN_BOOTSTRAP_PASSWORD` เป็นรหัสใหม่ที่ไม่เคยอยู่ใน Git history
+   - เปลี่ยนรหัส Super Admin จริงผ่านหน้าความปลอดภัยบัญชีหรือระบบลืมรหัสผ่านแล้ว และควรตั้ง `ADMIN_BOOTSTRAP_PASSWORD` เป็นรหัสใหม่สำหรับกรณี bootstrap ฐานข้อมูลใหม่
    - Production ตั้งค่า `TURNSTILE_SITE_KEY` และ `TURNSTILE_SECRET_KEY` แล้ว ใช้ Turnstile จริงสำหรับ Login/Register/ลืมรหัสผ่าน
-   - `RESEND_API_KEY`, `EMAIL_FROM` และ `APP_URL` สำหรับส่งอีเมลลืมรหัสผ่าน
+   - Production ตั้งค่า `RESEND_API_KEY`, `EMAIL_FROM` และ `APP_URL` แล้ว ระบบส่งอีเมลลืมรหัสผ่านและตั้งรหัสใหม่ทำงานจริง
 3. Google OAuth เปิดใช้งานบน Production แล้ว
    - ปุ่ม Google, OAuth callback, การเชื่อมบัญชีเดิม และการสร้างสมาชิกใหม่ทำงานแล้ว
    - Authorized redirect URI คือ `https://mediaplatform.pages.dev/api/auth/google/callback`
@@ -309,11 +309,10 @@
 
 ## ลำดับงานแนะนำต่อไป
 
-1. ตั้งค่า Resend Secrets บน Cloudflare Pages เพื่อเปิดระบบลืมรหัสผ่านผ่านอีเมล
-2. Login Wrangler แล้วตั้ง `CRON_SECRET` ให้ตรงกันทั้ง Cloudflare Pages และ Worker จากนั้นรัน `npm run cron:secret` + `npm run cron:deploy`
-3. ทยอยแยก `src/App.tsx` และเพิ่ม Integration Test สำหรับ workflow สำคัญ
-4. แยก Migration และปรับ Backup/Restore ขนาดใหญ่
-5. กำหนดกติกาธุรกิจสำหรับซื้อแยกและ VIP expiry ก่อนเปิดสองระบบนี้
+1. Login Wrangler แล้วตั้ง `CRON_SECRET` ให้ตรงกันทั้ง Cloudflare Pages และ Worker จากนั้นรัน `npm run cron:secret` + `npm run cron:deploy`
+2. ทยอยแยก `src/App.tsx` และเพิ่ม Integration Test สำหรับ workflow สำคัญ
+3. แยก Migration และปรับ Backup/Restore ขนาดใหญ่
+4. กำหนดกติกาธุรกิจสำหรับซื้อแยกและ VIP expiry ก่อนเปิดสองระบบนี้
 
 ## ไฟล์หลักที่ควรดูเมื่อทำงานต่อ
 
@@ -412,6 +411,7 @@
 - วันที่ 13 มิถุนายน 2026 เพิ่ม Google OAuth Login จริง พร้อมเชื่อมอีเมลเดิม/สร้างสมาชิกใหม่, state cookie, rate limit, System Health และ Production smoke
 - วันที่ 14 มิถุนายน 2026 แก้ Google OAuth redirect ให้สร้าง headers/cookies แบบ Cloudflare Workers รองรับ ปิด Error 1101 จาก immutable `Response.redirect()` headers
 - วันที่ 14 มิถุนายน 2026 ตรวจ Production ยืนยันว่า Google Login และ Turnstile พร้อมใช้งาน ส่วน Password Reset Email ยังรอ Resend
+- วันที่ 14 มิถุนายน 2026 ตั้งค่า Resend บน Production และทดสอบเส้นทางลืมรหัสผ่าน ส่งอีเมล ตั้งรหัสใหม่ และเข้าสู่ระบบด้วยรหัสใหม่สำเร็จแล้ว
 - วันที่ 14 มิถุนายน 2026 เพิ่ม Production smoke ตรวจ Google OAuth state cookie/callback และแยกหน้ารายละเอียดสื่อกับรีวิวออกจาก `src/App.tsx`
 - วันที่ 14 มิถุนายน 2026 ตรวจ Production เวอร์ชัน `2026.06.14.2` หลังแยกหน้ารายละเอียดสื่อแล้ว ทั้ง desktop/mobile ไม่มี horizontal overflow หรือ console error และ Production smoke ผ่านครบ
 - วันที่ 14 มิถุนายน 2026 เอา Toast แจ้งเชื่อมต่อ Cloudflare + Neon สำเร็จออกจากหน้าเว็บผู้ใช้ โดยยังคง Toast การทำงานและข้อผิดพลาดที่จำเป็นไว้
