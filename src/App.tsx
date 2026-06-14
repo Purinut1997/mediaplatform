@@ -8,6 +8,7 @@ import {
   BarChart3,
   CheckCircle2,
   ChevronRight,
+  Copy,
   Crown,
   Database,
   Download,
@@ -2395,6 +2396,27 @@ function AdminPanel({
     }
   }
 
+  const duplicateMedia = async (item: MediaItem) => {
+    setError('')
+    setSaving(true)
+    try {
+      const response = await fetch('/api/media/duplicate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ id: item.id }),
+      })
+      const result = await readJson<{ media?: { id: number; title: string }; error?: string }>(response)
+      if (!response.ok) throw new Error(result.error ?? 'สร้างสำเนาสื่อไม่สำเร็จ')
+      await loadAdminMediaPage(1)
+      onCreated()
+    } catch (duplicateError) {
+      setError(duplicateError instanceof Error ? duplicateError.message : 'สร้างสำเนาสื่อไม่สำเร็จ')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   const toggleSelectedMedia = (id: number) => {
     setSelectedMediaIds((current) => {
       const next = new Set(current)
@@ -4569,6 +4591,15 @@ function AdminPanel({
                             แก้ไข
                           </button>
                           <button
+                            className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-sky-400/10 px-3 text-sm font-black text-sky-100 disabled:opacity-50"
+                            disabled={saving}
+                            onClick={() => void duplicateMedia(item)}
+                            type="button"
+                          >
+                            <Copy size={15} />
+                            ทำสำเนา
+                          </button>
+                          <button
                             className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-red-400/10 px-3 text-sm font-black text-red-200"
                             onClick={() => deleteMedia(item)}
                             type="button"
@@ -4611,13 +4642,21 @@ function AdminPanel({
                       {item.tags.map((tag) => `#${tag}`).join(' ')}
                     </p>
                   )}
-                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                  <div className="mt-3 grid gap-2 sm:grid-cols-3">
                     <button
                       className="min-h-11 rounded-xl bg-cyan-300 px-4 font-black text-slate-950"
                       onClick={() => startEditMedia(item)}
                       type="button"
                     >
                       แก้ไข
+                    </button>
+                    <button
+                      className="min-h-11 rounded-xl bg-sky-400/15 px-4 font-black text-sky-100 disabled:opacity-50"
+                      disabled={saving}
+                      onClick={() => void duplicateMedia(item)}
+                      type="button"
+                    >
+                      ทำสำเนา
                     </button>
                     <button
                       className="min-h-11 rounded-xl bg-red-400/15 px-4 font-black text-red-100"

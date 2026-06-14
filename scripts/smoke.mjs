@@ -79,6 +79,13 @@ const checks = [
     expectedStatus: 401,
     validate: (data) => data.ok === false && data.error === 'Unauthorized',
   },
+  {
+    path: '/api/media/duplicate',
+    method: 'POST',
+    body: { id: 1 },
+    expectedStatus: 401,
+    validate: (data) => data.ok === false && data.error === 'Unauthorized',
+  },
 ]
 
 let failed = false
