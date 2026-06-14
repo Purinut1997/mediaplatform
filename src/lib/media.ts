@@ -43,6 +43,14 @@ export function createEmptyMediaForm(topic = 'โรงเรียน'): MediaF
   }
 }
 
+export function moveMediaLink(links: MediaLink[], index: number, direction: 'up' | 'down') {
+  const nextIndex = direction === 'up' ? index - 1 : index + 1
+  if (index < 0 || index >= links.length || nextIndex < 0 || nextIndex >= links.length) return links
+  const next = [...links]
+  ;[next[index], next[nextIndex]] = [next[nextIndex], next[index]]
+  return next
+}
+
 export function canViewAccess(user: CurrentUser | null, access: AccessLevel) {
   if (user?.role === 'superadmin' || user?.role === 'admin') return true
   if (access === 'สาธารณะ') return true

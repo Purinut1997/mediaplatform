@@ -3,6 +3,7 @@ import {
   canViewAccess,
   createEmptyMediaForm,
   getPreviewUrl,
+  moveMediaLink,
   normalizeMediaStatus,
 } from './media'
 
@@ -61,5 +62,17 @@ describe('frontend media helpers', () => {
         { label: 'วิดีโอ', type: 'YouTube', url: 'https://youtu.be/video-id', previewUrl: '', access: 'สาธารณะ' },
       ],
     })).toBe('https://www.youtube.com/embed/video-id')
+  })
+
+  it('reorders media links without mutating the original list', () => {
+    const links = [
+      { label: 'ไฟล์', type: 'Google Drive' as const, url: 'https://example.com/file', previewUrl: '', access: 'สาธารณะ' as const },
+      { label: 'วิดีโอ', type: 'YouTube' as const, url: 'https://youtu.be/video', previewUrl: '', access: 'สาธารณะ' as const },
+    ]
+    const moved = moveMediaLink(links, 1, 'up')
+
+    expect(moved.map((link) => link.label)).toEqual(['วิดีโอ', 'ไฟล์'])
+    expect(links.map((link) => link.label)).toEqual(['ไฟล์', 'วิดีโอ'])
+    expect(moveMediaLink(links, 0, 'up')).toBe(links)
   })
 })

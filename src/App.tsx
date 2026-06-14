@@ -71,6 +71,7 @@ import {
   canViewMedia,
   createEmptyMediaForm,
   createEmptyMediaLink,
+  moveMediaLink,
   normalizeMediaStatus,
 } from './lib/media'
 import { LOGO_URL } from './brand'
@@ -2278,6 +2279,10 @@ function AdminPanel({
     }))
   }
 
+  const reorderMediaLink = (index: number, direction: 'up' | 'down') => {
+    setForm((current) => ({ ...current, links: moveMediaLink(current.links, index, direction) }))
+  }
+
   const startEditMedia = (item: MediaItem) => {
     setAdminSection('media')
     setEditingMediaId(item.id)
@@ -4260,7 +4265,7 @@ function AdminPanel({
                   <div>
                     <p className="text-sm font-black text-slate-200">ชุดลิงก์ไฟล์และวิดีโอ</p>
                     <p className="mt-1 text-xs font-semibold text-slate-500">
-                      เพิ่ม Drive, Sheet, YouTube หรือ preview ได้หลายรายการในสื่อเดียว
+                      เพิ่ม Drive, Sheet, YouTube หรือ preview ได้หลายรายการ และจัดลำดับรายการหลักได้
                     </p>
                   </div>
                   <span className="rounded-full bg-cyan-300/10 px-3 py-1 text-xs font-black text-cyan-200">
@@ -4292,11 +4297,39 @@ function AdminPanel({
                       className="rounded-2xl border border-white/10 bg-black/20 p-3 ring-1 ring-white/[0.03]"
                       key={`${index}-${link.type}`}
                     >
-                      <div className="mb-3 flex items-center justify-between gap-3">
-                        <span className="rounded-xl bg-white/10 px-3 py-1 text-xs font-black text-slate-300">
-                          รายการที่ {index + 1} · {link.type}
-                        </span>
-                        {form.links.length > 1 && (
+                      <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="rounded-xl bg-white/10 px-3 py-1 text-xs font-black text-slate-300">
+                            รายการที่ {index + 1} · {link.type}
+                          </span>
+                          {index === 0 && (
+                            <span className="rounded-xl bg-cyan-300/15 px-3 py-1 text-xs font-black text-cyan-100">
+                              รายการหลัก
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <button
+                            aria-label={`เลื่อน ${link.label || `รายการที่ ${index + 1}`} ขึ้น`}
+                            className="grid h-9 w-9 place-items-center rounded-xl bg-white/10 text-slate-200 disabled:cursor-not-allowed disabled:opacity-30"
+                            disabled={index === 0}
+                            onClick={() => reorderMediaLink(index, 'up')}
+                            title="เลื่อนขึ้น"
+                            type="button"
+                          >
+                            <ArrowUp size={15} />
+                          </button>
+                          <button
+                            aria-label={`เลื่อน ${link.label || `รายการที่ ${index + 1}`} ลง`}
+                            className="grid h-9 w-9 place-items-center rounded-xl bg-white/10 text-slate-200 disabled:cursor-not-allowed disabled:opacity-30"
+                            disabled={index === form.links.length - 1}
+                            onClick={() => reorderMediaLink(index, 'down')}
+                            title="เลื่อนลง"
+                            type="button"
+                          >
+                            <ArrowDown size={15} />
+                          </button>
+                          {form.links.length > 1 && (
                           <button
                             className="inline-flex min-h-9 items-center gap-2 rounded-xl bg-red-400/10 px-3 text-xs font-black text-red-200"
                             onClick={() => removeMediaLink(index)}
@@ -4305,7 +4338,8 @@ function AdminPanel({
                             <Trash2 size={14} />
                             ลบ
                           </button>
-                        )}
+                          )}
+                        </div>
                       </div>
                       <div className="grid gap-3 lg:grid-cols-[1fr_160px_160px]">
                         <label>
