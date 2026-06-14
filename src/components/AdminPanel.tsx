@@ -1101,24 +1101,24 @@ export function AdminPanel({
   }
 
   return (
-    <section className="admin-shell mx-auto max-w-7xl px-4 py-8 sm:px-6">
-      <div className="admin-command-center overflow-hidden rounded-[1.75rem] border p-4 text-white sm:p-6">
-        <div className="mb-6 grid gap-4 lg:grid-cols-[1fr_auto] lg:items-center">
+    <section className="admin-shell mx-auto max-w-[1440px] px-3 py-6 sm:px-6 sm:py-10">
+      <div className="admin-command-center overflow-hidden rounded-[1.75rem] border p-4 sm:rounded-[2rem] sm:p-7">
+        <div className="admin-command-header mb-6 grid gap-4 lg:grid-cols-[1fr_auto] lg:items-center">
           <div>
-            <p className="mb-3 inline-flex items-center gap-2 rounded-full border border-cyan-300/30 bg-cyan-300/12 px-3 py-1.5 text-sm font-black text-cyan-100">
+            <p className="admin-badge mb-3 inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-black">
               <Gauge size={16} />
               Super Admin Control Center
             </p>
-            <h2 className="text-3xl font-black leading-tight sm:text-4xl">
+            <h2 className="admin-title text-3xl font-black leading-tight sm:text-4xl">
               MIKPURINUT Media Command Center
             </h2>
-            <p className="mt-2 max-w-2xl text-sm font-semibold leading-7 text-slate-400">
+            <p className="admin-description mt-2 max-w-2xl text-sm font-semibold leading-7">
               ศูนย์ควบคุมคลังสื่อ สิทธิ์สมาชิก VIP และข้อความหน้าเว็บ ใช้ตรวจงาน อนุมัติสื่อ และดูแลระบบจากพื้นที่เดียว
             </p>
           </div>
           <a
             onClick={() => setAdminSection('media')}
-            className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-cyan-300 to-sky-400 px-5 font-black text-slate-950 shadow-lg shadow-cyan-500/20 transition hover:-translate-y-0.5"
+            className="admin-primary-action inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl px-5 font-black transition"
             href="#admin-create-media"
           >
             <Plus size={20} />
@@ -1126,34 +1126,30 @@ export function AdminPanel({
           </a>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="admin-stat-grid grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {adminMetrics.map((stat) => (
             <article
-              className="rounded-2xl border border-white/10 bg-white/[0.07] p-4 shadow-sm ring-1 ring-white/[0.03]"
+              className="admin-stat-card rounded-2xl border p-4"
               key={stat.label}
             >
-              <stat.icon className="mb-4 text-cyan-300" size={24} />
-              <p className="text-sm font-bold text-slate-400">{stat.label}</p>
-              <p className="mt-1 text-3xl font-black tracking-tight text-white">{stat.value}</p>
+              <stat.icon className="admin-stat-icon mb-4" size={24} />
+              <p className="admin-muted text-sm font-bold">{stat.label}</p>
+              <p className="admin-title mt-1 text-3xl font-black tracking-tight">{stat.value}</p>
             </article>
           ))}
         </div>
 
-        <div className="mt-5 grid gap-5 lg:grid-cols-[230px_1fr]">
-          <aside className="h-max rounded-2xl border border-white/10 bg-black/25 p-3 lg:sticky lg:top-24">
+        <div className="admin-layout mt-5 grid gap-5 lg:grid-cols-[250px_1fr]">
+          <aside className="admin-sidebar h-max rounded-2xl border p-3 lg:sticky lg:top-24">
             {adminMenuGroups.map(({ group, items }, groupIndex) => (
-              <div className={groupIndex ? 'mt-4 border-t border-white/10 pt-4' : ''} key={group}>
-                <p className="mb-2 px-3 text-[11px] font-black uppercase tracking-widest text-cyan-200/60">{group}</p>
+              <div className={`admin-menu-group ${groupIndex ? 'mt-4 border-t pt-4' : ''}`} key={group}>
+                <p className="admin-menu-title mb-2 px-3 text-[11px] font-black uppercase tracking-widest">{group}</p>
                 {items.map((item) => {
                   const MenuIcon = item.icon
                   const isActive = adminSection === item.id
                   return (
                     <button
-                      className={`mb-1 flex min-h-12 w-full items-center gap-3 rounded-xl px-3 text-left text-sm font-black transition ${
-                        isActive
-                          ? 'bg-cyan-300 text-slate-950 shadow-lg shadow-cyan-500/15'
-                          : 'text-slate-300 hover:bg-cyan-300/10 hover:text-cyan-100'
-                      }`}
+                      className={`admin-menu-item ${isActive ? 'is-active' : ''} mb-1 flex min-h-12 w-full items-center gap-3 rounded-xl px-3 text-left text-sm font-black transition`}
                       key={item.id}
                       onClick={() => setAdminSection(item.id)}
                       type="button"
@@ -1161,7 +1157,7 @@ export function AdminPanel({
                       <MenuIcon size={19} />
                       <span className="min-w-0 flex-1">
                         <span className="block truncate">{item.label}</span>
-                        <span className={`block truncate text-xs ${isActive ? 'text-slate-700' : 'text-slate-500'}`}>
+                        <span className="admin-menu-detail block truncate text-xs">
                           {item.detail}
                         </span>
                       </span>
@@ -1172,45 +1168,45 @@ export function AdminPanel({
             ))}
           </aside>
 
-          <div className="grid gap-6">
+          <div className="admin-content grid min-w-0 gap-6">
           {adminSection === 'dashboard' && (
-            <section className="rounded-2xl border border-cyan-300/20 bg-white/[0.07] p-4 ring-1 ring-white/[0.03]">
+            <section className="admin-panel rounded-2xl border p-4">
               <div className="grid gap-4 xl:grid-cols-[1fr_0.9fr]">
-                <div className="rounded-2xl border border-white/10 bg-black/20 p-5">
-                  <p className="text-sm font-black text-cyan-200">งานที่ควรดูวันนี้</p>
-                  <h3 className="mt-2 text-2xl font-black">ศูนย์ควบคุมระบบสื่อ</h3>
+                <div className="admin-inner-panel rounded-2xl border p-5">
+                  <p className="admin-kicker text-sm font-black">งานที่ควรดูวันนี้</p>
+                  <h3 className="admin-title mt-2 text-2xl font-black">ศูนย์ควบคุมระบบสื่อ</h3>
                   <div className="mt-5 grid gap-3 sm:grid-cols-2">
                     {adminMenu.slice(1).map((item) => (
                       <button
-                        className="flex min-h-20 items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.05] p-4 text-left transition hover:-translate-y-0.5 hover:border-cyan-300/40"
+                        className="admin-task-card flex min-h-20 items-center gap-3 rounded-2xl border p-4 text-left transition"
                         key={item.id}
                         onClick={() => setAdminSection(item.id)}
                         type="button"
                       >
-                        <item.icon className="text-cyan-300" size={22} />
+                        <item.icon className="admin-stat-icon" size={22} />
                         <span>
-                          <span className="block font-black text-white">{item.label}</span>
-                          <span className="text-sm font-semibold text-slate-400">{item.detail}</span>
+                          <span className="admin-title block font-black">{item.label}</span>
+                          <span className="admin-muted text-sm font-semibold">{item.detail}</span>
                         </span>
                       </button>
                     ))}
                   </div>
                 </div>
 
-                <div className="rounded-2xl border border-white/10 bg-black/20 p-5">
-                  <p className="text-sm font-black text-cyan-200">สถานะระบบ</p>
+                <div className="admin-inner-panel rounded-2xl border p-5">
+                  <p className="admin-kicker text-sm font-black">สถานะระบบ</p>
                   <div className="mt-4 grid gap-3">
-                    <div className="rounded-2xl bg-emerald-300/10 p-4">
-                      <p className="font-black text-emerald-200">ฐานข้อมูลพร้อมใช้งาน</p>
-                      <p className="text-sm font-semibold text-slate-400">Neon เชื่อมต่อกับ Cloudflare แล้ว</p>
+                    <div className="admin-status-card is-success rounded-2xl p-4">
+                      <p className="font-black">ฐานข้อมูลพร้อมใช้งาน</p>
+                      <p className="admin-muted text-sm font-semibold">Neon เชื่อมต่อกับ Cloudflare แล้ว</p>
                     </div>
-                    <div className="rounded-2xl bg-sky-300/10 p-4">
-                      <p className="font-black text-sky-200">จัดการสื่อผ่านเว็บได้แล้ว</p>
-                      <p className="text-sm font-semibold text-slate-400">เพิ่ม แก้ไข ลบ และแปะลิงก์สื่อได้โดยไม่แก้โค้ด</p>
+                    <div className="admin-status-card is-info rounded-2xl p-4">
+                      <p className="font-black">จัดการสื่อผ่านเว็บได้แล้ว</p>
+                      <p className="admin-muted text-sm font-semibold">เพิ่ม แก้ไข ลบ และแปะลิงก์สื่อได้โดยไม่แก้โค้ด</p>
                     </div>
-                    <div className="rounded-2xl bg-amber-300/10 p-4">
-                      <p className="font-black text-amber-200">คำขอ VIP</p>
-                      <p className="text-sm font-semibold text-slate-400">{pendingVipRequests.length} รายการรอตรวจ</p>
+                    <div className="admin-status-card is-warning rounded-2xl p-4">
+                      <p className="font-black">คำขอ VIP</p>
+                      <p className="admin-muted text-sm font-semibold">{pendingVipRequests.length} รายการรอตรวจ</p>
                     </div>
                   </div>
                 </div>
