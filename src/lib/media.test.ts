@@ -53,5 +53,13 @@ describe('frontend media helpers', () => {
       .toBe('https://drive.google.com/file/d/file-id/preview')
     expect(getPreviewUrl({ ...base, source: 'Google Sheet', resourceUrl: 'https://docs.google.com/spreadsheets/d/sheet-id/edit#gid=0' }))
       .toBe('https://docs.google.com/spreadsheets/d/sheet-id/preview')
+    expect(getPreviewUrl({
+      ...base,
+      source: 'Google Drive',
+      links: [
+        { label: 'ไฟล์', type: 'Google Drive', url: 'https://drive.google.com/file/d/file-id/view', previewUrl: '', access: 'สาธารณะ' },
+        { label: 'วิดีโอ', type: 'YouTube', url: 'https://youtu.be/video-id', previewUrl: '', access: 'สาธารณะ' },
+      ],
+    })).toBe('https://www.youtube.com/embed/video-id')
   })
 })

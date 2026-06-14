@@ -23,6 +23,7 @@ import {
   Loader2,
   LockKeyhole,
   Mail,
+  PlayCircle,
   Plus,
   Pencil,
   Search,
@@ -52,6 +53,7 @@ import type {
   MediaFormState,
   MediaItem,
   MediaLink,
+  MediaSource,
   MediaStatus,
   MemberLibrary,
   RestorePreview,
@@ -2249,10 +2251,18 @@ function AdminPanel({
     }))
   }
 
-  const addMediaLink = () => {
+  const addMediaLink = (type: MediaSource = 'Google Drive') => {
+    const labels: Record<MediaSource, string> = {
+      'Google Drive': 'ดาวน์โหลดไฟล์',
+      'Google Sheet': 'เปิด Google Sheet',
+      YouTube: 'ดูวิดีโอสอน',
+      'External Link': 'เปิดลิงก์เพิ่มเติม',
+    }
     setForm((current) => ({
       ...current,
-      links: [...current.links, { ...createEmptyMediaLink(), access: current.access }],
+      links: current.links.length >= 20
+        ? current.links
+        : [...current.links, { ...createEmptyMediaLink(), type, label: labels[type], access: current.access }],
     }))
   }
 
@@ -4186,14 +4196,28 @@ function AdminPanel({
                       เพิ่ม Drive, Sheet, YouTube หรือ preview ได้หลายรายการในสื่อเดียว
                     </p>
                   </div>
-                  <button
-                    className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-cyan-300/10 px-4 text-sm font-black text-cyan-200 ring-1 ring-cyan-300/20 transition hover:bg-cyan-300/20"
-                    onClick={addMediaLink}
-                    type="button"
-                  >
-                    <Plus size={16} />
-                    เพิ่มลิงก์
-                  </button>
+                  <span className="rounded-full bg-cyan-300/10 px-3 py-1 text-xs font-black text-cyan-200">
+                    {form.links.length} / 20 รายการ
+                  </span>
+                </div>
+                <div className="mb-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                  {([
+                    ['Google Drive', 'เพิ่มไฟล์ Drive', FileText],
+                    ['Google Sheet', 'เพิ่ม Google Sheet', Database],
+                    ['YouTube', 'เพิ่มวิดีโอ YouTube', PlayCircle],
+                    ['External Link', 'เพิ่มลิงก์เว็บ', ExternalLink],
+                  ] as const).map(([type, label, Icon]) => (
+                    <button
+                      className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.05] px-3 text-sm font-black text-slate-200 transition hover:border-cyan-300/40 hover:bg-cyan-300/10 hover:text-cyan-100 disabled:cursor-not-allowed disabled:opacity-40"
+                      disabled={form.links.length >= 20}
+                      key={type}
+                      onClick={() => addMediaLink(type)}
+                      type="button"
+                    >
+                      <Icon size={17} />
+                      {label}
+                    </button>
+                  ))}
                 </div>
                 <div className="grid gap-3">
                   {form.links.map((link, index) => (
@@ -4203,7 +4227,7 @@ function AdminPanel({
                     >
                       <div className="mb-3 flex items-center justify-between gap-3">
                         <span className="rounded-xl bg-white/10 px-3 py-1 text-xs font-black text-slate-300">
-                          ลิงก์ที่ {index + 1}
+                          รายการที่ {index + 1} · {link.type}
                         </span>
                         {form.links.length > 1 && (
                           <button

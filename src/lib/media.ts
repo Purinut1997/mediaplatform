@@ -60,7 +60,10 @@ export function canAccessAdmin(user: CurrentUser | null) {
 }
 
 export function getPreviewUrl(item: MediaItem) {
-  const primaryLink = item.links?.[0]
+  const primaryLink =
+    item.links?.find((link) => link.previewUrl) ??
+    item.links?.find((link) => link.type === 'YouTube' && link.url) ??
+    item.links?.[0]
   const link = primaryLink?.previewUrl || primaryLink?.url || item.previewUrl || item.resourceUrl || ''
   if (!link) return ''
 
