@@ -465,3 +465,4 @@
 - วันที่ 14 มิถุนายน 2026 แยกหน้าดูแลสมาชิกเป็น รายชื่อสมาชิก, จัดการ VIP, คำขอรอตรวจ และผู้ดูแลระบบ พร้อมตัวกรองบทบาทฝั่งเซิร์ฟเวอร์และแบ่งหน้าละ 24 บัญชีในเวอร์ชัน `2026.06.14.14`
 - วันที่ 14 มิถุนายน 2026 ตรวจ Production เวอร์ชัน `2026.06.14.14` และ Production smoke ผ่านครบ 20 เส้นทาง
 - วันที่ 14 มิถุนายน 2026 ปรับธีมทั้งเว็บเป็น `MIKPURINUT Nexus — Modern AI School Portal` โดย Light Mode ใช้ Soft Apple AI, Dark Mode/หลังบ้านใช้ Nexus Cyber Glass, รวม Theme Token กลาง, glass surface, ปุ่ม gradient, code rain แบบเบา และรองรับ Reduced Motion ในเวอร์ชัน `2026.06.14.15`
+- วันที่ 14 มิถุนายน 2026 ตรวจ Production เวอร์ชัน `2026.06.14.15` ทั้ง Light/Dark และมือถือแล้ว ไม่พบ horizontal overflow หรือ console error, เครดิตยังอยู่ครบ และ Production smoke ผ่านครบ 20 เส้นทาง
