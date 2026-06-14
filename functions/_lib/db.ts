@@ -35,6 +35,7 @@ export async function ensureSchema(env: Env) {
   if (schemaReady) return
 
   const sql = getSql(env)
+  let existingVersion = ''
   try {
     const [state] = await sql`
       select value->>'version' as version
@@ -42,12 +43,19 @@ export async function ensureSchema(env: Env) {
       where key = 'schema_version'
       limit 1
     `
+    existingVersion = String(state?.version ?? '')
     if (state?.version === SCHEMA_VERSION) {
       schemaReady = true
       return
     }
   } catch {
     // First deployment continues into the idempotent schema bootstrap below.
+  }
+
+  if (existingVersion === '2026.06.14.11') {
+    await migrateExistingSchema(sql)
+    schemaReady = true
+    return
   }
 
   await sql`
@@ -454,6 +462,46 @@ export async function ensureSchema(env: Env) {
   `
 
   schemaReady = true
+}
+
+async function migrateExistingSchema(sql: ReturnType<typeof getSql>) {
+  await sql`alter table users add column if not exists vip_expires_at timestamptz`
+  await sql`
+    create table if not exists media_purchases (
+      id serial primary key,
+      user_id integer not null references users(id) on delete cascade,
+      media_id integer not null references media(id) on delete cascade,
+      amount integer not null default 0 check (amount between 0 and 10000000),
+      status text not null default 'active' check (status in ('active', 'refunded', 'revoked')),
+      granted_by text not null default 'system',
+      granted_at timestamptz not null default now(),
+      refunded_at timestamptz,
+      note text not null default '',
+      unique (user_id, media_id)
+    )
+  `
+  await sql`
+    create table if not exists purchase_requests (
+      id serial primary key,
+      user_id integer not null references users(id) on delete cascade,
+      media_id integer not null references media(id) on delete cascade,
+      amount integer not null default 0 check (amount between 0 and 10000000),
+      slip_name text,
+      status text not null default 'pending' check (status in ('pending', 'approved', 'rejected', 'cancelled', 'refunded')),
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now()
+    )
+  `
+  await Promise.all([
+    sql`create index if not exists users_vip_expiry_idx on users(access_level, vip_expires_at)`,
+    sql`create index if not exists media_purchases_user_status_idx on media_purchases(user_id, status, granted_at desc)`,
+    sql`create index if not exists purchase_requests_status_idx on purchase_requests(status, created_at desc)`,
+  ])
+  await sql`
+    insert into app_settings (key, value, updated_at)
+    values ('schema_version', ${JSON.stringify({ version: SCHEMA_VERSION })}::jsonb, now())
+    on conflict (key) do update set value = excluded.value, updated_at = now()
+  `
 }
 
 async function cleanupExpiredSecurityData(sql: ReturnType<typeof getSql>) {
