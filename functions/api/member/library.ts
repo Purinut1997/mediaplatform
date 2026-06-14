@@ -103,7 +103,7 @@ export const onRequestGet = async ({ env, request }: { env: Env; request: Reques
 
     const sql = getSql(env)
     const [user] = await sql`
-      select id, name, email, role, access_level, created_at
+      select id, name, email, role, access_level, vip_expires_at, created_at
       from users
       where lower(email) = ${currentUser.email.toLowerCase()}
       limit 1
@@ -196,6 +196,14 @@ export const onRequestGet = async ({ env, request }: { env: Env; request: Reques
       [user.id],
     )) as Array<MediaRow & { purchased_at?: string; purchase_amount?: number | string }>
 
+    const [vipRequest] = await sql`
+      select id, phone, slip_name, status, created_at, updated_at
+      from vip_requests
+      where user_id = ${user.id}
+      order by created_at desc
+      limit 1
+    `
+
     return Response.json({
       ok: true,
       profile: {
@@ -203,6 +211,7 @@ export const onRequestGet = async ({ env, request }: { env: Env; request: Reques
         email: user.email,
         role: user.role,
         access: user.access_level,
+        vipExpiresAt: user.vip_expires_at,
         createdAt: user.created_at,
       },
       favorites: favorites.map((row) => ({ media: hideProtectedLinks(toMedia(row), currentUser), savedAt: row.saved_at })),
@@ -216,6 +225,14 @@ export const onRequestGet = async ({ env, request }: { env: Env; request: Reques
         purchasedAt: row.purchased_at,
         amount: Number(row.purchase_amount ?? 0),
       })),
+      vipRequest: vipRequest ? {
+        id: vipRequest.id,
+        phone: vipRequest.phone ?? '',
+        slipName: vipRequest.slip_name ?? '',
+        status: vipRequest.status,
+        createdAt: vipRequest.created_at,
+        updatedAt: vipRequest.updated_at,
+      } : null,
     })
   } catch (error) {
     await writeErrorLog(env, 'member.library.read', error)

@@ -54,6 +54,13 @@ const checks = [
     expectedStatus: 401,
     validate: (data) => data.ok === false && data.error === 'Unauthorized',
   },
+  {
+    path: '/api/member/vip',
+    method: 'POST',
+    body: { agreementAccepted: true },
+    expectedStatus: 401,
+    validate: (data) => data.ok === false,
+  },
   { path: '/api/settings', validate: (data) => data.ok === true && typeof data.settings === 'object' },
   {
     path: '/api/media?page=1&pageSize=10',

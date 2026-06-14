@@ -62,6 +62,14 @@ export type MemberLibrary = {
   favorites: Array<{ media: MediaItem; savedAt: string }>
   history: Array<{ media: MediaItem; lastDownloadedAt: string; downloadCount: number }>
   purchases: Array<{ media: MediaItem; purchasedAt: string; amount: number }>
+  vipRequest: {
+    id: number
+    phone: string
+    slipName: string
+    status: 'pending' | 'approved' | 'rejected'
+    createdAt: string
+    updatedAt: string
+  } | null
 }
 
 export type AdminUser = {

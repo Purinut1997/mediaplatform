@@ -430,6 +430,7 @@ function App() {
               loading={memberLibraryLoading}
               onLogout={logout}
               onOpenDetail={openDetail}
+              onLibraryRefresh={() => setMemberLibraryRefresh((value) => value + 1)}
               onUserUpdated={setCurrentUser}
               renderFavorite={(media) => (
                 <MediaCard
@@ -441,6 +442,7 @@ function App() {
                 />
               )}
               setView={setView}
+              settings={siteSettings}
             />
           )}
           {view === 'account' && !currentUser && (
