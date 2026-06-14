@@ -96,6 +96,13 @@ const checks = [
     expectedStatus: 401,
     validate: (data) => data.ok === false && data.error === 'Unauthorized',
   },
+  {
+    path: '/api/cron/link-checks',
+    method: 'POST',
+    body: {},
+    expectedStatus: 401,
+    validate: (data) => data.ok === false && data.error === 'Unauthorized',
+  },
 ]
 
 let failed = false

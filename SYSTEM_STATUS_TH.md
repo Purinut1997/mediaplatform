@@ -260,12 +260,14 @@
 
 ### สำคัญมาก
 
-1. ตั้ง scheduler จริงให้เรียก Cron endpoint
+1. Cron scheduler เปิดใช้งานแล้วและควรติดตามผลระยะยาว
    - Pages Functions มี endpoint cron แล้ว
    - หลังบ้านมีคู่มือ endpoint/header/env ให้ดูจากหน้า System Health แล้ว
    - มี Worker Cron แยกใน `workers/link-check-cron` แล้ว
-   - เหลือ deploy Worker และใส่ `CRON_SECRET` จริงใน Cloudflare Variables and Secrets ก่อนใช้งานจริง
-   - ตรวจล่าสุดพบว่า Wrangler บนเครื่องยังไม่ได้ login บัญชี Cloudflare จึงยัง deploy อัตโนมัติไม่ได้
+   - Deploy Worker `mediaplatform-link-check-cron` แล้ว ทำงานตามตารางทุก 6 ชั่วโมง
+   - ตั้ง `CRON_SECRET` แบบสุ่มจริงค่าเดียวกันให้ Cloudflare Pages Production และ Worker แล้ว
+   - Wrangler บนเครื่องเชื่อมบัญชี Cloudflare เจ้าของระบบแล้ว
+   - ทดสอบ Worker เรียก Pages Cron endpoint จริงสำเร็จ และ endpoint ปฏิเสธคำขอที่ไม่มี Secret
 2. ตั้งค่า Secret ภายนอกก่อนเปิดใช้ฟีเจอร์เต็ม
    - เปลี่ยนรหัส Super Admin จริงผ่านหน้าความปลอดภัยบัญชีหรือระบบลืมรหัสผ่านแล้ว และควรตั้ง `ADMIN_BOOTSTRAP_PASSWORD` เป็นรหัสใหม่สำหรับกรณี bootstrap ฐานข้อมูลใหม่
    - Production ตั้งค่า `TURNSTILE_SITE_KEY` และ `TURNSTILE_SECRET_KEY` แล้ว ใช้ Turnstile จริงสำหรับ Login/Register/ลืมรหัสผ่าน
@@ -302,17 +304,18 @@
    - Public Shell รวม Header, Hero, Brand Showcase และหน้า Maintenance ไว้ที่ `src/components/PublicShell.tsx`
    - แยกหน้าคลังสมาชิกและการจัดการความปลอดภัยบัญชีไว้ที่ `src/components/MemberLibrary.tsx`
    - แยกหน้ารายละเอียดสื่อ, preview, ลิงก์ในชุด และรีวิวไว้ที่ `src/components/MediaDetail.tsx`
-   - `src/App.tsx` ลดจากประมาณ 6,064 เหลือประมาณ 4,415 บรรทัด โดยพฤติกรรมหน้าเว็บเดิมยังคงเดิม
+   - `src/App.tsx` ลดจากจุดเริ่มต้นประมาณ 6,064 เหลือประมาณ 4,951 บรรทัด โดยพฤติกรรมหน้าเว็บเดิมยังคงเดิม
    - ปรับฟอร์มบัญชีให้รองรับ Password Manager/Browser Autofill ด้วย `autocomplete` ที่ถูกต้อง และตัดตัวเลือกจำการเข้าสู่ระบบที่ยังไม่มีพฤติกรรมจริงออก
 5. เพิ่ม Integration Test สำหรับ Login, สมัครสมาชิก, Workflow สื่อ, VIP และ Backup/Restore
    - ตอนนี้มี Unit Test ด้าน URL และสิทธิ์สื่อ พร้อม GitHub Actions แล้ว
+   - เพิ่ม Unit/Integration Test สำหรับ Cron Worker แล้ว รวมชุดทดสอบปัจจุบันผ่าน 52 รายการ
+   - Production smoke ผ่าน 19 endpoint/security contract รวมการป้องกัน Cron endpoint
 
 ## ลำดับงานแนะนำต่อไป
 
-1. Login Wrangler แล้วตั้ง `CRON_SECRET` ให้ตรงกันทั้ง Cloudflare Pages และ Worker จากนั้นรัน `npm run cron:secret` + `npm run cron:deploy`
-2. ทยอยแยก `src/App.tsx` และเพิ่ม Integration Test สำหรับ workflow สำคัญ
-3. แยก Migration และปรับ Backup/Restore ขนาดใหญ่
-4. กำหนดกติกาธุรกิจสำหรับซื้อแยกและ VIP expiry ก่อนเปิดสองระบบนี้
+1. ทยอยแยก `src/App.tsx` และเพิ่ม Integration Test สำหรับ workflow สำคัญ
+2. แยก Migration และปรับ Backup/Restore ขนาดใหญ่
+3. กำหนดกติกาธุรกิจสำหรับซื้อแยกและ VIP expiry ก่อนเปิดสองระบบนี้
 
 ## ไฟล์หลักที่ควรดูเมื่อทำงานต่อ
 
@@ -412,6 +415,8 @@
 - วันที่ 14 มิถุนายน 2026 แก้ Google OAuth redirect ให้สร้าง headers/cookies แบบ Cloudflare Workers รองรับ ปิด Error 1101 จาก immutable `Response.redirect()` headers
 - วันที่ 14 มิถุนายน 2026 ตรวจ Production ยืนยันว่า Google Login และ Turnstile พร้อมใช้งาน ส่วน Password Reset Email ยังรอ Resend
 - วันที่ 14 มิถุนายน 2026 ตั้งค่า Resend บน Production และทดสอบเส้นทางลืมรหัสผ่าน ส่งอีเมล ตั้งรหัสใหม่ และเข้าสู่ระบบด้วยรหัสใหม่สำเร็จแล้ว
+- วันที่ 14 มิถุนายน 2026 เชื่อม Wrangler, Deploy Worker ตรวจลิงก์เสียทุก 6 ชั่วโมง และตั้ง `CRON_SECRET` ให้ตรงกันทั้ง Pages Production กับ Worker แล้ว
+- วันที่ 14 มิถุนายน 2026 ทดสอบ Cron Worker เรียก Production endpoint สำเร็จ เพิ่มชุดทดสอบ Worker และขยาย Production smoke ตรวจการป้องกัน Cron endpoint
 - วันที่ 14 มิถุนายน 2026 เพิ่ม Production smoke ตรวจ Google OAuth state cookie/callback และแยกหน้ารายละเอียดสื่อกับรีวิวออกจาก `src/App.tsx`
 - วันที่ 14 มิถุนายน 2026 ตรวจ Production เวอร์ชัน `2026.06.14.2` หลังแยกหน้ารายละเอียดสื่อแล้ว ทั้ง desktop/mobile ไม่มี horizontal overflow หรือ console error และ Production smoke ผ่านครบ
 - วันที่ 14 มิถุนายน 2026 เอา Toast แจ้งเชื่อมต่อ Cloudflare + Neon สำเร็จออกจากหน้าเว็บผู้ใช้ โดยยังคง Toast การทำงานและข้อผิดพลาดที่จำเป็นไว้
