@@ -73,6 +73,11 @@ const checks = [
     validate: (data) => data.ok === false && data.error === 'Unauthorized',
   },
   {
+    path: '/api/admin/notifications?page=1&pageSize=8',
+    expectedStatus: 401,
+    validate: (data) => data.ok === false && data.error === 'Unauthorized',
+  },
+  {
     path: '/api/media/bulk',
     method: 'POST',
     body: { action: 'delete', ids: [1] },

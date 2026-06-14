@@ -1,6 +1,7 @@
 import { requireAdminPermission } from '../../_lib/admin'
 import { ensureSchema, getSql, type Env } from '../../_lib/db'
 import { writeNotification } from '../../_lib/notifications'
+import { readPagination } from '../../_lib/pagination'
 
 type NotificationRow = {
   id: number
@@ -141,13 +142,18 @@ export const onRequestGet = async ({ env, request }: { env: Env; request: Reques
   await ensureSchema(env)
   await syncSystemNotifications(env)
   const sql = getSql(env)
+  const { page, pageSize, offset } = readPagination(new URL(request.url), {
+    defaultPageSize: 8,
+    minPageSize: 5,
+    maxPageSize: 50,
+  })
   const isSuperAdmin = currentUser.role === 'superadmin'
   const rows = (await sql`
     select id, audience, type, title, detail, tone, target_type, target_id, read_at, created_at
     from notifications
     where (${isSuperAdmin} or audience in ('admin', 'all'))
     order by read_at asc nulls first, created_at desc
-    limit 80
+    limit ${pageSize} offset ${offset}
   `) as NotificationRow[]
   const [countRow] = await sql`
     select
@@ -159,6 +165,8 @@ export const onRequestGet = async ({ env, request }: { env: Env; request: Reques
 
   return Response.json({
     ok: true,
+    page,
+    pageSize,
     total: Number(countRow?.total ?? 0),
     unread: Number(countRow?.unread ?? 0),
     notifications: rows.filter((row) => canSee(row, currentUser.role)).map((row) => ({

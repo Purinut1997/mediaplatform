@@ -1653,6 +1653,8 @@ function AdminPanel({
   const [errorTotal, setErrorTotal] = useState(0)
   const [notifications, setNotifications] = useState<AdminNotification[]>([])
   const [notificationUnread, setNotificationUnread] = useState(0)
+  const [notificationPage, setNotificationPage] = useState(1)
+  const [notificationTotal, setNotificationTotal] = useState(0)
   const [analytics, setAnalytics] = useState<AdminAnalytics | null>(null)
   const [systemHealth, setSystemHealth] = useState<SystemHealth | null>(null)
   const [telegramStatus, setTelegramStatus] = useState<TelegramStatus | null>(null)
@@ -1734,6 +1736,7 @@ function AdminPanel({
     ? (analytics.engagement.vipUsers / analytics.engagement.activeUsers) * 100
     : 0
   const unreadNotifications = notificationUnread
+  const notificationPageCount = Math.max(1, Math.ceil(notificationTotal / 8))
   const activityActions = Array.from(new Set(auditLogs.map((log) => log.action).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'th'))
   const activityTargets = Array.from(new Set(auditLogs.map((log) => log.targetType).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'th'))
   const filteredAuditLogs = auditLogs.filter((log) => {
@@ -1878,12 +1881,20 @@ function AdminPanel({
     }
   }
 
-  const loadNotifications = async () => {
-    const response = await fetch('/api/admin/notifications', { credentials: 'include' })
-    const result = await readJson<{ notifications?: AdminNotification[]; unread?: number; error?: string }>(response)
+  const loadNotifications = async (page = notificationPage) => {
+    const response = await fetch(`/api/admin/notifications?page=${page}&pageSize=8`, { credentials: 'include' })
+    const result = await readJson<{
+      notifications?: AdminNotification[]
+      unread?: number
+      total?: number
+      page?: number
+      error?: string
+    }>(response)
     if (!response.ok) throw new Error(result.error ?? 'โหลด Notification Center ไม่สำเร็จ')
     setNotifications(result.notifications ?? [])
     setNotificationUnread(result.unread ?? 0)
+    setNotificationTotal(result.total ?? 0)
+    setNotificationPage(result.page ?? page)
   }
 
   const loadAnalytics = async () => {
@@ -1971,7 +1982,7 @@ function AdminPanel({
       })
       const result = await readJson<{ error?: string }>(response)
       if (!response.ok) throw new Error(result.error ?? 'อัปเดตแจ้งเตือนไม่สำเร็จ')
-      await loadNotifications()
+      await loadNotifications(payload.action === 'mark-all-read' ? 1 : notificationPage)
     } catch (notificationError) {
       setOpsError(notificationError instanceof Error ? notificationError.message : 'อัปเดตแจ้งเตือนไม่สำเร็จ')
     }
@@ -2755,7 +2766,7 @@ function AdminPanel({
                     <div>
                       <p className="font-black text-white">Notification Center</p>
                       <p className="mt-1 text-xs font-bold text-slate-500">
-                        {unreadNotifications.toLocaleString('th-TH')} รายการยังไม่อ่าน
+                        {unreadNotifications.toLocaleString('th-TH')} รายการยังไม่อ่าน · ทั้งหมด {notificationTotal.toLocaleString('th-TH')}
                       </p>
                     </div>
                     <button
@@ -2773,7 +2784,7 @@ function AdminPanel({
                         ตอนนี้ไม่มีแจ้งเตือนสำคัญ
                       </div>
                     )}
-                    {notifications.slice(0, 8).map((notice) => (
+                    {notifications.map((notice) => (
                       <article
                         className={`rounded-2xl border p-4 transition hover:-translate-y-0.5 ${
                           notice.readAt ? 'opacity-55' : ''
@@ -2817,6 +2828,29 @@ function AdminPanel({
                       </article>
                     ))}
                   </div>
+                  {notificationTotal > 8 && (
+                    <div className="mt-4 flex items-center justify-between gap-2 border-t border-white/10 pt-4">
+                      <button
+                        className="min-h-10 rounded-xl bg-white/10 px-3 text-xs font-black text-white disabled:cursor-not-allowed disabled:opacity-35"
+                        disabled={notificationPage <= 1}
+                        onClick={() => void loadNotifications(notificationPage - 1)}
+                        type="button"
+                      >
+                        ก่อนหน้า
+                      </button>
+                      <span className="text-xs font-black text-cyan-200">
+                        หน้า {notificationPage.toLocaleString('th-TH')} / {notificationPageCount.toLocaleString('th-TH')}
+                      </span>
+                      <button
+                        className="min-h-10 rounded-xl bg-cyan-300 px-3 text-xs font-black text-slate-950 disabled:cursor-not-allowed disabled:opacity-35"
+                        disabled={notificationPage >= notificationPageCount}
+                        onClick={() => void loadNotifications(notificationPage + 1)}
+                        type="button"
+                      >
+                        ถัดไป
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             </section>
