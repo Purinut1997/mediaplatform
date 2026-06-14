@@ -408,6 +408,7 @@
 - หน้าสมาชิกหลังบ้านรองรับค้นหาชื่อ/อีเมลและแบ่งหน้า 50 บัญชีต่อหน้า
 - Restore แบบ Replace ถูกปิดทั้ง API/UI จนกว่าจะมีวิธี restore แบบ atomic หรือใช้ Neon Restore
 - เพิ่ม Schema Version Guard ลด cold-start จากการรัน DDL/seed ซ้ำใน Worker ใหม่
+  - ฐานข้อมูลเดิมที่มี schema version แล้วจะอัปเดต version แบบสั้น ไม่ย้อนรัน bootstrap ทั้งระบบจนชนเวลาจำกัด Cloudflare
 - Activity Log และ Error Log รองรับ Server-side Pagination 50 รายการต่อหน้า
 - Notification Center กรอง audience ก่อน limit และแสดงยอด unread จากฐานข้อมูลจริง
 - Link Checker เลือกลิงก์ที่ไม่เคยตรวจหรือเก่าสุดก่อน และตรวจขนานเป็นชุดละ 10 ลิงก์
@@ -455,3 +456,5 @@
 - วันที่ 14 มิถุนายน 2026 ตรวจ Production เวอร์ชัน `2026.06.14.10` หลังแบ่งหน้า Notification Center แล้ว Production smoke ผ่านครบ
 - วันที่ 14 มิถุนายน 2026 รวมกติกา pagination ของ Media, Members, Activity, Error และ Notification ไว้ที่ helper กลาง พร้อมขยาย Production smoke ตรวจสิทธิ์ API หลังบ้าน
 - วันที่ 14 มิถุนายน 2026 ตรวจ Production เวอร์ชัน `2026.06.14.11` หลังรวม pagination กลางแล้ว หน้าเว็บไม่ล้น ไม่มี console error และ Production smoke ผ่านครบ
+- วันที่ 14 มิถุนายน 2026 เพิ่มฐานระบบวันหมดอายุ VIP และซื้อสื่อแยก ปรับรายละเอียด/เงื่อนไขจาก Super Admin ได้ พร้อมสิทธิ์ซื้อรายสื่อ คลังสื่อที่ซื้อ และ Backup/Restore
+- วันที่ 14 มิถุนายน 2026 ตรวจ Production เวอร์ชัน `2026.06.14.12` หลัง migration ฐานการค้าแล้ว Schema พร้อมครบ, API กลับมาปกติ และ Production smoke ผ่านครบ 20 รายการ
