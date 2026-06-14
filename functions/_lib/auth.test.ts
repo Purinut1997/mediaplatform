@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { clearSessionCookie, publicUser, sessionCookie, type UserRow } from './auth'
+import { hashPassword, verifyPassword } from './db'
 
 const user: UserRow = {
   id: 7,
@@ -45,5 +46,14 @@ describe('authentication security', () => {
     expect(cookie).toContain('Secure')
     expect(cookie).toContain('SameSite=Lax')
     expect(cookie).toContain('Max-Age=0')
+  })
+
+  it('hashes passwords with a salt and rejects the wrong password', async () => {
+    const hash = await hashPassword('correct-password', '00112233445566778899aabbccddeeff')
+
+    expect(hash).toMatch(/^pbkdf2:00112233445566778899aabbccddeeff:[a-f0-9]{64}$/)
+    await expect(verifyPassword('correct-password', hash)).resolves.toBe(true)
+    await expect(verifyPassword('wrong-password', hash)).resolves.toBe(false)
+    await expect(verifyPassword('correct-password', 'invalid-hash')).resolves.toBe(false)
   })
 })

@@ -4,7 +4,7 @@
 
 ## ภาพรวมความคืบหน้า
 
-- ระบบพร้อมใช้งานหลักประมาณ **92%**
+- ระบบพร้อมใช้งานหลักประมาณ **95%**
 - งานหลักสำหรับหน้าเว็บผู้ใช้, สมาชิก, Super Admin, workflow สื่อ, รายงาน, log, backup และ security มีแล้ว
 - งานที่เหลือส่วนใหญ่เป็นการรองรับข้อมูลขนาดใหญ่มาก, แยกโครงสร้างโค้ด และการตั้งค่า Secret/บริการภายนอกจากบัญชีเจ้าของ
 
@@ -304,11 +304,13 @@
    - Public Shell รวม Header, Hero, Brand Showcase และหน้า Maintenance ไว้ที่ `src/components/PublicShell.tsx`
    - แยกหน้าคลังสมาชิกและการจัดการความปลอดภัยบัญชีไว้ที่ `src/components/MemberLibrary.tsx`
    - แยกหน้ารายละเอียดสื่อ, preview, ลิงก์ในชุด และรีวิวไว้ที่ `src/components/MediaDetail.tsx`
-   - `src/App.tsx` ลดจากจุดเริ่มต้นประมาณ 6,064 เหลือประมาณ 4,951 บรรทัด โดยพฤติกรรมหน้าเว็บเดิมยังคงเดิม
+   - แยก Super Admin ทั้งหน้าไปที่ `src/components/AdminPanel.tsx` และโหลดแบบ lazy เฉพาะเมื่อผู้ดูแลเปิดหลังบ้าน
+   - `src/App.tsx` ลดจากจุดเริ่มต้นประมาณ 6,064 เหลือประมาณ 1,600 บรรทัด โดยพฤติกรรมหน้าเว็บเดิมยังคงเดิม
+   - JavaScript หน้าเว็บทั่วไปลดจากประมาณ 406 KB เหลือประมาณ 290 KB และแยกชุดหลังบ้านประมาณ 118 KB ออกไปโหลดตามต้องการ
    - ปรับฟอร์มบัญชีให้รองรับ Password Manager/Browser Autofill ด้วย `autocomplete` ที่ถูกต้อง และตัดตัวเลือกจำการเข้าสู่ระบบที่ยังไม่มีพฤติกรรมจริงออก
 5. เพิ่ม Integration Test สำหรับ Login, สมัครสมาชิก, Workflow สื่อ, VIP และ Backup/Restore
    - ตอนนี้มี Unit Test ด้าน URL และสิทธิ์สื่อ พร้อม GitHub Actions แล้ว
-   - เพิ่ม Unit/Integration Test สำหรับ Cron Worker แล้ว รวมชุดทดสอบปัจจุบันผ่าน 52 รายการ
+   - เพิ่ม Unit/Integration Test สำหรับ Cron Worker และการ hash/ตรวจรหัสผ่านแล้ว รวมชุดทดสอบปัจจุบันผ่าน 53 รายการ
    - Production smoke ผ่าน 19 endpoint/security contract รวมการป้องกัน Cron endpoint
 
 ## ลำดับงานแนะนำต่อไป
@@ -417,6 +419,7 @@
 - วันที่ 14 มิถุนายน 2026 ตั้งค่า Resend บน Production และทดสอบเส้นทางลืมรหัสผ่าน ส่งอีเมล ตั้งรหัสใหม่ และเข้าสู่ระบบด้วยรหัสใหม่สำเร็จแล้ว
 - วันที่ 14 มิถุนายน 2026 เชื่อม Wrangler, Deploy Worker ตรวจลิงก์เสียทุก 6 ชั่วโมง และตั้ง `CRON_SECRET` ให้ตรงกันทั้ง Pages Production กับ Worker แล้ว
 - วันที่ 14 มิถุนายน 2026 ทดสอบ Cron Worker เรียก Production endpoint สำเร็จ เพิ่มชุดทดสอบ Worker และขยาย Production smoke ตรวจการป้องกัน Cron endpoint
+- วันที่ 14 มิถุนายน 2026 แยก Super Admin ออกจาก `src/App.tsx` และโหลดแบบ lazy ทำให้ JavaScript หน้าเว็บทั่วไปเล็กลง พร้อมตรวจ desktop/mobile ไม่พบ overflow หรือ console error
 - วันที่ 14 มิถุนายน 2026 เพิ่ม Production smoke ตรวจ Google OAuth state cookie/callback และแยกหน้ารายละเอียดสื่อกับรีวิวออกจาก `src/App.tsx`
 - วันที่ 14 มิถุนายน 2026 ตรวจ Production เวอร์ชัน `2026.06.14.2` หลังแยกหน้ารายละเอียดสื่อแล้ว ทั้ง desktop/mobile ไม่มี horizontal overflow หรือ console error และ Production smoke ผ่านครบ
 - วันที่ 14 มิถุนายน 2026 เอา Toast แจ้งเชื่อมต่อ Cloudflare + Neon สำเร็จออกจากหน้าเว็บผู้ใช้ โดยยังคง Toast การทำงานและข้อผิดพลาดที่จำเป็นไว้
