@@ -14,7 +14,7 @@ export function PortalTiles({ setView }: { setView: (view: View) => void }) {
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {portalTiles.map((tile) => (
           <button
-            className="group min-h-28 rounded-3xl border border-white/70 bg-white/74 p-5 text-left shadow-lg shadow-slate-950/5 backdrop-blur-xl transition hover:-translate-y-1 hover:border-cyan-300 dark:border-white/10 dark:bg-white/[0.06]"
+            className="nexus-card group min-h-28 rounded-3xl border p-5 text-left backdrop-blur-xl transition hover:-translate-y-1"
             key={tile.label}
             onClick={() => setView(tile.view)}
             type="button"

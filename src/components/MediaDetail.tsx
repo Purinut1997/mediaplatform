@@ -78,7 +78,7 @@ export function MediaDetail({
         กลับไปคลังสื่อ
       </button>
 
-      <div className="grid gap-6 overflow-hidden rounded-[2rem] border border-white/70 bg-white/78 p-4 shadow-2xl shadow-slate-950/10 backdrop-blur-xl lg:grid-cols-[.95fr_1.05fr] dark:border-white/10 dark:bg-white/[0.06]">
+      <div className="nexus-glass grid gap-6 overflow-hidden rounded-[2rem] border p-4 backdrop-blur-xl lg:grid-cols-[.95fr_1.05fr]">
         <div className="overflow-hidden rounded-3xl bg-slate-100 dark:bg-slate-800">
           <img alt={item.title} className="h-full min-h-80 w-full object-cover" src={item.cover} />
         </div>
@@ -143,7 +143,7 @@ export function MediaDetail({
       </div>
 
       {Boolean(item.links?.length) && (
-        <section className="mt-6 rounded-3xl border border-white/70 bg-white/76 p-6 shadow-sm backdrop-blur dark:border-white/10 dark:bg-white/[0.06]">
+        <section className="nexus-glass mt-6 rounded-3xl border p-6 backdrop-blur">
           <div className="mb-4 flex flex-wrap items-end justify-between gap-2">
             <div>
               <h3 className="text-xl font-black text-slate-950 dark:text-white">ไฟล์และบทเรียนในชุดนี้</h3>
@@ -169,7 +169,7 @@ export function MediaDetail({
       )}
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_360px]">
-        <section className="rounded-3xl border border-white/70 bg-white/76 p-6 shadow-sm backdrop-blur dark:border-white/10 dark:bg-white/[0.06]">
+        <section className="nexus-glass rounded-3xl border p-6 backdrop-blur">
           <h3 className="mb-4 inline-flex items-center gap-2 text-xl font-black"><FileText className="text-cyan-600" />รายละเอียดสื่อ</h3>
           <ul className="space-y-3 text-slate-600 dark:text-slate-300">
             <li>รองรับการแปะลิงก์ Google Drive, Google Sheet, YouTube และลิงก์ภายนอก</li>
@@ -177,7 +177,7 @@ export function MediaDetail({
             <li>ระบบจะเช็กสิทธิ์ก่อนแสดงปุ่มดาวน์โหลดจริงในขั้นตอน backend</li>
           </ul>
         </section>
-        <aside className="rounded-3xl border border-white/70 bg-white/76 p-6 shadow-sm backdrop-blur dark:border-white/10 dark:bg-white/[0.06]">
+        <aside className="nexus-glass rounded-3xl border p-6 backdrop-blur">
           <h3 className="mb-4 inline-flex items-center gap-2 text-xl font-black"><PlayCircle className="text-violet-600" />Preview</h3>
           {previewUrl ? (
             <iframe className="h-72 w-full rounded-2xl border border-slate-200 bg-slate-100 dark:border-white/10 dark:bg-slate-900" loading="lazy" referrerPolicy="no-referrer-when-downgrade" src={previewUrl} title={`preview-${item.title}`} />
@@ -209,7 +209,7 @@ function ReviewPanel({ currentUser, mediaId }: { currentUser: CurrentUser | null
   useEffect(refreshReviews, [mediaId])
 
   return (
-    <section className="mt-6 rounded-3xl border border-white/70 bg-white/76 p-5 shadow-sm backdrop-blur dark:border-white/10 dark:bg-white/[0.06] sm:p-6">
+    <section className="nexus-glass mt-6 rounded-3xl border p-5 backdrop-blur sm:p-6">
       <h3 className="flex items-center gap-2 text-xl font-black text-slate-950 dark:text-white"><Star className="fill-amber-400 text-amber-400" />คะแนนและความคิดเห็น</h3>
       {currentUser ? (
         <form className="mt-5 grid gap-3" onSubmit={async (event) => {

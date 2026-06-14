@@ -98,6 +98,7 @@ function App() {
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', theme === 'dark')
+    document.documentElement.dataset.theme = theme
     window.localStorage.setItem('theme', theme)
   }, [theme])
 
@@ -343,7 +344,7 @@ function App() {
     !maintenanceAuthViews.includes(view)
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[#f2fbff] text-slate-900 transition-colors duration-300 dark:bg-[#06111d] dark:text-slate-100">
+    <div className="theme-shell relative min-h-screen overflow-hidden text-slate-900 transition-colors duration-300 dark:text-slate-100">
       <TechBackground />
       {(loading || !sessionReady) && <LoadingOverlay />}
 
@@ -745,7 +746,7 @@ function MediaCard({
   onToggleFavorite?: (item: MediaItem) => void
 }) {
   return (
-    <article className="group grid overflow-hidden rounded-3xl border border-white/70 bg-white/76 shadow-lg shadow-slate-950/5 backdrop-blur-xl transition duration-300 hover:-translate-y-1 sm:grid-cols-[210px_1fr] dark:border-white/10 dark:bg-white/[0.06]">
+    <article className="nexus-card group grid overflow-hidden rounded-3xl border backdrop-blur-xl transition duration-300 hover:-translate-y-1 sm:grid-cols-[210px_1fr]">
       <div className="relative min-h-52 overflow-hidden sm:min-h-full">
         <img
           alt={item.title}
@@ -1161,7 +1162,7 @@ function ResetPasswordPanel({ onDone, token }: { onDone: () => void; token: stri
 function AuthActionPanel({ children, detail, title }: { children: ReactNode; detail: string; title: string }) {
   return (
     <section className="mx-auto grid min-h-[70vh] max-w-xl place-items-center px-4 py-12">
-      <div className="w-full rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-2xl backdrop-blur-2xl dark:border-white/10 dark:bg-slate-950/85 sm:p-8">
+      <div className="nexus-glass w-full rounded-[2rem] border p-6 backdrop-blur-2xl sm:p-8">
         <img alt="MIKPURINUT" className="h-16 w-16 rounded-2xl object-cover" src={LOGO_URL} />
         <h1 className="mt-5 text-3xl font-black text-slate-950 dark:text-white">{title}</h1>
         <p className="mb-6 mt-2 font-semibold leading-7 text-slate-500 dark:text-slate-400">{detail}</p>
@@ -1300,7 +1301,7 @@ function RegisterPanel({
       </div>
 
       <form
-        className="mt-6 rounded-[2rem] border border-white/70 bg-white/86 p-5 shadow-2xl shadow-slate-950/8 backdrop-blur-xl sm:p-8 lg:p-10 dark:border-white/10 dark:bg-white/[0.06]"
+        className="nexus-glass mt-6 rounded-[2rem] border p-5 backdrop-blur-xl sm:p-8 lg:p-10"
         onSubmit={submitRegister}
       >
         <div className="mb-6 flex flex-col justify-between gap-3 sm:flex-row sm:items-end">

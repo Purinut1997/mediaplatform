@@ -34,7 +34,7 @@ export function Header({
     : memberNav
 
   return (
-    <header className="sticky top-0 z-40 border-b border-white/60 bg-white/72 shadow-sm shadow-slate-950/5 backdrop-blur-2xl dark:border-white/10 dark:bg-[#070b14]/80">
+    <header className="nexus-header sticky top-0 z-40 border-b backdrop-blur-2xl">
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
         <button className="flex min-h-12 items-center gap-3 text-left" onClick={() => setView('home')} type="button">
           <img alt="MIKPURINUT logo" className="h-11 w-11 rounded-2xl border border-white object-cover shadow-lg shadow-cyan-900/15" src={LOGO_URL} />
@@ -47,7 +47,7 @@ export function Header({
         <nav className="hidden items-center rounded-2xl border border-white/70 bg-white/70 p-1 shadow-sm dark:border-white/10 dark:bg-white/5 lg:flex">
           {visibleNav.map((item) => (
             <button
-              className={`min-h-10 rounded-xl px-4 text-sm font-black transition ${view === item.value ? 'bg-slate-950 text-cyan-200 shadow-lg shadow-cyan-500/10 dark:bg-cyan-300 dark:text-slate-950' : 'text-slate-600 hover:bg-cyan-50 dark:text-slate-300 dark:hover:bg-white/10'}`}
+              className={`min-h-10 rounded-xl px-4 text-sm font-black transition ${view === item.value ? 'nexus-nav-active text-white' : 'text-slate-600 hover:bg-cyan-50 dark:text-slate-300 dark:hover:bg-white/10'}`}
               key={item.value}
               onClick={() => setView(item.value)}
               type="button"
@@ -100,14 +100,14 @@ export function Header({
 export function Hero({ setView, settings }: { setView: (view: View) => void; settings: SiteSettings }) {
   return (
     <section className="mx-auto max-w-7xl px-4 pb-8 pt-8 sm:px-6 lg:pt-12">
-      <div className="grid overflow-hidden rounded-[2rem] border border-white/80 bg-white/80 shadow-2xl shadow-sky-900/10 backdrop-blur-2xl lg:grid-cols-[0.9fr_1.1fr] dark:border-white/10 dark:bg-white/[0.06]">
+      <div className="nexus-hero grid overflow-hidden rounded-[2rem] border backdrop-blur-2xl lg:grid-cols-[0.9fr_1.1fr]">
         <div className="p-6 sm:p-9 lg:p-12">
           <div className="mb-6 inline-flex items-center gap-2 rounded-2xl border border-cyan-500/20 bg-cyan-50 px-4 py-2 text-sm font-black text-cyan-900 dark:bg-cyan-400/10 dark:text-cyan-200"><BrainCircuit size={18} />{settings.heroEyebrow}</div>
           {settings.announcementText && <div className="mb-5 rounded-2xl border border-amber-300/60 bg-amber-50 px-4 py-3 text-sm font-black text-amber-800 dark:border-amber-300/20 dark:bg-amber-300/10 dark:text-amber-100">{settings.announcementText}</div>}
           <h1 className="max-w-3xl text-4xl font-black leading-tight text-slate-950 sm:text-5xl dark:text-white">{settings.heroTitle}</h1>
           <p className="mt-5 max-w-2xl text-base leading-8 text-slate-600 sm:text-lg dark:text-slate-300">{settings.heroDescription}</p>
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-            <button className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-slate-950 px-6 font-black text-cyan-200 shadow-xl shadow-slate-900/15 transition hover:-translate-y-0.5 dark:bg-cyan-300 dark:text-slate-950" onClick={() => setView('media')} type="button"><BookOpen size={20} />{settings.heroPrimaryLabel}</button>
+            <button className="nexus-primary inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl px-6 font-black text-white transition hover:-translate-y-0.5" onClick={() => setView('media')} type="button"><BookOpen size={20} />{settings.heroPrimaryLabel}</button>
             <button className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-slate-300 bg-white/70 px-6 font-black text-slate-800 transition hover:-translate-y-0.5 hover:border-cyan-400 dark:border-white/10 dark:bg-white/10 dark:text-white" onClick={() => setView('media')} type="button"><ShieldCheck size={20} />{settings.heroSecondaryLabel}</button>
           </div>
         </div>
@@ -120,7 +120,7 @@ export function Hero({ setView, settings }: { setView: (view: View) => void; set
 export function MaintenanceScreen({ setView, settings }: { setView: (view: View) => void; settings: SiteSettings }) {
   return (
     <section className="mx-auto grid min-h-[64vh] max-w-4xl place-items-center px-4 py-16 text-center sm:px-6">
-      <div className="rounded-[2rem] border border-cyan-200/70 bg-white/82 p-8 shadow-2xl shadow-sky-900/10 backdrop-blur-2xl dark:border-white/10 dark:bg-white/[0.07]">
+      <div className="nexus-glass rounded-[2rem] border p-8 backdrop-blur-2xl">
         <img alt="MIKPURINUT logo" className="mx-auto h-20 w-20 rounded-3xl border border-cyan-200/50 object-cover shadow-xl shadow-cyan-500/10" src={LOGO_URL} />
         <p className="mt-6 text-sm font-black text-cyan-700 dark:text-cyan-200">MIKPURINUT Maintenance Mode</p>
         <h1 className="mt-3 text-3xl font-black text-slate-950 sm:text-5xl dark:text-white">{settings.maintenanceTitle}</h1>

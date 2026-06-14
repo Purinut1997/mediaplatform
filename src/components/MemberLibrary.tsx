@@ -44,7 +44,7 @@ export function MemberLibraryPanel({
 
   return (
     <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
-      <div className="overflow-hidden rounded-[2rem] border border-white/70 bg-white/78 shadow-2xl shadow-sky-900/10 backdrop-blur-2xl dark:border-white/10 dark:bg-white/[0.06]">
+      <div className="nexus-glass overflow-hidden rounded-[2rem] border backdrop-blur-2xl">
         <div className="grid gap-6 bg-[linear-gradient(125deg,#081427,#0d2941_60%,#0e7490)] p-6 text-white sm:p-8 lg:grid-cols-[1fr_auto] lg:items-center">
           <div>
             <p className="inline-flex items-center gap-2 rounded-2xl border border-cyan-300/20 bg-cyan-300/10 px-4 py-2 text-sm font-black text-cyan-100">

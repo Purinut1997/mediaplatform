@@ -1101,8 +1101,8 @@ export function AdminPanel({
   }
 
   return (
-    <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
-      <div className="overflow-hidden rounded-[1.75rem] border border-white/10 bg-[linear-gradient(135deg,rgba(15,23,42,.96),rgba(8,13,24,.98)_52%,rgba(12,35,50,.92))] p-4 text-white shadow-2xl shadow-slate-950/30 ring-1 ring-cyan-300/10 sm:p-6">
+    <section className="admin-shell mx-auto max-w-7xl px-4 py-8 sm:px-6">
+      <div className="admin-command-center overflow-hidden rounded-[1.75rem] border p-4 text-white sm:p-6">
         <div className="mb-6 grid gap-4 lg:grid-cols-[1fr_auto] lg:items-center">
           <div>
             <p className="mb-3 inline-flex items-center gap-2 rounded-full border border-cyan-300/30 bg-cyan-300/12 px-3 py-1.5 text-sm font-black text-cyan-100">

@@ -81,7 +81,7 @@ export function Popup({
 
 export function Footer({ settings }: { settings: SiteSettings }) {
   return (
-    <footer className="mt-10 bg-slate-950 px-4 py-10 text-white sm:px-6">
+    <footer className="nexus-footer mt-10 px-4 py-10 text-white sm:px-6">
       <div className="mx-auto grid max-w-7xl gap-8 md:grid-cols-[1.2fr_1fr_1fr]">
         <div>
           <div className="mb-4 flex items-center gap-3">
