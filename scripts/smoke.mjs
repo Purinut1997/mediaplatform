@@ -72,6 +72,13 @@ const checks = [
     expectedStatus: 401,
     validate: (data) => data.ok === false && data.error === 'Unauthorized',
   },
+  {
+    path: '/api/media/bulk',
+    method: 'POST',
+    body: { action: 'delete', ids: [1] },
+    expectedStatus: 401,
+    validate: (data) => data.ok === false && data.error === 'Unauthorized',
+  },
 ]
 
 let failed = false
@@ -79,7 +86,12 @@ for (const check of checks) {
   const started = Date.now()
   try {
     const response = await fetch(`${baseUrl}${check.path}`, {
-      headers: { 'user-agent': 'MIKPURINUT-production-smoke/1.0' },
+      method: check.method || 'GET',
+      headers: {
+        'user-agent': 'MIKPURINUT-production-smoke/1.0',
+        ...(check.body ? { 'content-type': 'application/json' } : {}),
+      },
+      body: check.body ? JSON.stringify(check.body) : undefined,
       redirect: check.redirect || 'follow',
       signal: AbortSignal.timeout(timeoutMs),
     })
