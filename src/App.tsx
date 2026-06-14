@@ -1625,6 +1625,9 @@ function AdminPanel({
   const [adminMediaPageSize, setAdminMediaPageSize] = useState(10)
   const [adminMediaTotal, setAdminMediaTotal] = useState(mediaItems.length)
   const [loadingAdminMedia, setLoadingAdminMedia] = useState(false)
+  const [selectedMediaIds, setSelectedMediaIds] = useState<Set<number>>(() => new Set())
+  const [bulkMediaStatus, setBulkMediaStatus] = useState<MediaStatus>('ฉบับร่าง')
+  const [bulkMediaTopic, setBulkMediaTopic] = useState(topics[0] ?? 'โรงเรียน')
   const [filterNow] = useState(() => Date.now())
   const [newTopicName, setNewTopicName] = useState('')
   const [editingTopic, setEditingTopic] = useState<{ original: string; name: string } | null>(null)
@@ -1865,6 +1868,7 @@ function AdminPanel({
       setAdminMediaResults(result.media ?? [])
       setAdminMediaPage(result.page ?? page)
       setAdminMediaTotal(result.total ?? 0)
+      setSelectedMediaIds(new Set())
     } catch (mediaLoadError) {
       setError(mediaLoadError instanceof Error ? mediaLoadError.message : 'โหลดรายการสื่อไม่สำเร็จ')
     } finally {
@@ -2386,6 +2390,47 @@ function AdminPanel({
       onCreated()
     } catch (deleteError) {
       setError(deleteError instanceof Error ? deleteError.message : 'ลบสื่อไม่สำเร็จ')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const toggleSelectedMedia = (id: number) => {
+    setSelectedMediaIds((current) => {
+      const next = new Set(current)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const toggleAllVisibleMedia = () => {
+    const visibleIds = adminFilteredMedia.map((item) => item.id)
+    const allSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedMediaIds.has(id))
+    setSelectedMediaIds(allSelected ? new Set() : new Set(visibleIds))
+  }
+
+  const runBulkMediaAction = async (action: 'status' | 'topic' | 'delete', value = '') => {
+    const ids = Array.from(selectedMediaIds)
+    if (!ids.length) return
+    if (action === 'delete' && !window.confirm(`ลบสื่อที่เลือก ${ids.length} รายการใช่ไหม? การดำเนินการนี้ย้อนกลับไม่ได้`)) return
+
+    setError('')
+    setSaving(true)
+    try {
+      const response = await fetch('/api/media/bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ action, ids, value }),
+      })
+      const result = await readJson<{ updated?: number; error?: string }>(response)
+      if (!response.ok) throw new Error(result.error ?? 'จัดการสื่อหลายรายการไม่สำเร็จ')
+      setSelectedMediaIds(new Set())
+      await loadAdminMediaPage(adminMediaPage)
+      onCreated()
+    } catch (bulkError) {
+      setError(bulkError instanceof Error ? bulkError.message : 'จัดการสื่อหลายรายการไม่สำเร็จ')
     } finally {
       setSaving(false)
     }
@@ -4407,6 +4452,63 @@ function AdminPanel({
               </select>
             </div>
 
+            {selectedMediaIds.size > 0 && (
+              <div className="mb-4 rounded-2xl border border-cyan-300/25 bg-cyan-300/[0.08] p-3">
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-sm font-black text-cyan-100">
+                    เลือกแล้ว {selectedMediaIds.size.toLocaleString('th-TH')} รายการ
+                  </p>
+                  <button
+                    className="min-h-10 rounded-xl bg-white/10 px-4 text-sm font-black text-white"
+                    onClick={() => setSelectedMediaIds(new Set())}
+                    type="button"
+                  >
+                    ยกเลิกการเลือก
+                  </button>
+                </div>
+                <div className="grid gap-2 lg:grid-cols-[1fr_auto_1fr_auto_auto]">
+                  <select
+                    className="min-h-11 rounded-xl border border-white/10 bg-slate-950 px-3 font-bold text-white outline-none focus:border-cyan-300"
+                    onChange={(event) => setBulkMediaStatus(event.target.value as MediaStatus)}
+                    value={bulkMediaStatus}
+                  >
+                    {statusOptions.map((status) => <option key={status}>{status}</option>)}
+                  </select>
+                  <button
+                    className="min-h-11 rounded-xl bg-cyan-300 px-4 text-sm font-black text-slate-950 disabled:opacity-50"
+                    disabled={saving}
+                    onClick={() => void runBulkMediaAction('status', bulkMediaStatus)}
+                    type="button"
+                  >
+                    เปลี่ยนสถานะ
+                  </button>
+                  <select
+                    className="min-h-11 rounded-xl border border-white/10 bg-slate-950 px-3 font-bold text-white outline-none focus:border-cyan-300"
+                    onChange={(event) => setBulkMediaTopic(event.target.value)}
+                    value={bulkMediaTopic}
+                  >
+                    {topics.filter((topic) => topic !== 'ทั้งหมด').map((topic) => <option key={topic}>{topic}</option>)}
+                  </select>
+                  <button
+                    className="min-h-11 rounded-xl bg-sky-400/20 px-4 text-sm font-black text-sky-100 disabled:opacity-50"
+                    disabled={saving}
+                    onClick={() => void runBulkMediaAction('topic', bulkMediaTopic)}
+                    type="button"
+                  >
+                    ย้ายหมวดหมู่
+                  </button>
+                  <button
+                    className="min-h-11 rounded-xl bg-red-400/15 px-4 text-sm font-black text-red-100 disabled:opacity-50"
+                    disabled={saving}
+                    onClick={() => void runBulkMediaAction('delete')}
+                    type="button"
+                  >
+                    ลบที่เลือก
+                  </button>
+                </div>
+              </div>
+            )}
+
             <div className="hidden overflow-hidden rounded-2xl border border-white/10 md:block">
               {adminFilteredMedia.length === 0 ? (
                 <div className="p-6 text-center text-sm font-bold text-slate-400">
@@ -4416,7 +4518,16 @@ function AdminPanel({
               <table className="w-full table-fixed text-left">
                 <thead className="bg-black/32 text-sm text-cyan-200">
                   <tr>
-                    <th className="w-[34%] px-4 py-3">สื่อ</th>
+                    <th className="w-12 px-4 py-3">
+                      <input
+                        aria-label="เลือกสื่อทั้งหมดในหน้านี้"
+                        checked={adminFilteredMedia.length > 0 && adminFilteredMedia.every((item) => selectedMediaIds.has(item.id))}
+                        className="h-5 w-5 accent-cyan-300"
+                        onChange={toggleAllVisibleMedia}
+                        type="checkbox"
+                      />
+                    </th>
+                    <th className="w-[30%] px-4 py-3">สื่อ</th>
                     <th className="px-4 py-3">สิทธิ์</th>
                     <th className="px-4 py-3">สถานะ</th>
                     <th className="px-4 py-3">ดาวน์โหลด</th>
@@ -4426,6 +4537,15 @@ function AdminPanel({
                 <tbody className="divide-y divide-white/10">
                   {adminFilteredMedia.map((item) => (
                     <tr key={item.id}>
+                      <td className="px-4 py-4">
+                        <input
+                          aria-label={`เลือก ${item.title}`}
+                          checked={selectedMediaIds.has(item.id)}
+                          className="h-5 w-5 accent-cyan-300"
+                          onChange={() => toggleSelectedMedia(item.id)}
+                          type="checkbox"
+                        />
+                      </td>
                       <td className="px-4 py-4">
                         <p className="truncate font-black text-white">{item.title}</p>
                         <p className="text-sm text-slate-400">{item.topic}</p>
@@ -4473,7 +4593,16 @@ function AdminPanel({
               )}
               {adminFilteredMedia.map((item) => (
                 <article className="rounded-2xl border border-white/10 bg-black/20 p-4" key={item.id}>
-                  <p className="font-black text-white">{item.title}</p>
+                  <div className="flex items-start gap-3">
+                    <input
+                      aria-label={`เลือก ${item.title}`}
+                      checked={selectedMediaIds.has(item.id)}
+                      className="mt-1 h-5 w-5 shrink-0 accent-cyan-300"
+                      onChange={() => toggleSelectedMedia(item.id)}
+                      type="checkbox"
+                    />
+                    <p className="font-black text-white">{item.title}</p>
+                  </div>
                   <p className="mt-1 text-sm text-slate-400">
                     {item.topic} · {item.access} · {item.status}
                   </p>
