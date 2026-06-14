@@ -44,6 +44,26 @@ async function syncSystemNotifications(env: Env) {
     await resolve('system:vip_pending')
   }
 
+  const [expiringVip] = await sql`
+    select count(*)::int as count
+    from users
+    where role <> 'superadmin' and access_level = 'VIP'
+      and vip_expires_at between now() and now() + interval '7 days'
+  `
+  if ((expiringVip?.count ?? 0) > 0) {
+    await writeNotification(env, {
+      audience: 'superadmin',
+      type: 'vip_expiring',
+      title: 'มีสมาชิก VIP ใกล้หมดอายุ',
+      detail: `${expiringVip.count} บัญชีจะหมดอายุภายใน 7 วัน`,
+      tone: 'amber',
+      targetType: 'users',
+      fingerprint: 'system:vip_expiring',
+    })
+  } else {
+    await resolve('system:vip_expiring')
+  }
+
   const [pendingMedia] = await sql`
     select count(*)::int as count
     from media

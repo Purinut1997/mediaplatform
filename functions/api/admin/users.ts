@@ -6,13 +6,15 @@ import { writeNotification } from '../../_lib/notifications'
 import { readPagination } from '../../_lib/pagination'
 
 type AdminAction = {
-  action?: 'approve-vip' | 'reject-vip' | 'approve-purchase' | 'reject-purchase' | 'set-access' | 'set-status' | 'set-role' | 'grant-purchase' | 'revoke-purchase'
+  action?: 'approve-vip' | 'reject-vip' | 'approve-purchase' | 'reject-purchase' | 'set-access' | 'set-vip-expiry' | 'extend-vip' | 'set-status' | 'set-role' | 'grant-purchase' | 'revoke-purchase'
   requestId?: number
   userId?: number
   access?: 'สมาชิก' | 'VIP'
   role?: 'admin' | 'member'
   status?: 'active' | 'disabled'
   mediaId?: number
+  days?: number
+  vipExpiresAt?: string
 }
 
 async function requireSuperAdmin(env: Env, request: Request) {
@@ -36,16 +38,46 @@ export const onRequestGet = async ({ env, request }: { env: Env; request: Reques
   const { page, pageSize, offset } = readPagination(url)
   const query = url.searchParams.get('query')?.trim().slice(0, 120) ?? ''
   const pattern = `%${query}%`
+  const accessFilter = ['all', 'member', 'vip', 'expiring', 'expired'].includes(url.searchParams.get('access') ?? '')
+    ? String(url.searchParams.get('access'))
+    : 'all'
+  const statusFilter = ['all', 'active', 'disabled'].includes(url.searchParams.get('status') ?? '')
+    ? String(url.searchParams.get('status'))
+    : 'all'
   const users = await sql`
     select id, name, email, role, access_level, vip_expires_at, status, created_at
     from users
     where (${query} = '' or name ilike ${pattern} or email ilike ${pattern})
+      and (${statusFilter} = 'all' or status = ${statusFilter})
+      and (
+        ${accessFilter} = 'all'
+        or (${accessFilter} = 'member' and access_level = 'สมาชิก')
+        or (${accessFilter} = 'vip' and access_level = 'VIP' and (vip_expires_at is null or vip_expires_at > now()))
+        or (${accessFilter} = 'expiring' and access_level = 'VIP' and vip_expires_at between now() and now() + interval '7 days')
+        or (${accessFilter} = 'expired' and access_level = 'VIP' and vip_expires_at <= now())
+      )
     order by created_at desc
     limit ${pageSize} offset ${offset}
   `
   const [countRow] = await sql`
     select count(*)::int as total from users
     where (${query} = '' or name ilike ${pattern} or email ilike ${pattern})
+      and (${statusFilter} = 'all' or status = ${statusFilter})
+      and (
+        ${accessFilter} = 'all'
+        or (${accessFilter} = 'member' and access_level = 'สมาชิก')
+        or (${accessFilter} = 'vip' and access_level = 'VIP' and (vip_expires_at is null or vip_expires_at > now()))
+        or (${accessFilter} = 'expiring' and access_level = 'VIP' and vip_expires_at between now() and now() + interval '7 days')
+        or (${accessFilter} = 'expired' and access_level = 'VIP' and vip_expires_at <= now())
+      )
+  `
+  const [vipSummary] = await sql`
+    select
+      count(*) filter (where access_level = 'VIP' and (vip_expires_at is null or vip_expires_at > now()))::int as active,
+      count(*) filter (where access_level = 'VIP' and vip_expires_at between now() and now() + interval '7 days')::int as expiring_soon,
+      count(*) filter (where access_level = 'VIP' and vip_expires_at <= now())::int as expired
+    from users
+    where role <> 'superadmin'
   `
   const vipRequests = await sql`
     select id, user_id, name, email, phone, slip_name, status, created_at
@@ -68,6 +100,11 @@ export const onRequestGet = async ({ env, request }: { env: Env; request: Reques
     page,
     pageSize,
     total: Number(countRow?.total ?? 0),
+    vipSummary: {
+      active: Number(vipSummary?.active ?? 0),
+      expiringSoon: Number(vipSummary?.expiring_soon ?? 0),
+      expired: Number(vipSummary?.expired ?? 0),
+    },
     users: users.map((user) => ({
       id: user.id,
       name: user.name,
@@ -220,6 +257,36 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
       `
       if (!updated) return Response.json({ ok: false, error: 'ไม่พบสมาชิกที่แก้ไขสิทธิ์ได้' }, { status: 404 })
       await writeAuditLog(env, currentUser, 'set_user_access', 'user', userId, { access: body.access, vipDurationDays })
+    } else if (body.action === 'extend-vip' && userId) {
+      const days = Number(body.days)
+      if (!Number.isInteger(days) || days < 1 || days > 3650) {
+        return Response.json({ ok: false, error: 'จำนวนวันต่ออายุ VIP ต้องอยู่ระหว่าง 1-3,650 วัน' }, { status: 400 })
+      }
+      const [updated] = await sql`
+        update users
+        set access_level = 'VIP',
+            vip_expires_at = greatest(coalesce(vip_expires_at, now()), now()) + make_interval(days => ${days}),
+            status = 'active',
+            updated_at = now()
+        where id = ${userId} and role <> 'superadmin'
+        returning vip_expires_at
+      `
+      if (!updated) return Response.json({ ok: false, error: 'ไม่พบสมาชิกที่ต่ออายุ VIP ได้' }, { status: 404 })
+      await writeAuditLog(env, currentUser, 'extend_user_vip', 'user', userId, { days, vipExpiresAt: updated.vip_expires_at })
+    } else if (body.action === 'set-vip-expiry' && userId) {
+      const expiry = new Date(String(body.vipExpiresAt ?? ''))
+      const maxExpiry = Date.now() + 3650 * 86400000
+      if (!Number.isFinite(expiry.getTime()) || expiry.getTime() <= Date.now() || expiry.getTime() > maxExpiry) {
+        return Response.json({ ok: false, error: 'วันหมดอายุ VIP ต้องเป็นวันในอนาคตและไม่เกิน 10 ปี' }, { status: 400 })
+      }
+      const [updated] = await sql`
+        update users
+        set access_level = 'VIP', vip_expires_at = ${expiry.toISOString()}, status = 'active', updated_at = now()
+        where id = ${userId} and role <> 'superadmin'
+        returning vip_expires_at
+      `
+      if (!updated) return Response.json({ ok: false, error: 'ไม่พบสมาชิกที่กำหนดวันหมดอายุได้' }, { status: 404 })
+      await writeAuditLog(env, currentUser, 'set_user_vip_expiry', 'user', userId, { vipExpiresAt: updated.vip_expires_at })
     } else if (body.action === 'grant-purchase' && userId && mediaId) {
       const [media] = await sql`select id, price from media where id = ${mediaId} and access_level = 'ซื้อแยก' limit 1`
       if (!media) return Response.json({ ok: false, error: 'ไม่พบสื่อซื้อแยกที่ต้องการให้สิทธิ์' }, { status: 404 })

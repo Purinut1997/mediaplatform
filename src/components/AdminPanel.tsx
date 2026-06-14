@@ -5,6 +5,7 @@ import {
   ArrowDown,
   ArrowUp,
   BarChart3,
+  CalendarDays,
   CheckCircle2,
   Copy,
   Crown,
@@ -54,6 +55,7 @@ import type {
   SystemHealth,
   TelegramStatus,
   VipRequest,
+  VipMemberSummary,
 } from '../types'
 import { readJson } from '../lib/api'
 import { createEmptyMediaForm, createEmptyMediaLink, moveMediaLink, normalizeMediaStatus } from '../lib/media'
@@ -111,8 +113,13 @@ export function AdminPanel({
   const [savingSettings, setSavingSettings] = useState(false)
   const [adminUsers, setAdminUsers] = useState<AdminUser[]>([])
   const [memberQuery, setMemberQuery] = useState('')
+  const [memberAccessFilter, setMemberAccessFilter] = useState<'all' | 'member' | 'vip' | 'expiring' | 'expired'>('all')
+  const [memberStatusFilter, setMemberStatusFilter] = useState<'all' | 'active' | 'disabled'>('all')
   const [memberPage, setMemberPage] = useState(1)
   const [memberTotal, setMemberTotal] = useState(0)
+  const [vipMemberSummary, setVipMemberSummary] = useState<VipMemberSummary>({ active: 0, expiringSoon: 0, expired: 0 })
+  const [editingVipUserId, setEditingVipUserId] = useState<number | null>(null)
+  const [vipExpiryDate, setVipExpiryDate] = useState('')
   const [vipRequests, setVipRequests] = useState<VipRequest[]>([])
   const [purchaseRequests, setPurchaseRequests] = useState<PurchaseRequest[]>([])
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([])
@@ -207,6 +214,8 @@ export function AdminPanel({
     ? (analytics.engagement.vipUsers / analytics.engagement.activeUsers) * 100
     : 0
   const unreadNotifications = notificationUnread
+  const minVipExpiryDate = new Date(filterNow + 86400000).toISOString().slice(0, 10)
+  const maxVipExpiryDate = new Date(filterNow + 3650 * 86400000).toISOString().slice(0, 10)
   const notificationPageCount = Math.max(1, Math.ceil(notificationTotal / 8))
   const activityActions = Array.from(new Set(auditLogs.map((log) => log.action).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'th'))
   const activityTargets = Array.from(new Set(auditLogs.map((log) => log.targetType).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'th'))
@@ -293,11 +302,14 @@ export function AdminPanel({
     try {
       const params = new URLSearchParams({ page: String(page), pageSize: '50' })
       if (query.trim()) params.set('query', query.trim())
+      params.set('access', memberAccessFilter)
+      params.set('status', memberStatusFilter)
       const response = await fetch(`/api/admin/users?${params}`, { credentials: 'include' })
       const result = await readJson<{
         users?: AdminUser[]
         vipRequests?: VipRequest[]
         purchaseRequests?: PurchaseRequest[]
+        vipSummary?: VipMemberSummary
         total?: number
         page?: number
         error?: string
@@ -307,6 +319,7 @@ export function AdminPanel({
       setAdminUsers(result.users ?? [])
       setVipRequests(result.vipRequests ?? [])
       setPurchaseRequests(result.purchaseRequests ?? [])
+      setVipMemberSummary(result.vipSummary ?? { active: 0, expiringSoon: 0, expired: 0 })
       setMemberTotal(result.total ?? 0)
       setMemberPage(result.page ?? page)
     } catch (loadError) {
@@ -660,6 +673,23 @@ export function AdminPanel({
       )
       setLoadingMembers(false)
     }
+  }
+
+  const openVipEditor = (user: AdminUser) => {
+    setEditingVipUserId((current) => current === user.id ? null : user.id)
+    setVipExpiryDate(user.vipExpiresAt?.slice(0, 10) ?? '')
+  }
+
+  const setVipExpiry = (userId: number) => {
+    if (!vipExpiryDate) {
+      setMemberError('กรุณาเลือกวันหมดอายุ VIP')
+      return
+    }
+    void submitMemberAction({
+      action: 'set-vip-expiry',
+      userId,
+      vipExpiresAt: `${vipExpiryDate}T23:59:59.999+07:00`,
+    })
   }
 
   const submitCategory = async (event: FormEvent<HTMLFormElement>) => {
@@ -1458,13 +1488,13 @@ export function AdminPanel({
                     </span>
                   </div>
                   <form
-                    className="flex gap-2"
+                    className="grid gap-2 sm:grid-cols-2"
                     onSubmit={(event) => {
                       event.preventDefault()
                       void loadMembers(1, memberQuery)
                     }}
                   >
-                    <label className="flex min-h-11 flex-1 items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3">
+                    <label className="flex min-h-11 items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 sm:col-span-2">
                       <Search size={17} className="text-cyan-300" />
                       <input
                         className="min-w-0 flex-1 bg-transparent text-sm font-semibold text-white outline-none placeholder:text-slate-500"
@@ -1473,10 +1503,34 @@ export function AdminPanel({
                         value={memberQuery}
                       />
                     </label>
-                    <button className="min-h-11 rounded-xl bg-cyan-300 px-4 font-black text-slate-950" type="submit">
+                    <select className="min-h-11 rounded-xl border border-white/10 bg-slate-900 px-3 text-sm font-bold text-white" onChange={(event) => setMemberAccessFilter(event.target.value as typeof memberAccessFilter)} value={memberAccessFilter}>
+                      <option value="all">ทุกสิทธิ์</option>
+                      <option value="member">สมาชิกทั่วไป</option>
+                      <option value="vip">VIP ใช้งาน</option>
+                      <option value="expiring">VIP ใกล้หมด</option>
+                      <option value="expired">VIP หมดอายุ</option>
+                    </select>
+                    <select className="min-h-11 rounded-xl border border-white/10 bg-slate-900 px-3 text-sm font-bold text-white" onChange={(event) => setMemberStatusFilter(event.target.value as typeof memberStatusFilter)} value={memberStatusFilter}>
+                      <option value="all">ทุกสถานะบัญชี</option>
+                      <option value="active">เปิดใช้งาน</option>
+                      <option value="disabled">ปิดบัญชี</option>
+                    </select>
+                    <button className="min-h-11 rounded-xl bg-cyan-300 px-4 font-black text-slate-950 sm:col-span-2" type="submit">
                       ค้นหา
                     </button>
                   </form>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      ['VIP ใช้งาน', vipMemberSummary.active, 'text-emerald-200'],
+                      ['ใกล้หมด 7 วัน', vipMemberSummary.expiringSoon, 'text-amber-200'],
+                      ['หมดอายุแล้ว', vipMemberSummary.expired, 'text-red-200'],
+                    ].map(([label, value, tone]) => (
+                      <div className="rounded-xl border border-white/10 bg-white/[0.04] p-2 text-center" key={label as string}>
+                        <p className={`text-lg font-black ${tone}`}>{Number(value).toLocaleString('th-TH')}</p>
+                        <p className="text-[11px] font-bold text-slate-400">{label as string}</p>
+                      </div>
+                    ))}
+                  </div>
                 </div>
                 <div className="grid max-h-[520px] gap-3 overflow-y-auto pr-1">
                   {adminUsers.length === 0 && (
@@ -1486,6 +1540,9 @@ export function AdminPanel({
                   )}
                   {adminUsers.map((user) => {
                     const isSuperAdmin = user.role === 'superadmin'
+                    const expiryTime = user.vipExpiresAt ? Date.parse(user.vipExpiresAt) : 0
+                    const vipExpired = user.access === 'VIP' && expiryTime > 0 && expiryTime <= filterNow
+                    const vipExpiringSoon = user.access === 'VIP' && expiryTime > filterNow && expiryTime <= filterNow + 7 * 86400000
                     return (
                       <article className="rounded-2xl border border-white/10 bg-white/[0.05] p-4" key={user.id}>
                         <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
@@ -1493,8 +1550,8 @@ export function AdminPanel({
                             <p className="truncate font-black text-white">{user.name}</p>
                             <p className="truncate text-sm font-semibold text-slate-400">{user.email}</p>
                             {user.vipExpiresAt && (
-                              <p className="mt-1 text-xs font-bold text-amber-200">
-                                VIP ถึง {new Date(user.vipExpiresAt).toLocaleDateString('th-TH')}
+                              <p className={`mt-1 text-xs font-bold ${vipExpired ? 'text-red-200' : vipExpiringSoon ? 'text-amber-200' : 'text-emerald-200'}`}>
+                                {vipExpired ? 'VIP หมดอายุ' : vipExpiringSoon ? 'VIP ใกล้หมดอายุ' : 'VIP ถึง'} {new Date(user.vipExpiresAt).toLocaleDateString('th-TH')}
                               </p>
                             )}
                             <div className="mt-2 flex flex-wrap gap-2 text-xs font-black">
@@ -1509,16 +1566,13 @@ export function AdminPanel({
                           <button
                             className="min-h-10 rounded-xl bg-cyan-300/10 px-3 text-sm font-black text-cyan-200 disabled:cursor-not-allowed disabled:opacity-40"
                             disabled={loadingMembers || isSuperAdmin}
-                            onClick={() =>
-                              submitMemberAction({
-                                action: 'set-access',
-                                userId: user.id,
-                                access: user.access === 'VIP' ? 'สมาชิก' : 'VIP',
-                              })
-                            }
+                            onClick={() => openVipEditor(user)}
                             type="button"
                           >
-                            {user.access === 'VIP' ? 'ลดเป็นสมาชิก' : 'ให้สิทธิ์ VIP'}
+                            <span className="inline-flex items-center justify-center gap-2">
+                              <CalendarDays size={16} />
+                              จัดการอายุ VIP
+                            </span>
                           </button>
                           <button
                             className="min-h-10 rounded-xl bg-violet-300/10 px-3 text-sm font-black text-violet-100 disabled:cursor-not-allowed disabled:opacity-40"
@@ -1549,6 +1603,53 @@ export function AdminPanel({
                             {user.status === 'active' ? 'ปิดบัญชี' : 'เปิดบัญชี'}
                           </button>
                         </div>
+                        {editingVipUserId === user.id && !isSuperAdmin && (
+                          <div className="mt-3 rounded-2xl border border-cyan-300/20 bg-cyan-300/[0.06] p-3">
+                            <p className="text-sm font-black text-cyan-100">กำหนดเวลาสิทธิ์ VIP</p>
+                            <p className="mt-1 text-xs font-semibold text-slate-400">การต่ออายุจะนับเพิ่มจากวันหมดอายุเดิม หรือเริ่มจากวันนี้หากหมดอายุแล้ว</p>
+                            <div className="mt-3 grid grid-cols-3 gap-2">
+                              {[30, 90, 365].map((days) => (
+                                <button
+                                  className="min-h-10 rounded-xl bg-cyan-300/10 px-2 text-xs font-black text-cyan-100 disabled:opacity-40"
+                                  disabled={loadingMembers}
+                                  key={days}
+                                  onClick={() => void submitMemberAction({ action: 'extend-vip', userId: user.id, days })}
+                                  type="button"
+                                >
+                                  +{days.toLocaleString('th-TH')} วัน
+                                </button>
+                              ))}
+                            </div>
+                            <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_auto]">
+                              <input
+                                className="min-h-11 rounded-xl border border-white/10 bg-black/20 px-3 font-bold text-white outline-none focus:border-cyan-300"
+                                max={maxVipExpiryDate}
+                                min={minVipExpiryDate}
+                                onChange={(event) => setVipExpiryDate(event.target.value)}
+                                type="date"
+                                value={vipExpiryDate}
+                              />
+                              <button
+                                className="min-h-11 rounded-xl bg-cyan-300 px-4 text-sm font-black text-slate-950 disabled:opacity-40"
+                                disabled={loadingMembers || !vipExpiryDate}
+                                onClick={() => setVipExpiry(user.id)}
+                                type="button"
+                              >
+                                บันทึกวันหมดอายุ
+                              </button>
+                            </div>
+                            {user.access === 'VIP' && (
+                              <button
+                                className="mt-2 min-h-10 w-full rounded-xl bg-red-400/10 px-3 text-sm font-black text-red-200 disabled:opacity-40"
+                                disabled={loadingMembers}
+                                onClick={() => void submitMemberAction({ action: 'set-access', userId: user.id, access: 'สมาชิก' })}
+                                type="button"
+                              >
+                                ยกเลิก VIP และเปลี่ยนเป็นสมาชิก
+                              </button>
+                            )}
+                          </div>
+                        )}
                       </article>
                     )
                   })}

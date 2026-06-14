@@ -75,6 +75,12 @@ export type AdminUser = {
   createdAt: string
 }
 
+export type VipMemberSummary = {
+  active: number
+  expiringSoon: number
+  expired: number
+}
+
 export type VipRequest = {
   id: number
   userId: number | null
