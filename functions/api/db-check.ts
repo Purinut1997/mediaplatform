@@ -24,7 +24,9 @@ export const onRequestGet = async ({ env }: { env: Env }) => {
       exists (
         select 1 from information_schema.columns
         where table_schema = 'public' and table_name = 'users' and column_name = 'vip_expires_at'
-      ) as vip_expiry_ready
+      ) as vip_expiry_ready,
+      (select value->>'version' from app_settings where key = 'schema_version' limit 1) as schema_version,
+      (select count(*)::int from pg_stat_activity where datname = current_database() and wait_event_type = 'Lock') as waiting_locks
   `
 
   return Response.json({
@@ -36,5 +38,7 @@ export const onRequestGet = async ({ env }: { env: Env }) => {
       purchaseRequests: Boolean(result.purchase_requests_ready),
       vipExpiry: Boolean(result.vip_expiry_ready),
     },
+    schemaVersion: String(result.schema_version ?? ''),
+    waitingLocks: Number(result.waiting_locks ?? 0),
   })
 }
