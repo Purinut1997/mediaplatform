@@ -52,7 +52,7 @@ export async function ensureSchema(env: Env) {
     // First deployment continues into the idempotent schema bootstrap below.
   }
 
-  if (existingVersion === '2026.06.14.11') {
+  if (existingVersion) {
     await sql`
       insert into app_settings (key, value, updated_at)
       values ('schema_version', ${JSON.stringify({ version: SCHEMA_VERSION })}::jsonb, now())
