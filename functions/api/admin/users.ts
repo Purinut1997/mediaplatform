@@ -44,11 +44,20 @@ export const onRequestGet = async ({ env, request }: { env: Env; request: Reques
   const statusFilter = ['all', 'active', 'disabled'].includes(url.searchParams.get('status') ?? '')
     ? String(url.searchParams.get('status'))
     : 'all'
+  const roleFilter = ['all', 'member', 'staff', 'manageable'].includes(url.searchParams.get('role') ?? '')
+    ? String(url.searchParams.get('role'))
+    : 'all'
   const users = await sql`
     select id, name, email, role, access_level, vip_expires_at, status, created_at
     from users
     where (${query} = '' or name ilike ${pattern} or email ilike ${pattern})
       and (${statusFilter} = 'all' or status = ${statusFilter})
+      and (
+        ${roleFilter} = 'all'
+        or (${roleFilter} = 'member' and role = 'member')
+        or (${roleFilter} = 'staff' and role in ('admin', 'superadmin'))
+        or (${roleFilter} = 'manageable' and role <> 'superadmin')
+      )
       and (
         ${accessFilter} = 'all'
         or (${accessFilter} = 'member' and access_level = 'สมาชิก')
@@ -63,6 +72,12 @@ export const onRequestGet = async ({ env, request }: { env: Env; request: Reques
     select count(*)::int as total from users
     where (${query} = '' or name ilike ${pattern} or email ilike ${pattern})
       and (${statusFilter} = 'all' or status = ${statusFilter})
+      and (
+        ${roleFilter} = 'all'
+        or (${roleFilter} = 'member' and role = 'member')
+        or (${roleFilter} = 'staff' and role in ('admin', 'superadmin'))
+        or (${roleFilter} = 'manageable' and role <> 'superadmin')
+      )
       and (
         ${accessFilter} = 'all'
         or (${accessFilter} = 'member' and access_level = 'สมาชิก')

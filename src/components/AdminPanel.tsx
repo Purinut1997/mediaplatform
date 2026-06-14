@@ -61,6 +61,13 @@ import { readJson } from '../lib/api'
 import { createEmptyMediaForm, createEmptyMediaLink, moveMediaLink, normalizeMediaStatus } from '../lib/media'
 import { accessOptions, sourceOptions, statusOptions } from '../defaults'
 
+type MemberView = 'directory' | 'vip' | 'requests' | 'admins'
+type MemberAccessFilter = 'all' | 'member' | 'vip' | 'expiring' | 'expired'
+type MemberStatusFilter = 'all' | 'active' | 'disabled'
+type MemberRoleFilter = 'all' | 'member' | 'staff' | 'manageable'
+
+const memberPageSize = 24
+
 export function AdminPanel({
   currentUser,
   mediaItems,
@@ -112,9 +119,11 @@ export function AdminPanel({
   const [saving, setSaving] = useState(false)
   const [savingSettings, setSavingSettings] = useState(false)
   const [adminUsers, setAdminUsers] = useState<AdminUser[]>([])
+  const [memberView, setMemberView] = useState<MemberView>('directory')
   const [memberQuery, setMemberQuery] = useState('')
-  const [memberAccessFilter, setMemberAccessFilter] = useState<'all' | 'member' | 'vip' | 'expiring' | 'expired'>('all')
-  const [memberStatusFilter, setMemberStatusFilter] = useState<'all' | 'active' | 'disabled'>('all')
+  const [memberAccessFilter, setMemberAccessFilter] = useState<MemberAccessFilter>('all')
+  const [memberStatusFilter, setMemberStatusFilter] = useState<MemberStatusFilter>('all')
+  const [memberRoleFilter, setMemberRoleFilter] = useState<MemberRoleFilter>('manageable')
   const [memberPage, setMemberPage] = useState(1)
   const [memberTotal, setMemberTotal] = useState(0)
   const [vipMemberSummary, setVipMemberSummary] = useState<VipMemberSummary>({ active: 0, expiringSoon: 0, expired: 0 })
@@ -296,14 +305,19 @@ export function AdminPanel({
     ['settings', 'Settings'],
   ] as const
 
-  const loadMembers = async (page = memberPage, query = memberQuery) => {
+  const loadMembers = async (
+    page = memberPage,
+    query = memberQuery,
+    filters: Partial<{ access: MemberAccessFilter; status: MemberStatusFilter; role: MemberRoleFilter }> = {},
+  ) => {
     setLoadingMembers(true)
     setMemberError('')
     try {
-      const params = new URLSearchParams({ page: String(page), pageSize: '50' })
+      const params = new URLSearchParams({ page: String(page), pageSize: String(memberPageSize) })
       if (query.trim()) params.set('query', query.trim())
-      params.set('access', memberAccessFilter)
-      params.set('status', memberStatusFilter)
+      params.set('access', filters.access ?? memberAccessFilter)
+      params.set('status', filters.status ?? memberStatusFilter)
+      params.set('role', filters.role ?? memberRoleFilter)
       const response = await fetch(`/api/admin/users?${params}`, { credentials: 'include' })
       const result = await readJson<{
         users?: AdminUser[]
@@ -329,6 +343,23 @@ export function AdminPanel({
     } finally {
       setLoadingMembers(false)
     }
+  }
+
+  const selectMemberView = (view: MemberView) => {
+    const filters: { access: MemberAccessFilter; status: MemberStatusFilter; role: MemberRoleFilter } =
+      view === 'vip'
+        ? { access: 'vip', status: 'all', role: 'manageable' }
+        : view === 'admins'
+          ? { access: 'all', status: 'all', role: 'staff' }
+          : { access: 'all', status: 'all', role: 'manageable' }
+
+    setMemberView(view)
+    setMemberQuery('')
+    setMemberAccessFilter(filters.access)
+    setMemberStatusFilter(filters.status)
+    setMemberRoleFilter(filters.role)
+    setEditingVipUserId(null)
+    void loadMembers(1, '', filters)
   }
 
   const formatAdminDate = (value?: string | null) =>
@@ -1398,7 +1429,31 @@ export function AdminPanel({
               </div>
             )}
 
-            <div className="grid gap-4 xl:grid-cols-[1fr_1.2fr]">
+            <div className="mb-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+              {([
+                ['directory', Users, 'รายชื่อสมาชิก', 'ค้นหาและจัดการบัญชี'],
+                ['vip', Crown, 'จัดการ VIP', `${vipMemberSummary.active.toLocaleString('th-TH')} ใช้งาน`],
+                ['requests', AlertCircle, 'คำขอรอตรวจ', `${(pendingVipRequests.length + pendingPurchaseRequests.length).toLocaleString('th-TH')} รายการ`],
+                ['admins', ShieldCheck, 'ผู้ดูแลระบบ', 'Admin และเจ้าของระบบ'],
+              ] as const).map(([view, Icon, label, detail]) => (
+                <button
+                  className={`min-h-16 rounded-2xl border px-4 text-left transition ${
+                    memberView === view
+                      ? 'border-cyan-300/50 bg-cyan-300/15 text-cyan-100 shadow-lg shadow-cyan-950/20'
+                      : 'border-white/10 bg-black/20 text-white hover:border-white/20 hover:bg-white/[0.06]'
+                  }`}
+                  key={view}
+                  onClick={() => selectMemberView(view)}
+                  type="button"
+                >
+                  <span className="flex items-center gap-2 font-black"><Icon size={18} />{label}</span>
+                  <span className="mt-1 block text-xs font-semibold text-slate-400">{detail}</span>
+                </button>
+              ))}
+            </div>
+
+            <div className="grid gap-4">
+              {memberView === 'requests' && (
               <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
                 <div className="mb-3 flex items-center justify-between gap-3">
                   <p className="font-black text-white">คำขอ VIP รอตรวจ</p>
@@ -1478,23 +1533,32 @@ export function AdminPanel({
                   </div>
                 </div>
               </div>
+              )}
 
+              {memberView !== 'requests' && (
               <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
                 <div className="mb-3 flex flex-col gap-3">
                   <div className="flex items-center justify-between gap-3">
-                    <p className="font-black text-white">สมาชิกทั้งหมด</p>
+                    <div>
+                      <p className="font-black text-white">
+                        {memberView === 'vip' ? 'สมาชิก VIP' : memberView === 'admins' ? 'บัญชีผู้ดูแลระบบ' : 'รายชื่อสมาชิก'}
+                      </p>
+                      <p className="mt-1 text-xs font-semibold text-slate-400">
+                        แสดงครั้งละ {memberPageSize.toLocaleString('th-TH')} บัญชี และแบ่งหน้าอัตโนมัติ
+                      </p>
+                    </div>
                     <span className="text-xs font-bold text-slate-400">
                       {memberTotal.toLocaleString('th-TH')} บัญชี
                     </span>
                   </div>
                   <form
-                    className="grid gap-2 sm:grid-cols-2"
+                    className="grid gap-2 sm:grid-cols-3"
                     onSubmit={(event) => {
                       event.preventDefault()
                       void loadMembers(1, memberQuery)
                     }}
                   >
-                    <label className="flex min-h-11 items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 sm:col-span-2">
+                    <label className="flex min-h-11 items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 sm:col-span-3">
                       <Search size={17} className="text-cyan-300" />
                       <input
                         className="min-w-0 flex-1 bg-transparent text-sm font-semibold text-white outline-none placeholder:text-slate-500"
@@ -1515,7 +1579,13 @@ export function AdminPanel({
                       <option value="active">เปิดใช้งาน</option>
                       <option value="disabled">ปิดบัญชี</option>
                     </select>
-                    <button className="min-h-11 rounded-xl bg-cyan-300 px-4 font-black text-slate-950 sm:col-span-2" type="submit">
+                    <select className="min-h-11 rounded-xl border border-white/10 bg-slate-900 px-3 text-sm font-bold text-white" onChange={(event) => setMemberRoleFilter(event.target.value as MemberRoleFilter)} value={memberRoleFilter}>
+                      <option value="manageable">สมาชิกและ Admin</option>
+                      <option value="member">เฉพาะสมาชิกทั่วไป</option>
+                      <option value="staff">เฉพาะผู้ดูแลระบบ</option>
+                      <option value="all">ทุกบทบาท</option>
+                    </select>
+                    <button className="min-h-11 rounded-xl bg-cyan-300 px-4 font-black text-slate-950 sm:col-span-3" type="submit">
                       ค้นหา
                     </button>
                   </form>
@@ -1532,7 +1602,7 @@ export function AdminPanel({
                     ))}
                   </div>
                 </div>
-                <div className="grid max-h-[520px] gap-3 overflow-y-auto pr-1">
+                <div className="grid gap-3 lg:grid-cols-2 2xl:grid-cols-3">
                   {adminUsers.length === 0 && (
                     <div className="rounded-2xl border border-dashed border-white/15 p-5 text-sm font-bold text-slate-400">
                       ยังไม่มีข้อมูลสมาชิก
@@ -1664,11 +1734,11 @@ export function AdminPanel({
                     ก่อนหน้า
                   </button>
                   <span className="text-xs font-bold text-slate-400">
-                    หน้า {memberPage.toLocaleString('th-TH')} / {Math.max(1, Math.ceil(memberTotal / 50)).toLocaleString('th-TH')}
+                    หน้า {memberPage.toLocaleString('th-TH')} / {Math.max(1, Math.ceil(memberTotal / memberPageSize)).toLocaleString('th-TH')}
                   </span>
                   <button
                     className="min-h-10 rounded-xl bg-white/10 px-4 text-sm font-black text-white disabled:opacity-35"
-                    disabled={loadingMembers || memberPage * 50 >= memberTotal}
+                    disabled={loadingMembers || memberPage * memberPageSize >= memberTotal}
                     onClick={() => void loadMembers(memberPage + 1, memberQuery)}
                     type="button"
                   >
@@ -1676,6 +1746,7 @@ export function AdminPanel({
                   </button>
                 </div>
               </div>
+              )}
             </div>
           </section>
           )}
