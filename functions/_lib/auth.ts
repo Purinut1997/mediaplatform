@@ -17,6 +17,7 @@ export type UserRow = {
   password_hash: string
   role: 'superadmin' | 'admin' | 'member'
   access_level: 'VIP' | 'สมาชิก'
+  vip_expires_at?: string | null
   status: 'active' | 'disabled'
 }
 
@@ -25,14 +26,21 @@ export type PublicUser = {
   email: string
   role: 'superadmin' | 'admin' | 'member'
   access: 'VIP' | 'สมาชิก'
+  vipExpiresAt: string | null
 }
 
 export function publicUser(user: UserRow): PublicUser {
+  const vipActive =
+    user.role !== 'member' ||
+    user.access_level !== 'VIP' ||
+    !user.vip_expires_at ||
+    new Date(user.vip_expires_at).getTime() > Date.now()
   return {
     name: user.name,
     email: user.email,
     role: user.role,
-    access: user.access_level,
+    access: vipActive ? user.access_level : 'สมาชิก',
+    vipExpiresAt: vipActive && user.access_level === 'VIP' ? user.vip_expires_at ?? null : null,
   }
 }
 
@@ -42,7 +50,7 @@ export async function loginWithPassword(env: Env, email: string, password: strin
   const normalizedEmail = email.trim().toLowerCase()
 
   const [user] = (await sql`
-    select id, name, email, password_hash, role, access_level, status
+    select id, name, email, password_hash, role, access_level, vip_expires_at, status
     from users
     where lower(email) = ${normalizedEmail}
     limit 1
@@ -73,7 +81,7 @@ export async function getCurrentUser(env: Env, request: Request) {
   const sql = getSql(env)
   const tokenHash = await sha256Hex(token)
   const [user] = (await sql`
-    select users.id, users.name, users.email, users.password_hash, users.role, users.access_level, users.status
+    select users.id, users.name, users.email, users.password_hash, users.role, users.access_level, users.vip_expires_at, users.status
     from sessions
     join users on users.id = sessions.user_id
     where sessions.token_hash = ${tokenHash}

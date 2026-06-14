@@ -48,6 +48,7 @@ import type {
   MediaLink,
   MediaSource,
   MediaStatus,
+  PurchaseRequest,
   RestorePreview,
   SiteSettings,
   SystemHealth,
@@ -99,6 +100,11 @@ export function AdminPanel({
   const [settingsForm, setSettingsForm] = useState({
     ...settings,
     vipPrice: String(settings.vipPrice),
+    vipDurationDays: String(settings.vipDurationDays),
+    vipRefundDays: String(settings.vipRefundDays),
+    purchaseRefundDays: String(settings.purchaseRefundDays),
+    orderExpiryHours: String(settings.orderExpiryHours),
+    paymentReviewHours: String(settings.paymentReviewHours),
   })
   const [editingMediaId, setEditingMediaId] = useState<number | null>(null)
   const [saving, setSaving] = useState(false)
@@ -108,6 +114,7 @@ export function AdminPanel({
   const [memberPage, setMemberPage] = useState(1)
   const [memberTotal, setMemberTotal] = useState(0)
   const [vipRequests, setVipRequests] = useState<VipRequest[]>([])
+  const [purchaseRequests, setPurchaseRequests] = useState<PurchaseRequest[]>([])
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([])
   const [activityPage, setActivityPage] = useState(1)
   const [activityTotal, setActivityTotal] = useState(0)
@@ -145,6 +152,7 @@ export function AdminPanel({
   const isSuperAdmin = currentUser.role === 'superadmin'
 
   const pendingVipRequests = vipRequests.filter((request) => request.status === 'pending')
+  const pendingPurchaseRequests = purchaseRequests.filter((request) => request.status === 'pending')
   const linkedMedia = mediaItems.filter((item) => item.resourceUrl || item.previewUrl || item.links?.some((link) => link.url || link.previewUrl))
   const publishedMediaCount = mediaItems.filter((item) => normalizeMediaStatus(item.status) === 'เผยแพร่แล้ว').length
   const tagStats = Array.from(
@@ -289,6 +297,7 @@ export function AdminPanel({
       const result = await readJson<{
         users?: AdminUser[]
         vipRequests?: VipRequest[]
+        purchaseRequests?: PurchaseRequest[]
         total?: number
         page?: number
         error?: string
@@ -297,6 +306,7 @@ export function AdminPanel({
       if (!response.ok) throw new Error(result.error ?? 'โหลดข้อมูลสมาชิกไม่สำเร็จ')
       setAdminUsers(result.users ?? [])
       setVipRequests(result.vipRequests ?? [])
+      setPurchaseRequests(result.purchaseRequests ?? [])
       setMemberTotal(result.total ?? 0)
       setMemberPage(result.page ?? page)
     } catch (loadError) {
@@ -946,6 +956,11 @@ export function AdminPanel({
     const nextSettings: SiteSettings = {
       ...settingsForm,
       vipPrice: Number(settingsForm.vipPrice || 0),
+      vipDurationDays: Number(settingsForm.vipDurationDays || 30),
+      vipRefundDays: Number(settingsForm.vipRefundDays || 0),
+      purchaseRefundDays: Number(settingsForm.purchaseRefundDays || 0),
+      orderExpiryHours: Number(settingsForm.orderExpiryHours || 24),
+      paymentReviewHours: Number(settingsForm.paymentReviewHours || 24),
     }
 
     try {
@@ -968,6 +983,11 @@ export function AdminPanel({
       setSettingsForm({
         ...result.settings,
         vipPrice: String(result.settings.vipPrice),
+        vipDurationDays: String(result.settings.vipDurationDays),
+        vipRefundDays: String(result.settings.vipRefundDays),
+        purchaseRefundDays: String(result.settings.purchaseRefundDays),
+        orderExpiryHours: String(result.settings.orderExpiryHours),
+        paymentReviewHours: String(result.settings.paymentReviewHours),
       })
       setSettingsNotice('บันทึกการตั้งค่าเรียบร้อยแล้ว')
     } catch (saveError) {
@@ -1400,6 +1420,33 @@ export function AdminPanel({
                     </article>
                   ))}
                 </div>
+                <div className="mt-5 border-t border-white/10 pt-5">
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <p className="font-black text-white">คำขอซื้อสื่อแยก</p>
+                    <span className="rounded-full bg-cyan-300 px-3 py-1 text-xs font-black text-slate-950">
+                      {pendingPurchaseRequests.length}
+                    </span>
+                  </div>
+                  <div className="grid gap-3">
+                    {pendingPurchaseRequests.length === 0 && (
+                      <div className="rounded-2xl border border-dashed border-white/15 p-5 text-sm font-bold text-slate-400">
+                        ยังไม่มีคำขอซื้อสื่อที่รอตรวจ
+                      </div>
+                    )}
+                    {pendingPurchaseRequests.map((request) => (
+                      <article className="rounded-2xl border border-white/10 bg-white/[0.05] p-4" key={request.id}>
+                        <p className="font-black text-white">{request.mediaTitle}</p>
+                        <p className="mt-1 text-sm font-semibold text-slate-400">{request.name} · {request.email}</p>
+                        <p className="mt-1 text-sm font-black text-cyan-200">{request.amount.toLocaleString('th-TH')} บาท</p>
+                        {request.slipName && <p className="mt-1 text-xs font-bold text-slate-400">สลิป: {request.slipName}</p>}
+                        <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                          <button className="min-h-11 rounded-xl bg-emerald-300 px-3 font-black text-slate-950 disabled:opacity-60" disabled={loadingMembers} onClick={() => submitMemberAction({ action: 'approve-purchase', requestId: request.id })} type="button">อนุมัติซื้อสื่อ</button>
+                          <button className="min-h-11 rounded-xl bg-white/10 px-3 font-black text-white disabled:opacity-60" disabled={loadingMembers} onClick={() => submitMemberAction({ action: 'reject-purchase', requestId: request.id })} type="button">ปฏิเสธ</button>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                </div>
               </div>
 
               <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
@@ -1445,6 +1492,11 @@ export function AdminPanel({
                           <div className="min-w-0">
                             <p className="truncate font-black text-white">{user.name}</p>
                             <p className="truncate text-sm font-semibold text-slate-400">{user.email}</p>
+                            {user.vipExpiresAt && (
+                              <p className="mt-1 text-xs font-bold text-amber-200">
+                                VIP ถึง {new Date(user.vipExpiresAt).toLocaleDateString('th-TH')}
+                              </p>
+                            )}
                             <div className="mt-2 flex flex-wrap gap-2 text-xs font-black">
                               <span className="rounded-full bg-cyan-300/10 px-3 py-1 text-cyan-200">{user.role}</span>
                               <span className="rounded-full bg-amber-300/10 px-3 py-1 text-amber-200">{user.access}</span>
@@ -1718,6 +1770,30 @@ export function AdminPanel({
                 value={settingsForm.vipPrice}
               />
               <AdminField
+                label="อายุ VIP (วัน)"
+                name="vipDurationDays"
+                onChange={updateSettings}
+                placeholder="30"
+                type="number"
+                value={settingsForm.vipDurationDays}
+              />
+              <AdminField
+                label="ขอคืนเงิน VIP ได้ภายใน (วัน)"
+                name="vipRefundDays"
+                onChange={updateSettings}
+                placeholder="7"
+                type="number"
+                value={settingsForm.vipRefundDays}
+              />
+              <AdminField
+                label="เวลาตรวจสอบการชำระเงิน (ชั่วโมง)"
+                name="paymentReviewHours"
+                onChange={updateSettings}
+                placeholder="24"
+                type="number"
+                value={settingsForm.paymentReviewHours}
+              />
+              <AdminField
                 label="URL QR Code"
                 name="vipQrUrl"
                 onChange={updateSettings}
@@ -1780,6 +1856,40 @@ export function AdminPanel({
                 placeholder="ลงทะเบียนสมาชิก"
                 value={settingsForm.vipSubmitLabel}
               />
+              <label className="flex min-h-12 items-center gap-3 rounded-2xl border border-white/10 bg-black/24 px-4 font-black text-slate-200">
+                <input
+                  checked={settingsForm.purchaseEnabled}
+                  onChange={(event) => updateSettings('purchaseEnabled', event.target.checked)}
+                  type="checkbox"
+                />
+                เปิดระบบซื้อสื่อแยก
+              </label>
+              <AdminField
+                label="ขอคืนเงินซื้อแยกได้ภายใน (วัน)"
+                name="purchaseRefundDays"
+                onChange={updateSettings}
+                placeholder="7"
+                type="number"
+                value={settingsForm.purchaseRefundDays}
+              />
+              <AdminField
+                label="คำสั่งซื้อหมดอายุภายใน (ชั่วโมง)"
+                name="orderExpiryHours"
+                onChange={updateSettings}
+                placeholder="24"
+                type="number"
+                value={settingsForm.orderExpiryHours}
+              />
+              <label className="md:col-span-2">
+                <span className="text-sm font-black text-slate-200">เงื่อนไขการซื้อและคืนเงิน</span>
+                <textarea
+                  className="mt-2 min-h-28 w-full rounded-2xl border border-white/10 bg-black/24 px-4 py-3 text-base text-white outline-none transition placeholder:text-slate-500 focus:border-pink-300 focus:ring-4 focus:ring-pink-300/10"
+                  maxLength={2000}
+                  onChange={(event) => updateSettings('commercePolicyText', event.target.value)}
+                  placeholder="ระบุเงื่อนไขการใช้สิทธิ์ การคืนเงิน และข้อห้ามเผยแพร่ต่อ"
+                  value={settingsForm.commercePolicyText}
+                />
+              </label>
             </div>
 
             {settingsError && (

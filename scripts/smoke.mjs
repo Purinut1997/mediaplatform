@@ -49,6 +49,11 @@ const checks = [
     validate: (_body, response) => (response.headers.get('location') || '').includes('oauth=invalid_state'),
   },
   { path: '/api/auth/me', validate: (data) => data.ok === true && data.user === null },
+  {
+    path: '/api/purchases',
+    expectedStatus: 401,
+    validate: (data) => data.ok === false && data.error === 'Unauthorized',
+  },
   { path: '/api/settings', validate: (data) => data.ok === true && typeof data.settings === 'object' },
   {
     path: '/api/media?page=1&pageSize=10',

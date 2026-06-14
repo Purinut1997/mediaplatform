@@ -53,6 +53,7 @@ create table if not exists users (
   password_hash text not null,
   role text not null default 'member' check (role in ('superadmin', 'admin', 'member')),
   access_level text not null default 'สมาชิก' check (access_level in ('สมาชิก', 'VIP')),
+  vip_expires_at timestamptz,
   status text not null default 'active' check (status in ('active', 'disabled')),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -115,6 +116,30 @@ create table if not exists vip_requests (
   updated_at timestamptz not null default now()
 );
 
+create table if not exists media_purchases (
+  id serial primary key,
+  user_id integer not null references users(id) on delete cascade,
+  media_id integer not null references media(id) on delete cascade,
+  amount integer not null default 0 check (amount between 0 and 10000000),
+  status text not null default 'active' check (status in ('active', 'refunded', 'revoked')),
+  granted_by text not null default 'system',
+  granted_at timestamptz not null default now(),
+  refunded_at timestamptz,
+  note text not null default '',
+  unique (user_id, media_id)
+);
+
+create table if not exists purchase_requests (
+  id serial primary key,
+  user_id integer not null references users(id) on delete cascade,
+  media_id integer not null references media(id) on delete cascade,
+  amount integer not null default 0 check (amount between 0 and 10000000),
+  slip_name text,
+  status text not null default 'pending' check (status in ('pending', 'approved', 'rejected', 'cancelled', 'refunded')),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 create table if not exists app_settings (
   key text primary key,
   value jsonb not null,
@@ -125,6 +150,9 @@ create index if not exists media_status_topic_idx on media(status, topic);
 create index if not exists media_access_idx on media(access_level);
 create index if not exists sessions_user_idx on sessions(user_id, expires_at);
 create index if not exists vip_requests_status_idx on vip_requests(status, created_at);
+create index if not exists media_purchases_user_status_idx on media_purchases(user_id, status, granted_at desc);
+create index if not exists purchase_requests_status_idx on purchase_requests(status, created_at desc);
+create index if not exists users_vip_expiry_idx on users(access_level, vip_expires_at);
 create index if not exists user_favorites_user_created_idx on user_favorites(user_id, created_at desc);
 create index if not exists password_reset_tokens_user_idx on password_reset_tokens(user_id, expires_at desc);
 create index if not exists media_reviews_media_idx on media_reviews(media_id, updated_at desc);

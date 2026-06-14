@@ -1,7 +1,7 @@
 import { getCurrentUser } from '../../_lib/auth'
 import { writeErrorLog } from '../../_lib/admin'
 import { ensureSchema, getSql, type Env } from '../../_lib/db'
-import { canAccessLevel } from '../../_lib/media-access'
+import { canAccessLevel, hasPurchasedMedia } from '../../_lib/media-access'
 import { recordMediaEvent } from '../../_lib/media-events'
 import { safeHttpUrl } from '../../_lib/url'
 
@@ -39,10 +39,10 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
     if (!link) {
       return Response.json({ ok: false, error: 'สื่อนี้ยังไม่มีลิงก์ใช้งาน' }, { status: 404 })
     }
-    if (
-      !canAccessLevel(user, String(media.access_level)) ||
-      !canAccessLevel(user, String(link.access_level || media.access_level))
-    ) {
+    const purchased = await hasPurchasedMedia(env, user, mediaId)
+    const canAccessMedia = purchased || canAccessLevel(user, String(media.access_level))
+    const canAccessLink = purchased || canAccessLevel(user, String(link.access_level || media.access_level))
+    if (!canAccessMedia || !canAccessLink) {
       return Response.json({ ok: false, error: 'บัญชีนี้ยังไม่มีสิทธิ์เปิดสื่อ' }, { status: 403 })
     }
 

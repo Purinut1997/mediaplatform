@@ -21,7 +21,7 @@ export type Env = {
 }
 
 let schemaReady = false
-const SCHEMA_VERSION = '2026.06.09.1'
+const SCHEMA_VERSION = '2026.06.14.12'
 
 export function getSql(env: Env) {
   if (!env.DATABASE_URL) {
@@ -182,6 +182,7 @@ export async function ensureSchema(env: Env) {
       password_hash text not null,
       role text not null default 'member' check (role in ('superadmin', 'admin', 'member')),
       access_level text not null default 'สมาชิก' check (access_level in ('สมาชิก', 'VIP')),
+      vip_expires_at timestamptz,
       status text not null default 'active' check (status in ('active', 'disabled')),
       created_at timestamptz not null default now(),
       updated_at timestamptz not null default now()
@@ -258,6 +259,34 @@ export async function ensureSchema(env: Env) {
   `
 
   await sql`
+    create table if not exists media_purchases (
+      id serial primary key,
+      user_id integer not null references users(id) on delete cascade,
+      media_id integer not null references media(id) on delete cascade,
+      amount integer not null default 0 check (amount between 0 and 10000000),
+      status text not null default 'active' check (status in ('active', 'refunded', 'revoked')),
+      granted_by text not null default 'system',
+      granted_at timestamptz not null default now(),
+      refunded_at timestamptz,
+      note text not null default '',
+      unique (user_id, media_id)
+    )
+  `
+
+  await sql`
+    create table if not exists purchase_requests (
+      id serial primary key,
+      user_id integer not null references users(id) on delete cascade,
+      media_id integer not null references media(id) on delete cascade,
+      amount integer not null default 0 check (amount between 0 and 10000000),
+      slip_name text,
+      status text not null default 'pending' check (status in ('pending', 'approved', 'rejected', 'cancelled', 'refunded')),
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now()
+    )
+  `
+
+  await sql`
     create table if not exists app_settings (
       key text primary key,
       value jsonb not null,
@@ -296,6 +325,7 @@ export async function ensureSchema(env: Env) {
       or access_level not in ('สมาชิก', 'VIP')
       or status not in ('active', 'disabled')
   `
+  await sql`alter table users add column if not exists vip_expires_at timestamptz`
   await sql`
     update vip_requests
     set status = 'pending'
@@ -331,6 +361,12 @@ export async function ensureSchema(env: Env) {
       if not exists (select 1 from pg_constraint where conname = 'vip_requests_status_check') then
         alter table vip_requests add constraint vip_requests_status_check check (status in ('pending', 'approved', 'rejected'));
       end if;
+      if not exists (select 1 from pg_constraint where conname = 'media_purchases_status_check') then
+        alter table media_purchases add constraint media_purchases_status_check check (status in ('active', 'refunded', 'revoked'));
+      end if;
+      if not exists (select 1 from pg_constraint where conname = 'purchase_requests_status_check') then
+        alter table purchase_requests add constraint purchase_requests_status_check check (status in ('pending', 'approved', 'rejected', 'cancelled', 'refunded'));
+      end if;
     end $$;
   `
 
@@ -348,6 +384,15 @@ export async function ensureSchema(env: Env) {
 
   await sql`
     create index if not exists vip_requests_status_idx on vip_requests(status, created_at)
+  `
+  await sql`
+    create index if not exists media_purchases_user_status_idx on media_purchases(user_id, status, granted_at desc)
+  `
+  await sql`
+    create index if not exists purchase_requests_status_idx on purchase_requests(status, created_at desc)
+  `
+  await sql`
+    create index if not exists users_vip_expiry_idx on users(access_level, vip_expires_at)
   `
 
   await sql`

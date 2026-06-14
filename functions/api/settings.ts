@@ -22,6 +22,13 @@ type SiteSettings = {
   maintenanceMessage: string
   vipRegistrationEnabled: boolean
   vipPrice: number
+  vipDurationDays: number
+  vipRefundDays: number
+  purchaseEnabled: boolean
+  purchaseRefundDays: number
+  orderExpiryHours: number
+  paymentReviewHours: number
+  commercePolicyText: string
   vipQrUrl: string
   vipBankName: string
   vipAccountNumber: string
@@ -52,6 +59,13 @@ const defaultSettings: SiteSettings = {
   maintenanceMessage: 'กรุณากลับมาใหม่ภายหลัง',
   vipRegistrationEnabled: false,
   vipPrice: 0,
+  vipDurationDays: 30,
+  vipRefundDays: 7,
+  purchaseEnabled: false,
+  purchaseRefundDays: 7,
+  orderExpiryHours: 24,
+  paymentReviewHours: 24,
+  commercePolicyText: 'สิทธิ์ผูกกับบัญชีผู้ซื้อ ห้ามเผยแพร่หรือจำหน่ายต่อ การคืนเงินพิจารณาตามเงื่อนไขที่แสดงก่อนชำระเงิน',
   vipQrUrl: '',
   vipBankName: 'พร้อมเพย์ (PromptPay)',
   vipAccountNumber: '',
@@ -69,8 +83,14 @@ function normalizeSettings(value?: Partial<SiteSettings>) {
     ...defaultSettings,
     ...(value ?? {}),
     vipRegistrationEnabled: Boolean(value?.vipRegistrationEnabled),
+    purchaseEnabled: Boolean(value?.purchaseEnabled),
     maintenanceEnabled: Boolean(value?.maintenanceEnabled),
     vipPrice: Number.isInteger(legacyPrice) && legacyPrice >= 0 && legacyPrice <= 10_000_000 ? legacyPrice : 0,
+    vipDurationDays: boundedInteger(value?.vipDurationDays ?? defaultSettings.vipDurationDays, 'อายุ VIP', { min: 1, max: 3650 }),
+    vipRefundDays: boundedInteger(value?.vipRefundDays ?? defaultSettings.vipRefundDays, 'ระยะเวลาขอคืนเงิน VIP', { max: 365 }),
+    purchaseRefundDays: boundedInteger(value?.purchaseRefundDays ?? defaultSettings.purchaseRefundDays, 'ระยะเวลาขอคืนเงินซื้อแยก', { max: 365 }),
+    orderExpiryHours: boundedInteger(value?.orderExpiryHours ?? defaultSettings.orderExpiryHours, 'อายุคำสั่งซื้อ', { min: 1, max: 720 }),
+    paymentReviewHours: boundedInteger(value?.paymentReviewHours ?? defaultSettings.paymentReviewHours, 'เวลาตรวจสอบการชำระเงิน', { min: 1, max: 720 }),
     heroImageUrl: safeHttpUrl(value?.heroImageUrl, defaultSettings.heroImageUrl),
     vipQrUrl: safeHttpUrl(value?.vipQrUrl),
   }
@@ -94,6 +114,13 @@ function readSettings(body: Partial<SiteSettings>): SiteSettings {
     maintenanceMessage: boundedText(body.maintenanceMessage ?? defaultSettings.maintenanceMessage, 'ข้อความปิดปรับปรุง', { max: 500 }),
     vipRegistrationEnabled: Boolean(body.vipRegistrationEnabled),
     vipPrice: boundedInteger(body.vipPrice ?? defaultSettings.vipPrice, 'ราคา VIP', { max: 10_000_000 }),
+    vipDurationDays: boundedInteger(body.vipDurationDays ?? defaultSettings.vipDurationDays, 'อายุ VIP', { min: 1, max: 3650 }),
+    vipRefundDays: boundedInteger(body.vipRefundDays ?? defaultSettings.vipRefundDays, 'ระยะเวลาขอคืนเงิน VIP', { max: 365 }),
+    purchaseEnabled: Boolean(body.purchaseEnabled),
+    purchaseRefundDays: boundedInteger(body.purchaseRefundDays ?? defaultSettings.purchaseRefundDays, 'ระยะเวลาขอคืนเงินซื้อแยก', { max: 365 }),
+    orderExpiryHours: boundedInteger(body.orderExpiryHours ?? defaultSettings.orderExpiryHours, 'อายุคำสั่งซื้อ', { min: 1, max: 720 }),
+    paymentReviewHours: boundedInteger(body.paymentReviewHours ?? defaultSettings.paymentReviewHours, 'เวลาตรวจสอบการชำระเงิน', { min: 1, max: 720 }),
+    commercePolicyText: boundedText(body.commercePolicyText ?? defaultSettings.commercePolicyText, 'เงื่อนไขการซื้อและคืนเงิน', { max: 2000 }),
     vipQrUrl: optionalHttpUrl(body.vipQrUrl, 'ลิงก์ QR Code'),
     vipBankName: boundedText(body.vipBankName ?? defaultSettings.vipBankName, 'ชื่อช่องทางชำระเงิน', { max: 120 }),
     vipAccountNumber: boundedText(body.vipAccountNumber, 'เลขบัญชี', { max: 80 }),
@@ -107,10 +134,11 @@ function readSettings(body: Partial<SiteSettings>): SiteSettings {
 }
 
 function settingsForViewer(settings: SiteSettings, isSuperAdmin: boolean) {
-  if (isSuperAdmin || settings.vipRegistrationEnabled) return settings
+  if (isSuperAdmin || settings.vipRegistrationEnabled || settings.purchaseEnabled) return settings
   return {
     ...settings,
     vipPrice: 0,
+    purchaseEnabled: false,
     vipQrUrl: '',
     vipBankName: '',
     vipAccountNumber: '',

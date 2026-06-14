@@ -10,8 +10,8 @@ type BackupPayload = {
   mode?: 'merge' | 'replace'
   replaceTables?: string[]
   backup?: {
-    data?: Partial<Record<'media' | 'mediaLinks' | 'mediaEvents' | 'mediaReviews' | 'userFavorites' | 'tags' | 'mediaTags' | 'categories' | 'users' | 'vipRequests' | 'notifications' | 'settings', BackupRow[]>>
-  } & Partial<Record<'media' | 'mediaLinks' | 'mediaEvents' | 'mediaReviews' | 'userFavorites' | 'tags' | 'mediaTags' | 'categories' | 'users' | 'vipRequests' | 'notifications' | 'settings', BackupRow[]>>
+    data?: Partial<Record<'media' | 'mediaLinks' | 'mediaEvents' | 'mediaReviews' | 'userFavorites' | 'tags' | 'mediaTags' | 'categories' | 'users' | 'vipRequests' | 'purchaseRequests' | 'mediaPurchases' | 'notifications' | 'settings', BackupRow[]>>
+  } & Partial<Record<'media' | 'mediaLinks' | 'mediaEvents' | 'mediaReviews' | 'userFavorites' | 'tags' | 'mediaTags' | 'categories' | 'users' | 'vipRequests' | 'purchaseRequests' | 'mediaPurchases' | 'notifications' | 'settings', BackupRow[]>>
 }
 
 const text = (value: unknown, fallback = '') => String(value ?? fallback).trim()
@@ -24,6 +24,8 @@ const USER_ROLES = ['admin', 'member'] as const
 const USER_ACCESS_LEVELS = ['สมาชิก', 'VIP'] as const
 const USER_STATUSES = ['active', 'disabled'] as const
 const VIP_STATUSES = ['pending', 'approved', 'rejected'] as const
+const PURCHASE_REQUEST_STATUSES = ['pending', 'approved', 'rejected', 'cancelled', 'refunded'] as const
+const PURCHASE_STATUSES = ['active', 'refunded', 'revoked'] as const
 const DEFAULT_COVER_URL =
   'https://raw.githubusercontent.com/Purinut1997/web-images/ab67fea68788dc5db9514475e8f2b8cb1c32d8b3/ChatGPT%20Image%2023%20%E0%B8%9E.%E0%B8%84.%202569%2008_05_56.png'
 const replaceableTables = new Set([
@@ -36,6 +38,8 @@ const replaceableTables = new Set([
   'mediaTags',
   'categories',
   'vipRequests',
+  'purchaseRequests',
+  'mediaPurchases',
   'notifications',
   'settings',
 ])
@@ -63,6 +67,8 @@ function readData(payload: BackupPayload) {
     categories: Array.isArray(source.categories) ? source.categories : [],
     users: Array.isArray(source.users) ? source.users : [],
     vipRequests: Array.isArray(source.vipRequests) ? source.vipRequests : [],
+    purchaseRequests: Array.isArray(source.purchaseRequests) ? source.purchaseRequests : [],
+    mediaPurchases: Array.isArray(source.mediaPurchases) ? source.mediaPurchases : [],
     notifications: Array.isArray(source.notifications) ? source.notifications : [],
     settings: Array.isArray(source.settings) ? source.settings : [],
   }
@@ -85,6 +91,8 @@ function preview(data: ReturnType<typeof readData>, replaceTables: string[] = []
     mediaTags: data.mediaTags.length,
     users: data.users.length,
     vipRequests: data.vipRequests.length,
+    purchaseRequests: data.purchaseRequests.length,
+    mediaPurchases: data.mediaPurchases.length,
     notifications: data.notifications.length,
     settings: data.settings.length,
     mode: replaceTables.length ? 'replace' : 'merge',
@@ -95,6 +103,7 @@ function preview(data: ReturnType<typeof readData>, replaceTables: string[] = []
         : 'โหมด restore นี้เป็นแบบ merge และไม่ลบข้อมูลเดิม',
       'ผู้ใช้ใหม่จากไฟล์ backup ที่ไม่มี password_hash จะถูกข้ามเพื่อความปลอดภัย',
       'คำขอ VIP จะนำเข้าแบบกันซ้ำจาก email และ created_at',
+      'คำขอซื้อและสิทธิ์ซื้อแยกจะนำเข้าเฉพาะรายการที่จับคู่สมาชิกและสื่อได้',
     ],
   }
 }
@@ -274,7 +283,8 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
         if (existing) {
           await sql`
             update users
-            set name = ${text(user.name, email)}, role = ${role}, access_level = ${access}, status = ${status}, updated_at = now()
+            set name = ${text(user.name, email)}, role = ${role}, access_level = ${access},
+                vip_expires_at = ${text(user.vip_expires_at) || null}, status = ${status}, updated_at = now()
             where lower(email) = ${email} and role <> 'superadmin'
           `
           if (Number.isFinite(Number(user.id))) {
@@ -287,12 +297,13 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
       }
       const passwordHash = text(user.password_hash) || await hashPassword(randomHex(16))
       const [restoredUser] = await sql`
-        insert into users (name, email, password_hash, role, access_level, status)
-        values (${text(user.name, email)}, ${email}, ${passwordHash}, ${role}, ${access}, ${status})
+        insert into users (name, email, password_hash, role, access_level, vip_expires_at, status)
+        values (${text(user.name, email)}, ${email}, ${passwordHash}, ${role}, ${access}, ${text(user.vip_expires_at) || null}, ${status})
         on conflict (email) do update set
           name = excluded.name,
           role = case when users.role = 'superadmin' then users.role else excluded.role end,
           access_level = excluded.access_level,
+          vip_expires_at = excluded.vip_expires_at,
           status = excluded.status,
           updated_at = now()
         returning id
@@ -335,6 +346,49 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
         where not exists (
           select 1 from vip_requests where lower(email) = ${email} and created_at = ${createdAt}
         )
+      `
+    }
+
+    for (const requestRow of data.purchaseRequests) {
+      const userId = userIdMap.get(Number(requestRow.user_id))
+      const mediaId = mediaIdMap.get(Number(requestRow.media_id))
+      const createdAt = text(requestRow.created_at) || new Date().toISOString()
+      if (!userId || !mediaId) continue
+      await sql`
+        insert into purchase_requests (user_id, media_id, amount, slip_name, status, created_at, updated_at)
+        select ${userId}, ${mediaId}, ${Math.max(0, int(requestRow.amount))}, ${text(requestRow.slip_name) || null},
+               ${choice(requestRow.status, PURCHASE_REQUEST_STATUSES, 'pending')}, ${createdAt},
+               ${text(requestRow.updated_at) || createdAt}
+        where not exists (
+          select 1 from purchase_requests
+          where user_id = ${userId} and media_id = ${mediaId} and created_at = ${createdAt}
+        )
+      `
+    }
+
+    for (const purchaseRow of data.mediaPurchases) {
+      const userId = userIdMap.get(Number(purchaseRow.user_id))
+      const mediaId = mediaIdMap.get(Number(purchaseRow.media_id))
+      if (!userId || !mediaId) continue
+      await sql`
+        insert into media_purchases (
+          user_id, media_id, amount, status, granted_by, granted_at, refunded_at, note
+        )
+        values (
+          ${userId}, ${mediaId}, ${Math.max(0, int(purchaseRow.amount))},
+          ${choice(purchaseRow.status, PURCHASE_STATUSES, 'active')},
+          ${text(purchaseRow.granted_by, 'restore')},
+          ${text(purchaseRow.granted_at) || new Date().toISOString()},
+          ${text(purchaseRow.refunded_at) || null},
+          ${text(purchaseRow.note)}
+        )
+        on conflict (user_id, media_id) do update set
+          amount = excluded.amount,
+          status = excluded.status,
+          granted_by = excluded.granted_by,
+          granted_at = excluded.granted_at,
+          refunded_at = excluded.refunded_at,
+          note = excluded.note
       `
     }
 

@@ -6,12 +6,13 @@ import { writeNotification } from '../../_lib/notifications'
 import { readPagination } from '../../_lib/pagination'
 
 type AdminAction = {
-  action?: 'approve-vip' | 'reject-vip' | 'set-access' | 'set-status' | 'set-role'
+  action?: 'approve-vip' | 'reject-vip' | 'approve-purchase' | 'reject-purchase' | 'set-access' | 'set-status' | 'set-role' | 'grant-purchase' | 'revoke-purchase'
   requestId?: number
   userId?: number
   access?: 'สมาชิก' | 'VIP'
   role?: 'admin' | 'member'
   status?: 'active' | 'disabled'
+  mediaId?: number
 }
 
 async function requireSuperAdmin(env: Env, request: Request) {
@@ -36,7 +37,7 @@ export const onRequestGet = async ({ env, request }: { env: Env; request: Reques
   const query = url.searchParams.get('query')?.trim().slice(0, 120) ?? ''
   const pattern = `%${query}%`
   const users = await sql`
-    select id, name, email, role, access_level, status, created_at
+    select id, name, email, role, access_level, vip_expires_at, status, created_at
     from users
     where (${query} = '' or name ilike ${pattern} or email ilike ${pattern})
     order by created_at desc
@@ -52,6 +53,15 @@ export const onRequestGet = async ({ env, request }: { env: Env; request: Reques
     order by created_at desc
     limit 200
   `
+  const purchaseRequests = await sql`
+    select purchase_requests.id, purchase_requests.user_id, purchase_requests.media_id,
+           users.name, users.email, media.title as media_title, purchase_requests.amount,
+           purchase_requests.slip_name, purchase_requests.status, purchase_requests.created_at
+    from purchase_requests
+    join users on users.id = purchase_requests.user_id
+    join media on media.id = purchase_requests.media_id
+    order by purchase_requests.created_at desc limit 200
+  `
 
   return Response.json({
     ok: true,
@@ -64,6 +74,7 @@ export const onRequestGet = async ({ env, request }: { env: Env; request: Reques
       email: user.email,
       role: user.role,
       access: user.access_level,
+      vipExpiresAt: user.vip_expires_at,
       status: user.status,
       createdAt: user.created_at,
     })),
@@ -76,6 +87,18 @@ export const onRequestGet = async ({ env, request }: { env: Env; request: Reques
       slipName: request.slip_name ?? '',
       status: request.status,
       createdAt: request.created_at,
+    })),
+    purchaseRequests: purchaseRequests.map((item) => ({
+      id: item.id,
+      userId: item.user_id,
+      mediaId: item.media_id,
+      name: item.name,
+      email: item.email,
+      mediaTitle: item.media_title,
+      amount: Number(item.amount ?? 0),
+      slipName: item.slip_name ?? '',
+      status: item.status,
+      createdAt: item.created_at,
     })),
   })
 }
@@ -92,8 +115,14 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
     const body = (await request.json().catch(() => ({}))) as AdminAction
     const requestId = positiveId(body.requestId)
     const userId = positiveId(body.userId)
+    const mediaId = positiveId(body.mediaId)
 
     if (body.action === 'approve-vip' && requestId) {
+      const [siteSettings] = await sql`
+        select coalesce((value->>'vipDurationDays')::int, 30) as vip_duration_days
+        from app_settings where key = 'site' limit 1
+      `
+      const vipDurationDays = Math.min(3650, Math.max(1, Number(siteSettings?.vip_duration_days ?? 30)))
       const [vipRequest] = await sql`
         with approved as (
           update vip_requests
@@ -103,7 +132,10 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
         ),
         activated as (
           update users
-          set access_level = 'VIP', status = 'active', updated_at = now()
+          set access_level = 'VIP',
+              vip_expires_at = greatest(coalesce(vip_expires_at, now()), now()) + make_interval(days => ${vipDurationDays}),
+              status = 'active',
+              updated_at = now()
           where id in (select user_id from approved where user_id is not null)
             and role <> 'superadmin'
           returning id
@@ -115,7 +147,7 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
       if (vipRequest.user_id && !vipRequest.activated_user_id) {
         throw new Error('VIP request user could not be activated')
       }
-      await writeAuditLog(env, currentUser, 'approve_vip', 'vip_request', requestId)
+      await writeAuditLog(env, currentUser, 'approve_vip', 'vip_request', requestId, { vipDurationDays })
       await writeNotification(env, {
         audience: 'superadmin',
         type: 'vip_resolved',
@@ -147,13 +179,66 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
         fingerprint: `vip_request:${requestId}:rejected`,
       })
       await notifyTelegram(env, `MIKPURINUT Media Platform\nปฏิเสธคำขอ VIP\nRequest ID: ${requestId}`)
+    } else if (body.action === 'approve-purchase' && requestId) {
+      const [purchase] = await sql`
+        with approved as (
+          update purchase_requests set status = 'approved', updated_at = now()
+          where id = ${requestId} and status = 'pending'
+          returning user_id, media_id, amount
+        )
+        insert into media_purchases (user_id, media_id, amount, status, granted_by)
+        select user_id, media_id, amount, 'active', ${currentUser.email} from approved
+        on conflict (user_id, media_id) do update set
+          amount = excluded.amount, status = 'active', granted_by = excluded.granted_by,
+          granted_at = now(), refunded_at = null
+        returning user_id, media_id
+      `
+      if (!purchase) return Response.json({ ok: false, error: 'ไม่พบคำขอซื้อที่รอตรวจสอบ' }, { status: 409 })
+      await writeAuditLog(env, currentUser, 'approve_media_purchase', 'purchase_request', requestId, purchase)
+    } else if (body.action === 'reject-purchase' && requestId) {
+      const [purchase] = await sql`
+        update purchase_requests set status = 'rejected', updated_at = now()
+        where id = ${requestId} and status = 'pending' returning id
+      `
+      if (!purchase) return Response.json({ ok: false, error: 'ไม่พบคำขอซื้อที่รอตรวจสอบ' }, { status: 409 })
+      await writeAuditLog(env, currentUser, 'reject_media_purchase', 'purchase_request', requestId)
     } else if (body.action === 'set-access' && userId && ['สมาชิก', 'VIP'].includes(String(body.access))) {
+      const [siteSettings] = await sql`
+        select coalesce((value->>'vipDurationDays')::int, 30) as vip_duration_days
+        from app_settings where key = 'site' limit 1
+      `
+      const vipDurationDays = Math.min(3650, Math.max(1, Number(siteSettings?.vip_duration_days ?? 30)))
       const [updated] = await sql`
-        update users set access_level = ${body.access}, updated_at = now()
+        update users
+        set access_level = ${body.access},
+            vip_expires_at = case
+              when ${body.access} = 'VIP' then coalesce(vip_expires_at, now() + make_interval(days => ${vipDurationDays}))
+              else null
+            end,
+            updated_at = now()
         where id = ${userId} and role <> 'superadmin' returning id
       `
       if (!updated) return Response.json({ ok: false, error: 'ไม่พบสมาชิกที่แก้ไขสิทธิ์ได้' }, { status: 404 })
-      await writeAuditLog(env, currentUser, 'set_user_access', 'user', userId, { access: body.access })
+      await writeAuditLog(env, currentUser, 'set_user_access', 'user', userId, { access: body.access, vipDurationDays })
+    } else if (body.action === 'grant-purchase' && userId && mediaId) {
+      const [media] = await sql`select id, price from media where id = ${mediaId} and access_level = 'ซื้อแยก' limit 1`
+      if (!media) return Response.json({ ok: false, error: 'ไม่พบสื่อซื้อแยกที่ต้องการให้สิทธิ์' }, { status: 404 })
+      await sql`
+        insert into media_purchases (user_id, media_id, amount, status, granted_by)
+        values (${userId}, ${mediaId}, ${Number(media.price ?? 0)}, 'active', ${currentUser.email})
+        on conflict (user_id, media_id) do update set
+          amount = excluded.amount, status = 'active', granted_by = excluded.granted_by,
+          granted_at = now(), refunded_at = null
+      `
+      await writeAuditLog(env, currentUser, 'grant_media_purchase', 'media', mediaId, { userId })
+    } else if (body.action === 'revoke-purchase' && userId && mediaId) {
+      const [updated] = await sql`
+        update media_purchases set status = 'revoked'
+        where user_id = ${userId} and media_id = ${mediaId} and status = 'active'
+        returning id
+      `
+      if (!updated) return Response.json({ ok: false, error: 'ไม่พบสิทธิ์ซื้อแยกที่กำลังใช้งาน' }, { status: 404 })
+      await writeAuditLog(env, currentUser, 'revoke_media_purchase', 'media', mediaId, { userId })
     } else if (body.action === 'set-status' && userId && ['active', 'disabled'].includes(String(body.status))) {
       const [updated] = await sql`
         update users set status = ${body.status}, updated_at = now()

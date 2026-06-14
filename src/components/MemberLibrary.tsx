@@ -5,6 +5,7 @@ import {
   Heart,
   Loader2,
   LogOut,
+  PackageCheck,
   Search,
   UserCircle2,
 } from 'lucide-react'
@@ -39,6 +40,7 @@ export function MemberLibraryPanel({
       : '-'
   const favorites = library?.favorites ?? []
   const history = library?.history ?? []
+  const purchases = library?.purchases ?? []
 
   return (
     <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
@@ -77,11 +79,12 @@ export function MemberLibraryPanel({
                 <p className="truncate text-sm font-bold text-slate-500 dark:text-slate-400">{library?.profile.email ?? currentUser.email}</p>
               </div>
             </div>
-            <div className="mt-5 grid gap-3 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
+            <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
               {[
                 ['สิทธิ์', currentUser.access],
                 ['รายการโปรด', `${favorites.length} รายการ`],
                 ['เคยดาวน์โหลด', `${history.length} สื่อ`],
+                ['ซื้อแยก', `${purchases.length} สื่อ`],
               ].map(([label, value]) => (
                 <div className="rounded-2xl bg-slate-100/80 p-4 dark:bg-white/[0.06]" key={label}>
                   <p className="text-xs font-black uppercase text-slate-400">{label}</p>
@@ -124,6 +127,37 @@ export function MemberLibraryPanel({
       </div>
 
       <AccountSecurity currentUser={currentUser} onLogout={onLogout} onUserUpdated={onUserUpdated} />
+
+      {purchases.length > 0 && (
+        <section className="mt-8 rounded-3xl border border-amber-200/80 bg-amber-50/75 p-5 shadow-lg backdrop-blur dark:border-amber-300/15 dark:bg-amber-300/[0.06]">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <p className="inline-flex items-center gap-2 text-sm font-black text-amber-700 dark:text-amber-200">
+                <PackageCheck size={18} />
+                PURCHASED MEDIA
+              </p>
+              <h2 className="mt-2 text-2xl font-black text-slate-950 dark:text-white">สื่อที่ซื้อไว้</h2>
+            </div>
+            <span className="rounded-full bg-amber-200 px-3 py-1 text-xs font-black text-amber-950 dark:bg-amber-300/15 dark:text-amber-100">
+              {purchases.length.toLocaleString('th-TH')} รายการ
+            </span>
+          </div>
+          <div className="mt-5 grid gap-3 lg:grid-cols-2">
+            {purchases.map(({ media, purchasedAt, amount }) => (
+              <button className="grid min-h-24 w-full grid-cols-[72px_1fr_auto] items-center gap-3 rounded-2xl border border-amber-200 bg-white/80 p-3 text-left transition hover:border-amber-400 dark:border-white/10 dark:bg-white/[0.04]" key={media.id} onClick={() => onOpenDetail(media)} type="button">
+                <img alt="" className="h-[72px] w-[72px] rounded-xl object-cover" src={media.cover} />
+                <span className="min-w-0">
+                  <span className="line-clamp-2 font-black text-slate-950 dark:text-white">{media.title}</span>
+                  <span className="mt-1 block text-xs font-bold text-slate-400">{formatDate(purchasedAt)}</span>
+                </span>
+                <span className="rounded-xl bg-amber-100 px-3 py-2 text-xs font-black text-amber-900 dark:bg-amber-300/10 dark:text-amber-100">
+                  {amount.toLocaleString('th-TH')} บาท
+                </span>
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
 
       <div className="mt-8 flex flex-wrap items-end justify-between gap-3">
         <div>

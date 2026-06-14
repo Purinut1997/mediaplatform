@@ -2,13 +2,14 @@ import { useEffect, useState } from 'react'
 import { Download, ExternalLink, Eye, FileText, Heart, LockKeyhole, PlayCircle, Star } from 'lucide-react'
 import { readJson } from '../lib/api'
 import { canViewAccess, getPreviewUrl } from '../lib/media'
-import type { CurrentUser, MediaItem } from '../types'
+import type { CurrentUser, MediaItem, SiteSettings } from '../types'
 
 export function MediaDetail({
   canDownload,
   currentUser,
   isFavorite,
   item,
+  settings,
   onBack,
   onDownloaded,
   onError,
@@ -18,6 +19,7 @@ export function MediaDetail({
   currentUser: CurrentUser | null
   isFavorite: boolean
   item: MediaItem
+  settings: SiteSettings
   onBack: () => void
   onDownloaded: () => void
   onError: () => void
@@ -25,6 +27,11 @@ export function MediaDetail({
 }) {
   const previewUrl = getPreviewUrl(item)
   const primaryLink = item.links?.find((link) => canViewAccess(currentUser, link.access) && link.url) ?? item.links?.[0]
+  const [purchaseSlipName, setPurchaseSlipName] = useState('')
+  const [purchaseNotice, setPurchaseNotice] = useState('')
+  const [requestingPurchase, setRequestingPurchase] = useState(false)
+  const canCheckPurchasedAccess = item.access === 'ซื้อแยก' && Boolean(currentUser)
+  const purchaseAvailable = settings.purchaseEnabled && item.price > 0
 
   const openResource = async (linkId?: number, allowed = canDownload) => {
     if (!allowed) return onError()
@@ -41,6 +48,27 @@ export function MediaDetail({
       onDownloaded()
     } catch {
       onError()
+    }
+  }
+
+  const requestPurchase = async () => {
+    if (!currentUser) return onError()
+    setRequestingPurchase(true)
+    setPurchaseNotice('')
+    try {
+      const response = await fetch('/api/purchases', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ mediaId: item.id, slipName: purchaseSlipName }),
+      })
+      const result = await readJson<{ error?: string }>(response)
+      if (!response.ok) throw new Error(result.error || 'ส่งคำขอซื้อไม่สำเร็จ')
+      setPurchaseNotice('ส่งคำขอซื้อแล้ว ผู้ดูแลจะตรวจสอบและเปิดสิทธิ์ให้บัญชีนี้')
+    } catch (error) {
+      setPurchaseNotice(error instanceof Error ? error.message : 'ส่งคำขอซื้อไม่สำเร็จ')
+    } finally {
+      setRequestingPurchase(false)
     }
   }
 
@@ -69,7 +97,7 @@ export function MediaDetail({
             <InfoTile icon={LockKeyhole} label="ระดับสิทธิ์" value={item.access} />
           </div>
           <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-            <button className="inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-2xl bg-cyan-400 px-5 font-black text-slate-950 shadow-lg shadow-cyan-500/20" onClick={() => void openResource(primaryLink?.id, canDownload && (!primaryLink || canViewAccess(currentUser, primaryLink.access)))} type="button">
+            <button className="inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-2xl bg-cyan-400 px-5 font-black text-slate-950 shadow-lg shadow-cyan-500/20" onClick={() => void openResource(primaryLink?.id, (canDownload && (!primaryLink || canViewAccess(currentUser, primaryLink.access))) || canCheckPurchasedAccess)} type="button">
               <Download size={20} />ดาวน์โหลด / เปิดลิงก์
             </button>
             <button className={`inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-2xl px-5 font-black shadow-lg transition ${isFavorite ? 'bg-rose-500 text-white shadow-rose-500/20' : 'bg-slate-950 text-cyan-200 shadow-slate-900/10 dark:bg-cyan-300 dark:text-slate-950'}`} onClick={onFavorite} type="button">
@@ -77,6 +105,40 @@ export function MediaDetail({
               {isFavorite ? 'บันทึกในคลังของฉันแล้ว' : 'เก็บไว้ในคลังของฉัน'}
             </button>
           </div>
+          {item.access === 'ซื้อแยก' && !canDownload && (
+            <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-300/20 dark:bg-amber-300/10">
+              <p className="font-black text-amber-900 dark:text-amber-100">
+                {purchaseAvailable ? `ซื้อสิทธิ์สื่อนี้ ${item.price.toLocaleString('th-TH')} บาท` : 'สื่อนี้ยังไม่เปิดจำหน่าย'}
+              </p>
+              {purchaseAvailable ? (
+                <>
+                  <p className="mt-1 text-sm font-semibold text-amber-800/80 dark:text-amber-100/70">
+                    ชำระเงินแล้วแนบสลิป ผู้ดูแลจะตรวจสอบภายในประมาณ {settings.paymentReviewHours.toLocaleString('th-TH')} ชั่วโมง
+                  </p>
+                  {(settings.vipQrUrl || settings.vipAccountNumber) && (
+                    <div className="mt-3 grid gap-3 rounded-2xl bg-white/70 p-3 sm:grid-cols-[auto_1fr] dark:bg-black/20">
+                      {settings.vipQrUrl && <img alt="QR Code ชำระเงิน" className="h-28 w-28 rounded-xl bg-white object-contain p-2" src={settings.vipQrUrl} />}
+                      <div className="text-sm font-bold leading-6 text-amber-950 dark:text-amber-100">
+                        <p>{settings.vipBankName}</p>
+                        {settings.vipAccountNumber && <p>เลขบัญชี: {settings.vipAccountNumber}</p>}
+                        {settings.vipAccountName && <p>ชื่อบัญชี: {settings.vipAccountName}</p>}
+                      </div>
+                    </div>
+                  )}
+                  <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                    <input className="min-h-11 flex-1 rounded-xl border border-amber-200 bg-white px-3 text-sm dark:border-white/10 dark:bg-white/10" onChange={(event) => setPurchaseSlipName(event.target.files?.[0]?.name ?? '')} type="file" />
+                    <button className="min-h-11 rounded-xl bg-amber-400 px-4 font-black text-slate-950 disabled:opacity-60" disabled={requestingPurchase || !currentUser} onClick={() => void requestPurchase()} type="button">
+                      {currentUser ? (requestingPurchase ? 'กำลังส่ง...' : 'ส่งคำขอซื้อ') : 'เข้าสู่ระบบเพื่อซื้อ'}
+                    </button>
+                  </div>
+                  {settings.commercePolicyText && <p className="mt-3 text-xs font-semibold leading-5 text-amber-800/80 dark:text-amber-100/65">{settings.commercePolicyText}</p>}
+                </>
+              ) : (
+                <p className="mt-1 text-sm font-semibold text-amber-800/80 dark:text-amber-100/70">ผู้ดูแลกำลังกำหนดราคาและเงื่อนไข กรุณากลับมาตรวจสอบภายหลัง</p>
+              )}
+              {purchaseNotice && <p className="mt-3 text-sm font-bold text-amber-900 dark:text-amber-100">{purchaseNotice}</p>}
+            </div>
+          )}
         </div>
       </div>
 
@@ -91,7 +153,7 @@ export function MediaDetail({
           </div>
           <div className="grid gap-3 md:grid-cols-2">
             {item.links?.map((link, index) => {
-              const allowed = canDownload && canViewAccess(currentUser, link.access)
+              const allowed = (canDownload && canViewAccess(currentUser, link.access)) || canCheckPurchasedAccess
               return (
                 <button className={`flex min-h-16 items-center gap-3 rounded-2xl border px-4 py-3 text-left transition ${allowed ? 'border-cyan-200 bg-cyan-50 hover:border-cyan-400 hover:bg-cyan-100 dark:border-cyan-300/20 dark:bg-cyan-300/10 dark:hover:bg-cyan-300/15' : 'border-slate-200 bg-slate-100 text-slate-500 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-400'}`} key={link.id ?? `${link.label}-${index}`} onClick={() => void openResource(link.id, allowed)} type="button">
                   {allowed ? <ExternalLink className="shrink-0 text-cyan-600 dark:text-cyan-300" size={21} /> : <LockKeyhole className="shrink-0" size={21} />}

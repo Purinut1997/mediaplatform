@@ -54,12 +54,14 @@ export type CurrentUser = {
   email: string
   role: 'superadmin' | 'admin' | 'member'
   access: 'VIP' | 'สมาชิก'
+  vipExpiresAt?: string | null
 }
 
 export type MemberLibrary = {
   profile: CurrentUser & { createdAt: string }
   favorites: Array<{ media: MediaItem; savedAt: string }>
   history: Array<{ media: MediaItem; lastDownloadedAt: string; downloadCount: number }>
+  purchases: Array<{ media: MediaItem; purchasedAt: string; amount: number }>
 }
 
 export type AdminUser = {
@@ -69,6 +71,7 @@ export type AdminUser = {
   role: CurrentUser['role']
   access: CurrentUser['access']
   status: 'active' | 'disabled'
+  vipExpiresAt?: string | null
   createdAt: string
 }
 
@@ -80,6 +83,19 @@ export type VipRequest = {
   phone: string
   slipName: string
   status: 'pending' | 'approved' | 'rejected'
+  createdAt: string
+}
+
+export type PurchaseRequest = {
+  id: number
+  userId: number
+  mediaId: number
+  name: string
+  email: string
+  mediaTitle: string
+  amount: number
+  slipName: string
+  status: 'pending' | 'approved' | 'rejected' | 'cancelled' | 'refunded'
   createdAt: string
 }
 
@@ -200,6 +216,8 @@ export type RestorePreview = {
   mediaTags: number
   users: number
   vipRequests: number
+  purchaseRequests: number
+  mediaPurchases: number
   notifications: number
   settings: number
   mode?: 'merge' | 'replace'
@@ -240,6 +258,13 @@ export type SiteSettings = {
   maintenanceMessage: string
   vipRegistrationEnabled: boolean
   vipPrice: number
+  vipDurationDays: number
+  vipRefundDays: number
+  purchaseEnabled: boolean
+  purchaseRefundDays: number
+  orderExpiryHours: number
+  paymentReviewHours: number
+  commercePolicyText: string
   vipQrUrl: string
   vipBankName: string
   vipAccountNumber: string

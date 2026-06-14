@@ -411,6 +411,7 @@ function App() {
               item={selected}
               canDownload={canViewMedia(currentUser, selected)}
               currentUser={currentUser}
+              settings={siteSettings}
               isFavorite={favoriteIds.has(selected.id)}
               onBack={() => setView('media')}
               onFavorite={() => void toggleFavorite(selected)}
@@ -1376,7 +1377,7 @@ function RegisterPanel({
             badge="แนะนำ"
             detail={
               settings.vipRegistrationEnabled && settings.vipPrice > 0
-                ? `${settings.vipPrice.toLocaleString('th-TH')} บาท / ตลอดชีพ`
+                ? `${settings.vipPrice.toLocaleString('th-TH')} บาท / ${settings.vipDurationDays.toLocaleString('th-TH')} วัน`
                 : 'รอเปิดรับจากผู้ดูแล'
             }
             disabled={!settings.vipRegistrationEnabled}
@@ -1428,6 +1429,11 @@ function RegisterPanel({
                 </label>
               </div>
             </div>
+            {settings.commercePolicyText && (
+              <p className="mt-5 rounded-2xl border border-slate-200 bg-white/70 p-4 text-sm font-semibold leading-6 text-slate-600 dark:border-white/10 dark:bg-white/[0.05] dark:text-slate-300">
+                {settings.commercePolicyText}
+              </p>
+            )}
           </div>
         )}
 

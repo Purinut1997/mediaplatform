@@ -1,7 +1,7 @@
 import { getCurrentUser } from '../../_lib/auth'
 import { writeAuditLog, writeErrorLog } from '../../_lib/admin'
 import { ensureSchema, getSql, type Env } from '../../_lib/db'
-import { canAccessLevel, hideProtectedLinks } from '../../_lib/media-access'
+import { canAccessLevel, hasPurchasedMedia, hideProtectedLinks } from '../../_lib/media-access'
 import { safeHttpUrl } from '../../_lib/url'
 
 type FavoritePayload = {
@@ -73,6 +73,16 @@ function toMedia(row: MediaRow) {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }
+}
+
+function revealPurchasedLinks(media: ReturnType<typeof toMedia>) {
+  const links = media.links.map((link) => ({
+    ...link,
+    url: safeHttpUrl(link.url),
+    previewUrl: safeHttpUrl(link.previewUrl),
+  }))
+  const first = links.find((link) => link.url || link.previewUrl)
+  return { ...media, resourceUrl: first?.url ?? '', previewUrl: first?.previewUrl ?? '', links }
 }
 
 function mediaSelect(prefix: string) {
@@ -158,6 +168,34 @@ export const onRequestGet = async ({ env, request }: { env: Env; request: Reques
       [currentUser.email.toLowerCase()],
     )) as MediaRow[]
 
+    const purchases = (await sql.query(
+      `
+        select ${mediaSelect('media')}, media_purchases.granted_at as purchased_at,
+          media_purchases.amount as purchase_amount
+        from media_purchases
+        join media on media.id = media_purchases.media_id
+        left join lateral (
+          select jsonb_agg(
+            jsonb_build_object(
+              'label', label, 'type', type, 'url', url,
+              'previewUrl', preview_url, 'access', access_level
+            ) order by sort_order asc, id asc
+          ) as links
+          from media_links where media_links.media_id = media.id
+        ) link on true
+        left join lateral (
+          select array_agg(tags.name order by tags.name asc) as tags
+          from media_tags join tags on tags.id = media_tags.tag_id
+          where media_tags.media_id = media.id
+        ) tagset on true
+        where media_purchases.user_id = $1 and media_purchases.status = 'active'
+          and media.status in ('เผยแพร่', 'เผยแพร่แล้ว')
+        order by media_purchases.granted_at desc
+        limit 60
+      `,
+      [user.id],
+    )) as Array<MediaRow & { purchased_at?: string; purchase_amount?: number | string }>
+
     return Response.json({
       ok: true,
       profile: {
@@ -172,6 +210,11 @@ export const onRequestGet = async ({ env, request }: { env: Env; request: Reques
         media: hideProtectedLinks(toMedia(row), currentUser),
         lastDownloadedAt: row.last_downloaded_at,
         downloadCount: Number(row.download_count ?? 0),
+      })),
+      purchases: purchases.map((row) => ({
+        media: revealPurchasedLinks(toMedia(row)),
+        purchasedAt: row.purchased_at,
+        amount: Number(row.purchase_amount ?? 0),
       })),
     })
   } catch (error) {
@@ -205,7 +248,7 @@ export const onRequestPatch = async ({ env, request }: { env: Env; request: Requ
     if (!user || !media) {
       return Response.json({ ok: false, error: 'ไม่พบสมาชิกหรือสื่อที่ต้องการ' }, { status: 404 })
     }
-    if (body.favorite && !canAccessLevel(currentUser, String(media.access_level))) {
+    if (body.favorite && !canAccessLevel(currentUser, String(media.access_level)) && !(await hasPurchasedMedia(env, currentUser, mediaId))) {
       return Response.json({ ok: false, error: 'บัญชีนี้ยังไม่มีสิทธิ์บันทึกสื่อนี้' }, { status: 403 })
     }
 
