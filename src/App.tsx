@@ -1620,6 +1620,7 @@ function AdminPanel({
   const [adminMediaSort, setAdminMediaSort] = useState<AdminMediaSort>('ล่าสุด')
   const [adminMediaResults, setAdminMediaResults] = useState<MediaItem[]>(mediaItems)
   const [adminMediaPage, setAdminMediaPage] = useState(1)
+  const [adminMediaPageSize, setAdminMediaPageSize] = useState(10)
   const [adminMediaTotal, setAdminMediaTotal] = useState(mediaItems.length)
   const [loadingAdminMedia, setLoadingAdminMedia] = useState(false)
   const [filterNow] = useState(() => Date.now())
@@ -1703,6 +1704,9 @@ function AdminPanel({
     if (adminMediaSort === 'ชื่อ A-Z') return a.title.localeCompare(b.title, 'th')
     return Date.parse(b.updatedAt ?? b.createdAt ?? '') - Date.parse(a.updatedAt ?? a.createdAt ?? '')
   })
+  const adminMediaPageCount = Math.max(1, Math.ceil(adminMediaTotal / adminMediaPageSize))
+  const adminMediaRangeStart = adminMediaTotal ? (adminMediaPage - 1) * adminMediaPageSize + 1 : 0
+  const adminMediaRangeEnd = Math.min(adminMediaPage * adminMediaPageSize, adminMediaTotal)
   const topDownloadedMedia = [...mediaItems]
     .sort((a, b) => b.downloads - a.downloads)
     .slice(0, 5)
@@ -1839,11 +1843,11 @@ function AdminPanel({
         }).format(new Date(value))
       : '-'
 
-  const loadAdminMediaPage = async (page: number, append = false) => {
+  const loadAdminMediaPage = async (page: number) => {
     setLoadingAdminMedia(true)
     setError('')
     try {
-      const params = new URLSearchParams({ page: String(page), pageSize: '50' })
+      const params = new URLSearchParams({ page: String(page), pageSize: String(adminMediaPageSize) })
       params.set('status', adminMediaStatus === 'ทั้งหมด' ? 'all' : adminMediaStatus)
       if (adminMediaQuery.trim()) params.set('query', adminMediaQuery.trim())
       if (adminMediaTagQuery.trim()) params.set('tag', adminMediaTagQuery.trim())
@@ -1856,11 +1860,7 @@ function AdminPanel({
       const response = await fetch(`/api/media?${params}`, { credentials: 'include' })
       const result = await readJson<{ media?: MediaItem[]; page?: number; total?: number; error?: string }>(response)
       if (!response.ok) throw new Error(result.error ?? 'โหลดรายการสื่อไม่สำเร็จ')
-      setAdminMediaResults((items) => {
-        if (!append) return result.media ?? []
-        const known = new Set(items.map((item) => item.id))
-        return [...items, ...(result.media ?? []).filter((item) => !known.has(item.id))]
-      })
+      setAdminMediaResults(result.media ?? [])
       setAdminMediaPage(result.page ?? page)
       setAdminMediaTotal(result.total ?? 0)
     } catch (mediaLoadError) {
@@ -2144,6 +2144,7 @@ function AdminPanel({
     adminMediaStatus,
     adminMediaTagQuery,
     adminMediaTopic,
+    adminMediaPageSize,
     mediaItems.length,
   ])
 
@@ -4476,22 +4477,44 @@ function AdminPanel({
                 </article>
               ))}
             </div>
-            {adminMediaResults.length < adminMediaTotal && (
-              <div className="mt-5 flex flex-col items-center gap-2 border-t border-white/10 pt-5">
+            <div className="mt-5 flex flex-col gap-3 border-t border-white/10 pt-5 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex flex-wrap items-center gap-3">
                 <p className="text-xs font-bold text-slate-400">
-                  โหลดแล้ว {adminMediaResults.length.toLocaleString('th-TH')} จาก {adminMediaTotal.toLocaleString('th-TH')} รายการ
+                  แสดง {adminMediaRangeStart.toLocaleString('th-TH')}–{adminMediaRangeEnd.toLocaleString('th-TH')} จาก {adminMediaTotal.toLocaleString('th-TH')} รายการ
                 </p>
+                <label className="inline-flex items-center gap-2 text-xs font-bold text-slate-400">
+                  ต่อหน้า
+                  <select
+                    className="min-h-10 rounded-xl border border-white/10 bg-black/24 px-3 font-black text-white outline-none focus:border-cyan-300"
+                    onChange={(event) => setAdminMediaPageSize(Number(event.target.value))}
+                    value={adminMediaPageSize}
+                  >
+                    {[10, 20, 50].map((size) => <option className="bg-slate-950" key={size} value={size}>{size}</option>)}
+                  </select>
+                </label>
+              </div>
+              <div className="flex items-center justify-between gap-2 sm:justify-end">
                 <button
-                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-cyan-300 px-5 font-black text-slate-950 disabled:opacity-50"
-                  disabled={loadingAdminMedia}
-                  onClick={() => void loadAdminMediaPage(adminMediaPage + 1, true)}
+                  className="min-h-10 rounded-xl bg-white/10 px-4 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-35"
+                  disabled={loadingAdminMedia || adminMediaPage <= 1}
+                  onClick={() => void loadAdminMediaPage(adminMediaPage - 1)}
                   type="button"
                 >
-                  {loadingAdminMedia ? <Loader2 className="animate-spin" size={18} /> : <Download size={18} />}
-                  โหลดสื่อเพิ่มเติม
+                  ก่อนหน้า
+                </button>
+                <span className="min-w-20 text-center text-xs font-black text-cyan-200">
+                  หน้า {adminMediaPage.toLocaleString('th-TH')} / {adminMediaPageCount.toLocaleString('th-TH')}
+                </span>
+                <button
+                  className="min-h-10 rounded-xl bg-cyan-300 px-4 text-sm font-black text-slate-950 disabled:cursor-not-allowed disabled:opacity-35"
+                  disabled={loadingAdminMedia || adminMediaPage >= adminMediaPageCount}
+                  onClick={() => void loadAdminMediaPage(adminMediaPage + 1)}
+                  type="button"
+                >
+                  ถัดไป
                 </button>
               </div>
-            )}
+            </div>
           </section>
           </>
           )}
