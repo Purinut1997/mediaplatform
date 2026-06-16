@@ -6,6 +6,7 @@ import {
   CheckCircle2,
   Clock3,
   Crown,
+  FileUp,
   Heart,
   Loader2,
   LogOut,
@@ -15,6 +16,7 @@ import {
   UserCircle2,
 } from 'lucide-react'
 import { readJson } from '../lib/api'
+import { paymentProofAccept, paymentProofHelpText, readPaymentProof } from '../lib/payment-proof'
 import type { CurrentUser, MediaItem, MemberLibrary, SiteSettings, View } from '../types'
 
 export function MemberLibraryPanel({
@@ -219,6 +221,7 @@ function MembershipUpgradePanel({
 }) {
   const [phone, setPhone] = useState('')
   const [slipName, setSlipName] = useState('')
+  const [slipDataUrl, setSlipDataUrl] = useState('')
   const [agree, setAgree] = useState(false)
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState('')
@@ -226,6 +229,25 @@ function MembershipUpgradePanel({
   const vipExpiresAt = library?.profile.vipExpiresAt ?? currentUser.vipExpiresAt
   const formatDate = (value?: string | null) =>
     value ? new Intl.DateTimeFormat('th-TH', { dateStyle: 'long' }).format(new Date(value)) : 'ไม่กำหนดวันหมดอายุ'
+
+  const vipDurationText = settings.vipLifetimeEnabled
+    ? 'ตลอดชีพหลังอนุมัติ'
+    : `${settings.vipDurationDays.toLocaleString('th-TH')} วันหลังอนุมัติ`
+  const slipLabel = settings.vipSlipLabel || 'แนบหลักฐานการโอน'
+
+  const selectSlip = async (file?: File) => {
+    setNotice('')
+    setSlipName('')
+    setSlipDataUrl('')
+    if (!file) return
+    try {
+      const proof = await readPaymentProof(file)
+      setSlipName(proof.name)
+      setSlipDataUrl(proof.dataUrl)
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'แนบหลักฐานไม่สำเร็จ')
+    }
+  }
 
   const submitRequest = async () => {
     setBusy(true)
@@ -235,13 +257,14 @@ function MembershipUpgradePanel({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ phone, slipName, agreementAccepted: agree }),
+        body: JSON.stringify({ phone, slipName, slipDataUrl, agreementAccepted: agree }),
       })
       const result = await readJson<{ ok?: boolean; error?: string }>(response)
       if (!response.ok) throw new Error(result.error || 'ส่งคำขอ VIP ไม่สำเร็จ')
       setNotice('ส่งคำขอ VIP แล้ว ผู้ดูแลจะตรวจสอบและอัปเดตสถานะในหน้านี้')
       setPhone('')
       setSlipName('')
+      setSlipDataUrl('')
       setAgree(false)
       onLibraryRefresh()
     } catch (error) {
@@ -308,7 +331,7 @@ function MembershipUpgradePanel({
           </p>
           <div className="mt-4 grid gap-2 text-sm font-bold text-slate-600 dark:text-slate-300">
             <p className="inline-flex items-center gap-2"><CheckCircle2 className="text-emerald-500" size={17} />เข้าถึงสื่อสมาชิกและ VIP</p>
-            <p className="inline-flex items-center gap-2"><CheckCircle2 className="text-emerald-500" size={17} />อายุสิทธิ์ {settings.vipDurationDays.toLocaleString('th-TH')} วันหลังอนุมัติ</p>
+            <p className="inline-flex items-center gap-2"><CheckCircle2 className="text-emerald-500" size={17} />อายุสิทธิ์ {vipDurationText}</p>
             <p className="inline-flex items-center gap-2"><CheckCircle2 className="text-emerald-500" size={17} />ติดตามสถานะคำขอได้จากหน้านี้</p>
           </div>
           {request?.status === 'rejected' && (
@@ -339,9 +362,10 @@ function MembershipUpgradePanel({
             </div>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               <input className="min-h-12 rounded-2xl border border-slate-200 bg-white px-4 outline-none focus:border-violet-400 dark:border-white/10 dark:bg-white/10" onChange={(event) => setPhone(event.target.value)} placeholder="เบอร์โทรศัพท์ (ถ้ามี)" value={phone} />
-              <label className="flex min-h-12 cursor-pointer items-center rounded-2xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-500 dark:border-white/10 dark:bg-white/10 dark:text-slate-300">
-                <span className="truncate">{slipName || settings.vipSlipLabel}</span>
-                <input className="hidden" onChange={(event) => setSlipName(event.target.files?.[0]?.name ?? '')} type="file" />
+              <label className="flex min-h-12 cursor-pointer items-center rounded-2xl border border-dashed border-violet-300 bg-violet-50/80 px-4 text-sm font-bold text-slate-600 transition hover:border-violet-400 hover:bg-violet-100 dark:border-violet-300/25 dark:bg-white/[0.04] dark:text-slate-300 dark:hover:bg-white/[0.07]">
+                <FileUp className="mr-2 shrink-0 text-violet-500" size={18} />
+                <span className="truncate">{slipName || `${slipLabel} (${paymentProofHelpText()})`}</span>
+                <input accept={paymentProofAccept()} className="hidden" onChange={(event) => void selectSlip(event.target.files?.[0])} type="file" />
               </label>
             </div>
             <label className="mt-4 flex items-start gap-3 text-sm font-bold text-slate-600 dark:text-slate-300">

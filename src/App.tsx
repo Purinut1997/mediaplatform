@@ -7,6 +7,7 @@ import {
   Download,
   Eye,
   EyeOff,
+  FileUp,
   Heart,
   ListFilter,
   Loader2,
@@ -29,6 +30,7 @@ import type {
 } from './types'
 import { readJson } from './lib/api'
 import { canAccessAdmin, canViewMedia } from './lib/media'
+import { paymentProofAccept, paymentProofHelpText, readPaymentProof } from './lib/payment-proof'
 import { LOGO_URL } from './brand'
 import { TechBackground } from './components/TechBackground'
 import { CreditBadge, EmptyState, Footer, LoadingOverlay, Popup, Toast } from './components/SharedUI'
@@ -1193,6 +1195,7 @@ function RegisterPanel({
   })
   const [agree, setAgree] = useState(false)
   const [slipName, setSlipName] = useState('')
+  const [slipDataUrl, setSlipDataUrl] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [botVerified, setBotVerified] = useState(false)
@@ -1202,6 +1205,25 @@ function RegisterPanel({
 
   const updateForm = (name: keyof typeof form, value: string) => {
     setForm((current) => ({ ...current, [name]: value }))
+  }
+
+  const vipDurationText = settings.vipLifetimeEnabled
+    ? 'ตลอดชีพ'
+    : `${settings.vipDurationDays.toLocaleString('th-TH')} วัน`
+  const slipLabel = settings.vipSlipLabel || 'แนบหลักฐานการโอน'
+
+  const selectSlip = async (file?: File) => {
+    setError('')
+    setSlipName('')
+    setSlipDataUrl('')
+    if (!file) return
+    try {
+      const proof = await readPaymentProof(file)
+      setSlipName(proof.name)
+      setSlipDataUrl(proof.dataUrl)
+    } catch (proofError) {
+      setError(proofError instanceof Error ? proofError.message : 'แนบหลักฐานไม่สำเร็จ')
+    }
   }
 
   const submitRegister = async (event: FormEvent<HTMLFormElement>) => {
@@ -1227,6 +1249,7 @@ function RegisterPanel({
         body: JSON.stringify({
           ...form,
           slipName,
+          slipDataUrl,
           botVerified,
           botStartedAt,
           turnstileToken,
@@ -1380,7 +1403,7 @@ function RegisterPanel({
             badge="แนะนำ"
             detail={
               settings.vipRegistrationEnabled && settings.vipPrice > 0
-                ? `${settings.vipPrice.toLocaleString('th-TH')} บาท / ${settings.vipDurationDays.toLocaleString('th-TH')} วัน`
+                ? `${settings.vipPrice.toLocaleString('th-TH')} บาท / ${vipDurationText}`
                 : 'รอเปิดรับจากผู้ดูแล'
             }
             disabled={!settings.vipRegistrationEnabled}
@@ -1422,13 +1445,23 @@ function RegisterPanel({
                 <p className="text-red-500">
                   ยอดโอน: {settings.vipPrice > 0 ? `${settings.vipPrice.toLocaleString('th-TH')} บาท` : 'รอผู้ดูแลกำหนด'}
                 </p>
+                <p className="rounded-2xl bg-emerald-50 px-4 py-3 text-emerald-700 dark:bg-emerald-300/10 dark:text-emerald-100">
+                  อายุสิทธิ์: {vipDurationText} หลังอนุมัติ
+                </p>
                 <label className="block">
-                  <span className="mb-2 block font-black">{settings.vipSlipLabel}</span>
+                  <span className="mb-2 flex items-center gap-2 font-black">
+                    <FileUp size={18} />
+                    {settings.vipSlipLabel}
+                  </span>
                   <input
+                    accept={paymentProofAccept()}
                     className="w-full rounded-xl border border-slate-300 bg-white px-3 py-3 text-sm dark:border-white/10 dark:bg-white/10"
-                    onChange={(event) => setSlipName(event.target.files?.[0]?.name ?? '')}
+                    onChange={(event) => void selectSlip(event.target.files?.[0])}
                     type="file"
                   />
+                  <span className="mt-2 block text-xs font-bold text-slate-500 dark:text-slate-400">
+                    {slipName || `${slipLabel} (${paymentProofHelpText()})`}
+                  </span>
                 </label>
               </div>
             </div>

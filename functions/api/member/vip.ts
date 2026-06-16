@@ -4,11 +4,13 @@ import { ensureSchema, getSql, type Env } from '../../_lib/db'
 import { boundedText, InputValidationError } from '../../_lib/input'
 import { notifyTelegram } from '../../_lib/notify'
 import { writeNotification } from '../../_lib/notifications'
+import { paymentProofDataUrl } from '../../_lib/payment-proof'
 import { enforceRateLimits, rateLimitResponse } from '../../_lib/rate-limit'
 
 type VipRequestPayload = {
   phone?: string
   slipName?: string
+  slipDataUrl?: string
   agreementAccepted?: boolean
 }
 
@@ -32,6 +34,7 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
     const body = (await request.json().catch(() => ({}))) as VipRequestPayload
     const phone = boundedText(body.phone, 'เบอร์โทรศัพท์', { max: 30 })
     const slipName = boundedText(body.slipName, 'ชื่อไฟล์สลิป', { max: 200 })
+    const slipDataUrl = paymentProofDataUrl(body.slipDataUrl)
     if (!body.agreementAccepted) {
       return Response.json({ ok: false, error: 'กรุณายอมรับเงื่อนไขก่อนส่งคำขอ VIP' }, { status: 400 })
     }
@@ -44,7 +47,7 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
       from app_settings where key = 'site' limit 1
     `
     if (!settings?.enabled) return Response.json({ ok: false, error: 'ขณะนี้ระบบยังไม่เปิดรับสมัคร VIP' }, { status: 403 })
-    if (Number(settings.price ?? 0) > 0 && !slipName) {
+    if (Number(settings.price ?? 0) > 0 && (!slipName || !slipDataUrl)) {
       return Response.json({ ok: false, error: 'กรุณาแนบสลิปการชำระเงินก่อนส่งคำขอ' }, { status: 400 })
     }
 
@@ -62,11 +65,15 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
     if (pending) return Response.json({ ok: false, error: 'คุณมีคำขอ VIP ที่กำลังรอตรวจสอบอยู่แล้ว' }, { status: 409 })
 
     const [vipRequest] = await sql`
-      insert into vip_requests (user_id, name, email, phone, slip_name)
-      values (${user.id}, ${user.name}, ${user.email}, ${phone || null}, ${slipName || null})
+      insert into vip_requests (user_id, name, email, phone, slip_name, slip_data_url)
+      values (${user.id}, ${user.name}, ${user.email}, ${phone || null}, ${slipName || null}, ${slipDataUrl || null})
       returning id, status, created_at, updated_at
     `
-    await writeAuditLog(env, currentUser, 'request_vip', 'vip_request', vipRequest.id, { phone, slipName })
+    await writeAuditLog(env, currentUser, 'request_vip', 'vip_request', vipRequest.id, {
+      phone,
+      slipName,
+      proofAttached: Boolean(slipDataUrl),
+    })
     await writeNotification(env, {
       audience: 'superadmin',
       type: 'vip_pending',
@@ -85,6 +92,7 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
         id: vipRequest.id,
         phone,
         slipName,
+        slipDataUrl,
         status: vipRequest.status,
         createdAt: vipRequest.created_at,
         updatedAt: vipRequest.updated_at,

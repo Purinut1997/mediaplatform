@@ -66,6 +66,7 @@ export type MemberLibrary = {
     id: number
     phone: string
     slipName: string
+    slipDataUrl: string
     status: 'pending' | 'approved' | 'rejected'
     createdAt: string
     updatedAt: string
@@ -96,6 +97,7 @@ export type VipRequest = {
   email: string
   phone: string
   slipName: string
+  slipDataUrl: string
   status: 'pending' | 'approved' | 'rejected'
   createdAt: string
 }
@@ -272,6 +274,7 @@ export type SiteSettings = {
   maintenanceMessage: string
   vipRegistrationEnabled: boolean
   vipPrice: number
+  vipLifetimeEnabled: boolean
   vipDurationDays: number
   vipRefundDays: number
   purchaseEnabled: boolean

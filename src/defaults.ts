@@ -83,6 +83,7 @@ export const defaultSiteSettings: SiteSettings = {
   maintenanceMessage: 'กรุณากลับมาใหม่ภายหลัง',
   vipRegistrationEnabled: false,
   vipPrice: 0,
+  vipLifetimeEnabled: false,
   vipDurationDays: 30,
   vipRefundDays: 7,
   purchaseEnabled: false,

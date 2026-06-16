@@ -197,7 +197,7 @@ export const onRequestGet = async ({ env, request }: { env: Env; request: Reques
     )) as Array<MediaRow & { purchased_at?: string; purchase_amount?: number | string }>
 
     const [vipRequest] = await sql`
-      select id, phone, slip_name, status, created_at, updated_at
+      select id, phone, slip_name, slip_data_url, status, created_at, updated_at
       from vip_requests
       where user_id = ${user.id}
       order by created_at desc
@@ -229,6 +229,7 @@ export const onRequestGet = async ({ env, request }: { env: Env; request: Reques
         id: vipRequest.id,
         phone: vipRequest.phone ?? '',
         slipName: vipRequest.slip_name ?? '',
+        slipDataUrl: vipRequest.slip_data_url ?? '',
         status: vipRequest.status,
         createdAt: vipRequest.created_at,
         updatedAt: vipRequest.updated_at,

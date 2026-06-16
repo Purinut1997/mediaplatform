@@ -6,7 +6,7 @@ import { writeNotification } from '../../_lib/notifications'
 import { readPagination } from '../../_lib/pagination'
 
 type AdminAction = {
-  action?: 'approve-vip' | 'reject-vip' | 'approve-purchase' | 'reject-purchase' | 'set-access' | 'set-vip-expiry' | 'extend-vip' | 'set-status' | 'set-role' | 'grant-purchase' | 'revoke-purchase'
+  action?: 'approve-vip' | 'reject-vip' | 'approve-purchase' | 'reject-purchase' | 'set-access' | 'set-vip-expiry' | 'set-vip-lifetime' | 'extend-vip' | 'set-status' | 'set-role' | 'grant-purchase' | 'revoke-purchase'
   requestId?: number
   userId?: number
   access?: 'สมาชิก' | 'VIP'
@@ -95,7 +95,7 @@ export const onRequestGet = async ({ env, request }: { env: Env; request: Reques
     where role <> 'superadmin'
   `
   const vipRequests = await sql`
-    select id, user_id, name, email, phone, slip_name, status, created_at
+    select id, user_id, name, email, phone, slip_name, slip_data_url, status, created_at
     from vip_requests
     order by created_at desc
     limit 200
@@ -137,6 +137,7 @@ export const onRequestGet = async ({ env, request }: { env: Env; request: Reques
       email: request.email,
       phone: request.phone ?? '',
       slipName: request.slip_name ?? '',
+      slipDataUrl: request.slip_data_url ?? '',
       status: request.status,
       createdAt: request.created_at,
     })),
@@ -171,10 +172,13 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
 
     if (body.action === 'approve-vip' && requestId) {
       const [siteSettings] = await sql`
-        select coalesce((value->>'vipDurationDays')::int, 30) as vip_duration_days
+        select
+          coalesce((value->>'vipDurationDays')::int, 30) as vip_duration_days,
+          coalesce((value->>'vipLifetimeEnabled')::boolean, false) as vip_lifetime_enabled
         from app_settings where key = 'site' limit 1
       `
       const vipDurationDays = Math.min(3650, Math.max(1, Number(siteSettings?.vip_duration_days ?? 30)))
+      const vipLifetimeEnabled = Boolean(siteSettings?.vip_lifetime_enabled)
       const [vipRequest] = await sql`
         with approved as (
           update vip_requests
@@ -185,7 +189,10 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
         activated as (
           update users
           set access_level = 'VIP',
-              vip_expires_at = greatest(coalesce(vip_expires_at, now()), now()) + make_interval(days => ${vipDurationDays}),
+              vip_expires_at = case
+                when ${vipLifetimeEnabled} then null
+                else greatest(coalesce(vip_expires_at, now()), now()) + make_interval(days => ${vipDurationDays})
+              end,
               status = 'active',
               updated_at = now()
           where id in (select user_id from approved where user_id is not null)
@@ -199,7 +206,7 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
       if (vipRequest.user_id && !vipRequest.activated_user_id) {
         throw new Error('VIP request user could not be activated')
       }
-      await writeAuditLog(env, currentUser, 'approve_vip', 'vip_request', requestId, { vipDurationDays })
+      await writeAuditLog(env, currentUser, 'approve_vip', 'vip_request', requestId, { vipDurationDays, vipLifetimeEnabled })
       await writeNotification(env, {
         audience: 'superadmin',
         type: 'vip_resolved',
@@ -256,14 +263,18 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
       await writeAuditLog(env, currentUser, 'reject_media_purchase', 'purchase_request', requestId)
     } else if (body.action === 'set-access' && userId && ['สมาชิก', 'VIP'].includes(String(body.access))) {
       const [siteSettings] = await sql`
-        select coalesce((value->>'vipDurationDays')::int, 30) as vip_duration_days
+        select
+          coalesce((value->>'vipDurationDays')::int, 30) as vip_duration_days,
+          coalesce((value->>'vipLifetimeEnabled')::boolean, false) as vip_lifetime_enabled
         from app_settings where key = 'site' limit 1
       `
       const vipDurationDays = Math.min(3650, Math.max(1, Number(siteSettings?.vip_duration_days ?? 30)))
+      const vipLifetimeEnabled = Boolean(siteSettings?.vip_lifetime_enabled)
       const [updated] = await sql`
         update users
         set access_level = ${body.access},
             vip_expires_at = case
+              when ${body.access} = 'VIP' and ${vipLifetimeEnabled} then null
               when ${body.access} = 'VIP' then coalesce(vip_expires_at, now() + make_interval(days => ${vipDurationDays}))
               else null
             end,
@@ -271,7 +282,7 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
         where id = ${userId} and role <> 'superadmin' returning id
       `
       if (!updated) return Response.json({ ok: false, error: 'ไม่พบสมาชิกที่แก้ไขสิทธิ์ได้' }, { status: 404 })
-      await writeAuditLog(env, currentUser, 'set_user_access', 'user', userId, { access: body.access, vipDurationDays })
+      await writeAuditLog(env, currentUser, 'set_user_access', 'user', userId, { access: body.access, vipDurationDays, vipLifetimeEnabled })
     } else if (body.action === 'extend-vip' && userId) {
       const days = Number(body.days)
       if (!Number.isInteger(days) || days < 1 || days > 3650) {
@@ -302,6 +313,15 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
       `
       if (!updated) return Response.json({ ok: false, error: 'ไม่พบสมาชิกที่กำหนดวันหมดอายุได้' }, { status: 404 })
       await writeAuditLog(env, currentUser, 'set_user_vip_expiry', 'user', userId, { vipExpiresAt: updated.vip_expires_at })
+    } else if (body.action === 'set-vip-lifetime' && userId) {
+      const [updated] = await sql`
+        update users
+        set access_level = 'VIP', vip_expires_at = null, status = 'active', updated_at = now()
+        where id = ${userId} and role <> 'superadmin'
+        returning id
+      `
+      if (!updated) return Response.json({ ok: false, error: 'ไม่พบสมาชิกที่กำหนด VIP ตลอดชีพได้' }, { status: 404 })
+      await writeAuditLog(env, currentUser, 'set_user_vip_lifetime', 'user', userId)
     } else if (body.action === 'grant-purchase' && userId && mediaId) {
       const [media] = await sql`select id, price from media where id = ${mediaId} and access_level = 'ซื้อแยก' limit 1`
       if (!media) return Response.json({ ok: false, error: 'ไม่พบสื่อซื้อแยกที่ต้องการให้สิทธิ์' }, { status: 404 })

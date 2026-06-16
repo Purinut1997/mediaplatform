@@ -21,7 +21,7 @@ export type Env = {
 }
 
 let schemaReady = false
-const SCHEMA_VERSION = '2026.06.14.12'
+const SCHEMA_VERSION = '2026.06.16.1'
 
 export function getSql(env: Env) {
   if (!env.DATABASE_URL) {
@@ -35,7 +35,6 @@ export async function ensureSchema(env: Env) {
   if (schemaReady) return
 
   const sql = getSql(env)
-  let existingVersion = ''
   try {
     const [state] = await sql`
       select value->>'version' as version
@@ -43,23 +42,12 @@ export async function ensureSchema(env: Env) {
       where key = 'schema_version'
       limit 1
     `
-    existingVersion = String(state?.version ?? '')
     if (state?.version === SCHEMA_VERSION) {
       schemaReady = true
       return
     }
   } catch {
     // First deployment continues into the idempotent schema bootstrap below.
-  }
-
-  if (existingVersion) {
-    await sql`
-      insert into app_settings (key, value, updated_at)
-      values ('schema_version', ${JSON.stringify({ version: SCHEMA_VERSION })}::jsonb, now())
-      on conflict (key) do update set value = excluded.value, updated_at = now()
-    `
-    schemaReady = true
-    return
   }
 
   await sql`
@@ -264,6 +252,7 @@ export async function ensureSchema(env: Env) {
       email text not null,
       phone text,
       slip_name text,
+      slip_data_url text,
       status text not null default 'pending' check (status in ('pending', 'approved', 'rejected')),
       created_at timestamptz not null default now(),
       updated_at timestamptz not null default now()
@@ -338,6 +327,7 @@ export async function ensureSchema(env: Env) {
       or status not in ('active', 'disabled')
   `
   await sql`alter table users add column if not exists vip_expires_at timestamptz`
+  await sql`alter table vip_requests add column if not exists slip_data_url text`
   await sql`
     update vip_requests
     set status = 'pending'
@@ -585,6 +575,7 @@ async function seedSettings(env: Env) {
         footerSystemTitle: 'ระบบ',
         footerSystemText: 'Public · Member · VIP · Admin',
         vipPrice: 0,
+        vipLifetimeEnabled: false,
         vipQrUrl: '',
         vipBankName: 'พร้อมเพย์ (PromptPay)',
         vipAccountNumber: '',
@@ -618,6 +609,7 @@ async function seedSettings(env: Env) {
           footerSystemTitle: 'ระบบ',
           footerSystemText: 'Public · Member · VIP · Admin',
           vipPrice: 0,
+          vipLifetimeEnabled: false,
           vipPaymentTitle: 'ข้อมูลการชำระเงิน VIP',
           vipPaymentSubtitle: 'กรุณาโอนเงินและแนบสลิปเพื่อยืนยันสิทธิ์',
           vipSlipLabel: 'แนบสลิปโอนเงิน',

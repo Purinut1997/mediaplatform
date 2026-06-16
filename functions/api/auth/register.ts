@@ -5,6 +5,7 @@ import { ensureSchema, getSql, hashPassword, type Env } from '../../_lib/db'
 import { boundedText, InputValidationError, normalizedEmail, passwordInput } from '../../_lib/input'
 import { notifyTelegram } from '../../_lib/notify'
 import { writeNotification } from '../../_lib/notifications'
+import { paymentProofDataUrl } from '../../_lib/payment-proof'
 import { enforceRateLimits, rateLimitResponse, requestIp } from '../../_lib/rate-limit'
 
 type RegisterPayload = BotCheckPayload & {
@@ -14,6 +15,7 @@ type RegisterPayload = BotCheckPayload & {
   password?: string
   membership?: 'member' | 'vip'
   slipName?: string
+  slipDataUrl?: string
 }
 
 function readRegisterInput(body: RegisterPayload) {
@@ -23,6 +25,7 @@ function readRegisterInput(body: RegisterPayload) {
     password: passwordInput(body.password),
     phone: boundedText(body.phone, 'เบอร์โทรศัพท์', { max: 30 }),
     slipName: boundedText(body.slipName, 'ชื่อไฟล์สลิป', { max: 200 }),
+    slipDataUrl: paymentProofDataUrl(body.slipDataUrl),
   }
 }
 
@@ -39,7 +42,7 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
       { status: 400 },
     )
   }
-  const { name, email, password, phone, slipName } = input
+  const { name, email, password, phone, slipName, slipDataUrl } = input
   const membership = body.membership === 'vip' ? 'vip' : 'member'
   const rateLimit = await enforceRateLimits(env, [
     {
@@ -60,13 +63,18 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
 
   if (membership === 'vip') {
     const [settings] = await sql`
-      select coalesce((value->>'vipRegistrationEnabled')::boolean, false) as enabled
+      select
+        coalesce((value->>'vipRegistrationEnabled')::boolean, false) as enabled,
+        coalesce((value->>'vipPrice')::int, 0) as price
       from app_settings
       where key = 'site'
       limit 1
     `
     if (!settings?.enabled) {
       return Response.json({ ok: false, error: 'ขณะนี้ระบบยังไม่เปิดรับสมัคร VIP' }, { status: 403 })
+    }
+    if (Number(settings.price ?? 0) > 0 && (!slipName || !slipDataUrl)) {
+      return Response.json({ ok: false, error: 'กรุณาแนบหลักฐานการโอนก่อนสมัคร VIP' }, { status: 400 })
     }
   }
 
@@ -90,8 +98,8 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
     `,
     ...(membership === 'vip'
       ? [tx`
-          insert into vip_requests (user_id, name, email, phone, slip_name)
-          select id, ${name}, ${email}, ${phone || null}, ${slipName || null}
+          insert into vip_requests (user_id, name, email, phone, slip_name, slip_data_url)
+          select id, ${name}, ${email}, ${phone || null}, ${slipName || null}, ${slipDataUrl || null}
           from users where lower(email) = ${email}
         `]
       : []),

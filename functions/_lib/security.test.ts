@@ -90,6 +90,23 @@ describe('API middleware', () => {
     expect(called).toBe(false)
   })
 
+  it('allows larger proof uploads on VIP request endpoints', async () => {
+    let called = false
+    const response = await apiMiddleware({
+      request: new Request('https://example.com/api/member/vip', {
+        method: 'POST',
+        headers: { 'Content-Length': '900000' },
+      }),
+      next: async () => {
+        called = true
+        return Response.json({ ok: true })
+      },
+    })
+
+    expect(response.status).toBe(200)
+    expect(called).toBe(true)
+  })
+
   it('adds hardened browser headers to API responses', async () => {
     const response = await apiMiddleware({
       request: new Request('https://example.com/api/health'),

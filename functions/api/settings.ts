@@ -22,6 +22,7 @@ type SiteSettings = {
   maintenanceMessage: string
   vipRegistrationEnabled: boolean
   vipPrice: number
+  vipLifetimeEnabled: boolean
   vipDurationDays: number
   vipRefundDays: number
   purchaseEnabled: boolean
@@ -59,6 +60,7 @@ const defaultSettings: SiteSettings = {
   maintenanceMessage: 'กรุณากลับมาใหม่ภายหลัง',
   vipRegistrationEnabled: false,
   vipPrice: 0,
+  vipLifetimeEnabled: false,
   vipDurationDays: 30,
   vipRefundDays: 7,
   purchaseEnabled: false,
@@ -85,6 +87,7 @@ function normalizeSettings(value?: Partial<SiteSettings>) {
     vipRegistrationEnabled: Boolean(value?.vipRegistrationEnabled),
     purchaseEnabled: Boolean(value?.purchaseEnabled),
     maintenanceEnabled: Boolean(value?.maintenanceEnabled),
+    vipLifetimeEnabled: Boolean(value?.vipLifetimeEnabled),
     vipPrice: Number.isInteger(legacyPrice) && legacyPrice >= 0 && legacyPrice <= 10_000_000 ? legacyPrice : 0,
     vipDurationDays: boundedInteger(value?.vipDurationDays ?? defaultSettings.vipDurationDays, 'อายุ VIP', { min: 1, max: 3650 }),
     vipRefundDays: boundedInteger(value?.vipRefundDays ?? defaultSettings.vipRefundDays, 'ระยะเวลาขอคืนเงิน VIP', { max: 365 }),
@@ -114,6 +117,7 @@ function readSettings(body: Partial<SiteSettings>): SiteSettings {
     maintenanceMessage: boundedText(body.maintenanceMessage ?? defaultSettings.maintenanceMessage, 'ข้อความปิดปรับปรุง', { max: 500 }),
     vipRegistrationEnabled: Boolean(body.vipRegistrationEnabled),
     vipPrice: boundedInteger(body.vipPrice ?? defaultSettings.vipPrice, 'ราคา VIP', { max: 10_000_000 }),
+    vipLifetimeEnabled: Boolean(body.vipLifetimeEnabled),
     vipDurationDays: boundedInteger(body.vipDurationDays ?? defaultSettings.vipDurationDays, 'อายุ VIP', { min: 1, max: 3650 }),
     vipRefundDays: boundedInteger(body.vipRefundDays ?? defaultSettings.vipRefundDays, 'ระยะเวลาขอคืนเงิน VIP', { max: 365 }),
     purchaseEnabled: Boolean(body.purchaseEnabled),

@@ -341,8 +341,8 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
       const createdAt = text(requestRow.created_at) || new Date().toISOString()
       if (!email || !text(requestRow.name)) continue
       await sql`
-        insert into vip_requests (user_id, name, email, phone, slip_name, status, created_at, updated_at)
-        select null, ${text(requestRow.name)}, ${email}, ${text(requestRow.phone) || null}, ${text(requestRow.slip_name) || null}, ${choice(requestRow.status, VIP_STATUSES, 'pending')}, ${createdAt}, ${text(requestRow.updated_at) || createdAt}
+        insert into vip_requests (user_id, name, email, phone, slip_name, slip_data_url, status, created_at, updated_at)
+        select null, ${text(requestRow.name)}, ${email}, ${text(requestRow.phone) || null}, ${text(requestRow.slip_name) || null}, ${text(requestRow.slip_data_url) || null}, ${choice(requestRow.status, VIP_STATUSES, 'pending')}, ${createdAt}, ${text(requestRow.updated_at) || createdAt}
         where not exists (
           select 1 from vip_requests where lower(email) = ${email} and created_at = ${createdAt}
         )

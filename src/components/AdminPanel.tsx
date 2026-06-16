@@ -1475,6 +1475,17 @@ export function AdminPanel({
                           {request.slipName && (
                             <p className="mt-1 text-xs font-bold text-cyan-200">สลิป: {request.slipName}</p>
                           )}
+                          {request.slipDataUrl && (
+                            <a
+                              className="mt-2 inline-flex min-h-9 items-center gap-2 rounded-xl bg-cyan-300/10 px-3 text-xs font-black text-cyan-100"
+                              href={request.slipDataUrl}
+                              rel="noreferrer"
+                              target="_blank"
+                            >
+                              <ExternalLink size={14} />
+                              เปิดหลักฐานการโอน
+                            </a>
+                          )}
                         </div>
                         <Crown className="shrink-0 text-amber-300" size={22} />
                       </div>
@@ -1615,6 +1626,9 @@ export function AdminPanel({
                           <div className="min-w-0">
                             <p className="truncate font-black text-white">{user.name}</p>
                             <p className="truncate text-sm font-semibold text-slate-400">{user.email}</p>
+                            {user.access === 'VIP' && !user.vipExpiresAt && (
+                              <p className="mt-1 text-xs font-bold text-amber-200">VIP ตลอดชีพ</p>
+                            )}
                             {user.vipExpiresAt && (
                               <p className={`mt-1 text-xs font-bold ${vipExpired ? 'text-red-200' : vipExpiringSoon ? 'text-amber-200' : 'text-emerald-200'}`}>
                                 {vipExpired ? 'VIP หมดอายุ' : vipExpiringSoon ? 'VIP ใกล้หมดอายุ' : 'VIP ถึง'} {new Date(user.vipExpiresAt).toLocaleDateString('th-TH')}
@@ -1686,6 +1700,14 @@ export function AdminPanel({
                                 </button>
                               ))}
                             </div>
+                            <button
+                              className="mt-2 min-h-10 w-full rounded-xl bg-amber-300/15 px-3 text-sm font-black text-amber-100 disabled:opacity-40"
+                              disabled={loadingMembers}
+                              onClick={() => void submitMemberAction({ action: 'set-vip-lifetime', userId: user.id })}
+                              type="button"
+                            >
+                              กำหนด VIP ตลอดชีพ
+                            </button>
                             <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_auto]">
                               <input
                                 className="min-h-11 rounded-xl border border-white/10 bg-black/20 px-3 font-bold text-white outline-none focus:border-cyan-300"
@@ -1926,6 +1948,14 @@ export function AdminPanel({
                 />
                 เปิดรับ VIP
               </label>
+              <label className="inline-flex min-h-11 items-center gap-3 rounded-2xl bg-amber-300/10 px-4 font-black text-amber-100">
+                <input
+                  checked={settingsForm.vipLifetimeEnabled}
+                  onChange={(event) => updateSettings('vipLifetimeEnabled', event.target.checked)}
+                  type="checkbox"
+                />
+                VIP ตลอดชีพ
+              </label>
             </div>
 
             <div className="grid gap-4 md:grid-cols-2">
@@ -1941,9 +1971,9 @@ export function AdminPanel({
                 label="อายุ VIP (วัน)"
                 name="vipDurationDays"
                 onChange={updateSettings}
-                placeholder="30"
+                placeholder={settingsForm.vipLifetimeEnabled ? 'ตลอดชีพ' : '30'}
                 type="number"
-                value={settingsForm.vipDurationDays}
+                value={settingsForm.vipLifetimeEnabled ? '' : settingsForm.vipDurationDays}
               />
               <AdminField
                 label="ขอคืนเงิน VIP ได้ภายใน (วัน)"

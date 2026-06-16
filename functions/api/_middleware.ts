@@ -10,7 +10,11 @@ export const onRequest = async ({ request, next }: Context) => {
   const origin = request.headers.get('Origin')
   const fetchSite = request.headers.get('Sec-Fetch-Site')
   const contentLength = Number(request.headers.get('Content-Length') ?? 0)
-  const maxBodyBytes = url.pathname === '/api/admin/restore' ? 25_000_000 : 512_000
+  const maxBodyBytes = url.pathname === '/api/admin/restore'
+    ? 25_000_000
+    : ['/api/auth/register', '/api/member/vip'].includes(url.pathname)
+      ? 1_250_000
+      : 512_000
 
   if (
     unsafeMethods.has(request.method) &&
