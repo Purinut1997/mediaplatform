@@ -35,6 +35,13 @@ export async function ensureSchema(env: Env) {
   if (schemaReady) return
 
   const sql = getSql(env)
+  const writeSchemaVersion = async () => {
+    await sql`
+      insert into app_settings (key, value, updated_at)
+      values ('schema_version', ${JSON.stringify({ version: SCHEMA_VERSION })}::jsonb, now())
+      on conflict (key) do update set value = excluded.value, updated_at = now()
+    `
+  }
   try {
     const [state] = await sql`
       select value->>'version' as version
@@ -43,6 +50,20 @@ export async function ensureSchema(env: Env) {
       limit 1
     `
     if (state?.version === SCHEMA_VERSION) {
+      schemaReady = true
+      return
+    }
+    if (state?.version) {
+      await sql`alter table users add column if not exists vip_expires_at timestamptz`
+      await sql`alter table vip_requests add column if not exists slip_data_url text`
+      await sql`
+        update app_settings
+        set value = jsonb_set(value, '{vipLifetimeEnabled}', 'false'::jsonb, true),
+            updated_at = now()
+        where key = 'site'
+          and not (value ? 'vipLifetimeEnabled')
+      `
+      await writeSchemaVersion()
       schemaReady = true
       return
     }
@@ -449,11 +470,7 @@ export async function ensureSchema(env: Env) {
   } catch (error) {
     console.error('Bootstrap admin failed', error)
   }
-  await sql`
-    insert into app_settings (key, value, updated_at)
-    values ('schema_version', ${JSON.stringify({ version: SCHEMA_VERSION })}::jsonb, now())
-    on conflict (key) do update set value = excluded.value, updated_at = now()
-  `
+  await writeSchemaVersion()
 
   schemaReady = true
 }
