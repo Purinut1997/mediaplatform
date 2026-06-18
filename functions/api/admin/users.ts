@@ -14,6 +14,7 @@ type AdminAction = {
   status?: 'active' | 'disabled'
   mediaId?: number
   days?: number
+  vipLifetime?: boolean
   vipExpiresAt?: string
 }
 
@@ -179,13 +180,21 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
           coalesce((value->>'vipLifetimeEnabled')::boolean, false) as vip_lifetime_enabled
         from app_settings where key = 'site' limit 1
       `
-      const vipDurationDays = Math.min(3650, Math.max(1, Number(siteSettings?.vip_duration_days ?? 30)))
-      const vipLifetimeEnabled = Boolean(siteSettings?.vip_lifetime_enabled)
+      const requestedDays = body.days === undefined ? Number(siteSettings?.vip_duration_days ?? 30) : Number(body.days)
+      if (!Number.isInteger(requestedDays) || requestedDays < 1 || requestedDays > 3650) {
+        return Response.json({ ok: false, error: 'อายุ VIP ต้องอยู่ระหว่าง 1-3,650 วัน' }, { status: 400 })
+      }
+      const vipDurationDays = requestedDays
+      const vipLifetimeEnabled = typeof body.vipLifetime === 'boolean'
+        ? body.vipLifetime
+        : Boolean(siteSettings?.vip_lifetime_enabled)
       const [vipRequest] = await sql`
         with approved as (
           update vip_requests
           set status = 'approved', updated_at = now()
-          where id = ${requestId} and status = 'pending'
+          where id = ${requestId}
+            and status = 'pending'
+            and coalesce(slip_data_url, '') <> ''
           returning user_id
         ),
         activated as (
@@ -204,7 +213,7 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
         select approved.user_id, activated.id as activated_user_id
         from approved left join activated on activated.id = approved.user_id
       `
-      if (!vipRequest) return Response.json({ ok: false, error: 'ไม่พบคำขอ VIP ที่รอตรวจสอบ' }, { status: 409 })
+      if (!vipRequest) return Response.json({ ok: false, error: 'ไม่พบคำขอ VIP ที่รอตรวจสอบหรือคำขอนี้ไม่มีหลักฐาน' }, { status: 409 })
       if (vipRequest.user_id && !vipRequest.activated_user_id) {
         throw new Error('VIP request user could not be activated')
       }

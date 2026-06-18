@@ -18,6 +18,7 @@ import {
 import { readJson } from '../lib/api'
 import { paymentProofAccept, paymentProofHelpText, readPaymentProof } from '../lib/payment-proof'
 import type { CurrentUser, MediaItem, MemberLibrary, SiteSettings, View } from '../types'
+import { VipTermsDialog } from './VipTermsDialog'
 
 export function MemberLibraryPanel({
   currentUser,
@@ -250,6 +251,10 @@ function MembershipUpgradePanel({
   }
 
   const submitRequest = async () => {
+    if (!slipDataUrl) {
+      setNotice('กรุณาแนบหลักฐานการชำระเงินก่อนส่งคำขอ VIP')
+      return
+    }
     setBusy(true)
     setNotice('')
     try {
@@ -323,16 +328,17 @@ function MembershipUpgradePanel({
         <div>
           <p className="inline-flex items-center gap-2 rounded-full bg-violet-100 px-3 py-1 text-xs font-black text-violet-800 dark:bg-violet-300/10 dark:text-violet-200">
             <Crown size={15} />
-            UPGRADE TO VIP
+            {settings.vipUpgradeBadge}
           </p>
-          <h2 className="mt-4 text-2xl font-black text-slate-950 dark:text-white">ปลดล็อกคลังสื่อขั้นสูงภายหลังได้ทุกเมื่อ</h2>
+          <h2 className="mt-4 text-2xl font-black text-slate-950 dark:text-white">{settings.vipUpgradeTitle}</h2>
           <p className="mt-2 font-semibold leading-7 text-slate-600 dark:text-slate-300">
-            ส่งคำขอจากบัญชีสมาชิกเดิม ประวัติและรายการโปรดทั้งหมดจะยังอยู่ครบ
+            {settings.vipUpgradeDescription}
           </p>
           <div className="mt-4 grid gap-2 text-sm font-bold text-slate-600 dark:text-slate-300">
-            <p className="inline-flex items-center gap-2"><CheckCircle2 className="text-emerald-500" size={17} />เข้าถึงสื่อสมาชิกและ VIP</p>
-            <p className="inline-flex items-center gap-2"><CheckCircle2 className="text-emerald-500" size={17} />อายุสิทธิ์ {vipDurationText}</p>
-            <p className="inline-flex items-center gap-2"><CheckCircle2 className="text-emerald-500" size={17} />ติดตามสถานะคำขอได้จากหน้านี้</p>
+            {settings.vipUpgradeBenefits.split(/\r?\n/).filter(Boolean).map((benefit) => (
+              <p className="inline-flex items-center gap-2" key={benefit}><CheckCircle2 className="shrink-0 text-emerald-500" size={17} />{benefit}</p>
+            ))}
+            <p className="inline-flex items-center gap-2"><CalendarDays className="shrink-0 text-violet-500" size={17} />อายุสิทธิ์ {vipDurationText}</p>
           </div>
           {request?.status === 'rejected' && (
             <p className="mt-4 inline-flex items-start gap-2 rounded-2xl border border-red-200 bg-red-50 p-3 text-sm font-bold text-red-700 dark:border-red-300/20 dark:bg-red-400/10 dark:text-red-200">
@@ -368,12 +374,15 @@ function MembershipUpgradePanel({
                 <input accept={paymentProofAccept()} className="hidden" onChange={(event) => void selectSlip(event.target.files?.[0])} type="file" />
               </label>
             </div>
+            <p className={`mt-2 text-xs font-black ${slipDataUrl ? 'text-emerald-600 dark:text-emerald-300' : 'text-amber-600 dark:text-amber-300'}`}>
+              {slipDataUrl ? `แนบหลักฐานแล้ว: ${slipName}` : `จำเป็นต้องแนบหลักฐาน (${paymentProofHelpText()})`}
+            </p>
             <label className="mt-4 flex items-start gap-3 text-sm font-bold text-slate-600 dark:text-slate-300">
               <input checked={agree} className="mt-1 h-4 w-4" onChange={(event) => setAgree(event.target.checked)} type="checkbox" />
-              {settings.vipAgreementLabel}
+              <span>{settings.vipAgreementLabel} <VipTermsDialog settings={settings} /></span>
             </label>
             {notice && <p className="mt-3 rounded-2xl bg-slate-100 p-3 text-sm font-bold text-slate-700 dark:bg-white/[0.06] dark:text-slate-200">{notice}</p>}
-            <button className="mt-4 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-violet-500 to-blue-500 px-5 font-black text-white shadow-lg shadow-violet-500/20 disabled:opacity-60" disabled={busy || !agree} onClick={() => void submitRequest()} type="button">
+            <button className="mt-4 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-violet-500 to-blue-500 px-5 font-black text-white shadow-lg shadow-violet-500/20 disabled:opacity-60" disabled={busy || !agree || !slipDataUrl} onClick={() => void submitRequest()} type="button">
               {busy ? <Loader2 className="animate-spin" size={19} /> : <Send size={19} />}
               ส่งคำขอสมัคร VIP
             </button>

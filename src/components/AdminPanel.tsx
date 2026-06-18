@@ -130,6 +130,7 @@ export function AdminPanel({
   const [editingVipUserId, setEditingVipUserId] = useState<number | null>(null)
   const [vipExpiryDate, setVipExpiryDate] = useState('')
   const [vipRequests, setVipRequests] = useState<VipRequest[]>([])
+  const [vipApprovalOptions, setVipApprovalOptions] = useState<Record<number, { days: string; lifetime: boolean }>>({})
   const [purchaseRequests, setPurchaseRequests] = useState<PurchaseRequest[]>([])
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([])
   const [activityPage, setActivityPage] = useState(1)
@@ -1486,14 +1487,45 @@ export function AdminPanel({
                               เปิดหลักฐานการโอน
                             </a>
                           )}
+                          {!request.hasSlipData && (
+                            <p className="mt-2 rounded-xl bg-red-400/10 px-3 py-2 text-xs font-black text-red-200">ไม่มีหลักฐานแนบมา — ไม่สามารถอนุมัติได้</p>
+                          )}
                         </div>
                         <Crown className="shrink-0 text-amber-300" size={22} />
                       </div>
-                      <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                      <div className="mt-4 rounded-2xl border border-cyan-300/15 bg-black/20 p-3">
+                        <p className="text-xs font-black text-cyan-100">ระยะสิทธิ์หลังอนุมัติ</p>
+                        <div className="mt-2 grid gap-2 sm:grid-cols-[1fr_auto]">
+                          <input
+                            className="min-h-10 rounded-xl border border-white/10 bg-black/20 px-3 text-sm font-bold text-white outline-none disabled:opacity-40"
+                            disabled={vipApprovalOptions[request.id]?.lifetime ?? settings.vipLifetimeEnabled}
+                            max={3650}
+                            min={1}
+                            onChange={(event) => setVipApprovalOptions((current) => ({ ...current, [request.id]: { days: event.target.value, lifetime: current[request.id]?.lifetime ?? settings.vipLifetimeEnabled } }))}
+                            type="number"
+                            value={vipApprovalOptions[request.id]?.days ?? String(settings.vipDurationDays)}
+                          />
+                          <label className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-amber-300/10 px-3 text-xs font-black text-amber-100">
+                            <input
+                              checked={vipApprovalOptions[request.id]?.lifetime ?? settings.vipLifetimeEnabled}
+                              onChange={(event) => setVipApprovalOptions((current) => ({ ...current, [request.id]: { days: current[request.id]?.days ?? String(settings.vipDurationDays), lifetime: event.target.checked } }))}
+                              type="checkbox"
+                            />
+                            ตลอดชีพ
+                          </label>
+                        </div>
+                        <p className="mt-2 text-xs font-semibold text-slate-400">กำหนดได้ 1–3,650 วัน หรือเลือกตลอดชีพสำหรับคำขอนี้</p>
+                      </div>
+                      <div className="mt-3 grid gap-2 sm:grid-cols-2">
                         <button
                           className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-emerald-300 px-3 font-black text-slate-950 disabled:opacity-60"
-                          disabled={loadingMembers}
-                          onClick={() => submitMemberAction({ action: 'approve-vip', requestId: request.id })}
+                          disabled={loadingMembers || !request.hasSlipData}
+                          onClick={() => submitMemberAction({
+                            action: 'approve-vip',
+                            requestId: request.id,
+                            days: Number(vipApprovalOptions[request.id]?.days ?? settings.vipDurationDays),
+                            vipLifetime: vipApprovalOptions[request.id]?.lifetime ?? settings.vipLifetimeEnabled,
+                          })}
                           type="button"
                         >
                           <CheckCircle2 size={18} />
@@ -1992,6 +2024,28 @@ export function AdminPanel({
                 value={settingsForm.paymentReviewHours}
               />
               <AdminField
+                label="ป้ายบนการ์ด VIP"
+                name="vipUpgradeBadge"
+                onChange={updateSettings}
+                placeholder="UPGRADE TO VIP"
+                value={settingsForm.vipUpgradeBadge}
+              />
+              <AdminField
+                label="หัวข้อแนะนำ VIP"
+                name="vipUpgradeTitle"
+                onChange={updateSettings}
+                placeholder="ปลดล็อกคลังสื่อขั้นสูงภายหลังได้ทุกเมื่อ"
+                value={settingsForm.vipUpgradeTitle}
+              />
+              <label className="md:col-span-2">
+                <span className="text-sm font-black text-slate-200">คำอธิบายการ์ด VIP</span>
+                <textarea className="mt-2 min-h-20 w-full rounded-2xl border border-white/10 bg-black/24 px-4 py-3 text-base text-white outline-none focus:border-pink-300" maxLength={500} onChange={(event) => updateSettings('vipUpgradeDescription', event.target.value)} value={settingsForm.vipUpgradeDescription} />
+              </label>
+              <label className="md:col-span-2">
+                <span className="text-sm font-black text-slate-200">รายการจุดเด่น VIP (หนึ่งบรรทัดต่อหนึ่งข้อ)</span>
+                <textarea className="mt-2 min-h-28 w-full rounded-2xl border border-white/10 bg-black/24 px-4 py-3 text-base text-white outline-none focus:border-pink-300" maxLength={1000} onChange={(event) => updateSettings('vipUpgradeBenefits', event.target.value)} value={settingsForm.vipUpgradeBenefits} />
+              </label>
+              <AdminField
                 label="URL QR Code"
                 name="vipQrUrl"
                 onChange={updateSettings}
@@ -2054,6 +2108,17 @@ export function AdminPanel({
                 placeholder="ลงทะเบียนสมาชิก"
                 value={settingsForm.vipSubmitLabel}
               />
+              <label className="md:col-span-2">
+                <span className="text-sm font-black text-slate-200">เงื่อนไขการสมัครและใช้สิทธิ์ VIP</span>
+                <textarea
+                  className="mt-2 min-h-56 w-full rounded-2xl border border-white/10 bg-black/24 px-4 py-3 text-base text-white outline-none transition placeholder:text-slate-500 focus:border-pink-300 focus:ring-4 focus:ring-pink-300/10"
+                  maxLength={5000}
+                  onChange={(event) => updateSettings('vipTermsText', event.target.value)}
+                  placeholder="ระบุเงื่อนไขสิทธิ์ การใช้บัญชี หลักฐาน และการคืนเงิน"
+                  value={settingsForm.vipTermsText}
+                />
+                <span className="mt-2 block text-xs font-semibold text-slate-400">สมาชิกจะกดอ่านเนื้อหานี้ได้ก่อนติ๊กยอมรับเงื่อนไข</span>
+              </label>
               <label className="flex min-h-12 items-center gap-3 rounded-2xl border border-white/10 bg-black/24 px-4 font-black text-slate-200">
                 <input
                   checked={settingsForm.purchaseEnabled}

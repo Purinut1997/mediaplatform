@@ -25,6 +25,11 @@ type SiteSettings = {
   vipLifetimeEnabled: boolean
   vipDurationDays: number
   vipRefundDays: number
+  vipUpgradeBadge: string
+  vipUpgradeTitle: string
+  vipUpgradeDescription: string
+  vipUpgradeBenefits: string
+  vipTermsText: string
   purchaseEnabled: boolean
   purchaseRefundDays: number
   orderExpiryHours: number
@@ -63,6 +68,11 @@ const defaultSettings: SiteSettings = {
   vipLifetimeEnabled: false,
   vipDurationDays: 30,
   vipRefundDays: 7,
+  vipUpgradeBadge: 'UPGRADE TO VIP',
+  vipUpgradeTitle: 'ปลดล็อกคลังสื่อขั้นสูงภายหลังได้ทุกเมื่อ',
+  vipUpgradeDescription: 'ส่งคำขอจากบัญชีสมาชิกเดิม ประวัติและรายการโปรดทั้งหมดจะยังอยู่ครบ',
+  vipUpgradeBenefits: 'เข้าถึงสื่อสมาชิกและ VIP\nรับสิทธิ์ตามระยะเวลาที่ผู้ดูแลอนุมัติ\nติดตามสถานะคำขอได้จากหน้านี้',
+  vipTermsText: '1. สิทธิ์ VIP ผูกกับบัญชีผู้สมัครและห้ามโอน ให้ยืม จำหน่ายต่อ หรือเผยแพร่สื่อแก่บุคคลอื่น\n2. ระยะเวลาสิทธิ์เริ่มนับหลังผู้ดูแลตรวจสอบหลักฐานและอนุมัติคำขอแล้ว\n3. ผู้สมัครต้องแนบหลักฐานการชำระเงินที่ถูกต้อง ชัดเจน และเป็นรายการจริง\n4. การส่งข้อมูลหรือหลักฐานอันเป็นเท็จอาจทำให้คำขอถูกปฏิเสธ ระงับสิทธิ์ หรือปิดบัญชี\n5. การขอคืนเงินเป็นไปตามระยะเวลาที่ระบบแสดง และขึ้นอยู่กับการใช้งานสิทธิ์จริงรวมถึงข้อกำหนดตามกฎหมาย\n6. ผู้ดูแลอาจปรับปรุงบริการหรือเงื่อนไข โดยจะแจ้งข้อความฉบับปัจจุบันให้ตรวจสอบก่อนยอมรับ\n7. เมื่อเลือกยอมรับ ถือว่าผู้สมัครได้อ่าน เข้าใจ และยอมรับเงื่อนไขฉบับนี้แล้ว',
   purchaseEnabled: false,
   purchaseRefundDays: 7,
   orderExpiryHours: 24,
@@ -120,6 +130,11 @@ function readSettings(body: Partial<SiteSettings>): SiteSettings {
     vipLifetimeEnabled: Boolean(body.vipLifetimeEnabled),
     vipDurationDays: boundedInteger(body.vipDurationDays ?? defaultSettings.vipDurationDays, 'อายุ VIP', { min: 1, max: 3650 }),
     vipRefundDays: boundedInteger(body.vipRefundDays ?? defaultSettings.vipRefundDays, 'ระยะเวลาขอคืนเงิน VIP', { max: 365 }),
+    vipUpgradeBadge: boundedText(body.vipUpgradeBadge ?? defaultSettings.vipUpgradeBadge, 'ป้ายหัวข้อ VIP', { min: 1, max: 80 }),
+    vipUpgradeTitle: boundedText(body.vipUpgradeTitle ?? defaultSettings.vipUpgradeTitle, 'หัวข้อแนะนำ VIP', { min: 1, max: 180 }),
+    vipUpgradeDescription: boundedText(body.vipUpgradeDescription ?? defaultSettings.vipUpgradeDescription, 'คำอธิบาย VIP', { max: 500 }),
+    vipUpgradeBenefits: boundedText(body.vipUpgradeBenefits ?? defaultSettings.vipUpgradeBenefits, 'รายการสิทธิประโยชน์ VIP', { max: 1000 }),
+    vipTermsText: boundedText(body.vipTermsText ?? defaultSettings.vipTermsText, 'เงื่อนไข VIP', { min: 1, max: 5000 }),
     purchaseEnabled: Boolean(body.purchaseEnabled),
     purchaseRefundDays: boundedInteger(body.purchaseRefundDays ?? defaultSettings.purchaseRefundDays, 'ระยะเวลาขอคืนเงินซื้อแยก', { max: 365 }),
     orderExpiryHours: boundedInteger(body.orderExpiryHours ?? defaultSettings.orderExpiryHours, 'อายุคำสั่งซื้อ', { min: 1, max: 720 }),

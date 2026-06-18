@@ -64,8 +64,7 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
   if (membership === 'vip') {
     const [settings] = await sql`
       select
-        coalesce((value->>'vipRegistrationEnabled')::boolean, false) as enabled,
-        coalesce((value->>'vipPrice')::int, 0) as price
+        coalesce((value->>'vipRegistrationEnabled')::boolean, false) as enabled
       from app_settings
       where key = 'site'
       limit 1
@@ -73,7 +72,7 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
     if (!settings?.enabled) {
       return Response.json({ ok: false, error: 'ขณะนี้ระบบยังไม่เปิดรับสมัคร VIP' }, { status: 403 })
     }
-    if (Number(settings.price ?? 0) > 0 && (!slipName || !slipDataUrl)) {
+    if (!slipName || !slipDataUrl) {
       return Response.json({ ok: false, error: 'กรุณาแนบหลักฐานการโอนก่อนสมัคร VIP' }, { status: 400 })
     }
   }

@@ -277,6 +277,11 @@ export type SiteSettings = {
   vipLifetimeEnabled: boolean
   vipDurationDays: number
   vipRefundDays: number
+  vipUpgradeBadge: string
+  vipUpgradeTitle: string
+  vipUpgradeDescription: string
+  vipUpgradeBenefits: string
+  vipTermsText: string
   purchaseEnabled: boolean
   purchaseRefundDays: number
   orderExpiryHours: number

@@ -39,6 +39,7 @@ import { AuthBotCheck } from './components/AuthBotCheck'
 import { Header, Hero, MaintenanceScreen } from './components/PublicShell'
 import { MemberLibraryPanel } from './components/MemberLibrary'
 import { MediaDetail } from './components/MediaDetail'
+import { VipTermsDialog } from './components/VipTermsDialog'
 import { defaultSiteSettings, mediaItems, topics } from './defaults'
 import './App.css'
 
@@ -1240,6 +1241,11 @@ function RegisterPanel({
       return
     }
 
+    if (form.membership === 'vip' && !slipDataUrl) {
+      setError('กรุณาแนบหลักฐานการชำระเงินก่อนสมัคร VIP')
+      return
+    }
+
     setSubmitting(true)
     try {
       const response = await fetch('/api/auth/register', {
@@ -1462,6 +1468,9 @@ function RegisterPanel({
                   <span className="mt-2 block text-xs font-bold text-slate-500 dark:text-slate-400">
                     {slipName || `${slipLabel} (${paymentProofHelpText()})`}
                   </span>
+                  <span className={`mt-2 block text-xs font-black ${slipDataUrl ? 'text-emerald-600 dark:text-emerald-300' : 'text-amber-600 dark:text-amber-300'}`}>
+                    {slipDataUrl ? `แนบหลักฐานแล้ว: ${slipName}` : 'จำเป็นต้องแนบหลักฐานก่อนสมัคร VIP'}
+                  </span>
                 </label>
               </div>
             </div>
@@ -1493,7 +1502,10 @@ function RegisterPanel({
             onChange={(event) => setAgree(event.target.checked)}
             type="checkbox"
           />
-          {settings.vipAgreementLabel}
+          <span>
+            {vipSelected ? settings.vipAgreementLabel : 'ข้อมูลสมัครสมาชิกถูกต้อง'}{' '}
+            {vipSelected && <VipTermsDialog settings={settings} />}
+          </span>
         </label>
 
         {error && (
