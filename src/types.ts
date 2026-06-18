@@ -287,6 +287,13 @@ export type SiteSettings = {
   orderExpiryHours: number
   paymentReviewHours: number
   commercePolicyText: string
+  refundRequestEnabled: boolean
+  refundContactTitle: string
+  refundInstructions: string
+  refundFormUrl: string
+  refundContactEmail: string
+  refundLineUrl: string
+  refundContactPhone: string
   vipQrUrl: string
   vipBankName: string
   vipAccountNumber: string

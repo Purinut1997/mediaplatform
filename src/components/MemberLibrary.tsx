@@ -19,6 +19,7 @@ import { readJson } from '../lib/api'
 import { paymentProofAccept, paymentProofHelpText, readPaymentProof } from '../lib/payment-proof'
 import type { CurrentUser, MediaItem, MemberLibrary, SiteSettings, View } from '../types'
 import { VipTermsDialog } from './VipTermsDialog'
+import { RefundSupport } from './RefundSupport'
 
 export function MemberLibraryPanel({
   currentUser,
@@ -146,6 +147,8 @@ export function MemberLibraryPanel({
       </div>
 
       <AccountSecurity currentUser={currentUser} onLogout={onLogout} onUserUpdated={onUserUpdated} />
+
+      <RefundSupport settings={settings} />
 
       {purchases.length > 0 && (
         <section className="mt-8 rounded-3xl border border-amber-200/80 bg-amber-50/75 p-5 shadow-lg backdrop-blur dark:border-amber-300/15 dark:bg-amber-300/[0.06]">

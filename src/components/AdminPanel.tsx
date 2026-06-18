@@ -2143,6 +2143,60 @@ export function AdminPanel({
                 type="number"
                 value={settingsForm.orderExpiryHours}
               />
+              <label className="flex min-h-12 items-center gap-3 rounded-2xl border border-rose-300/20 bg-rose-300/10 px-4 font-black text-rose-100">
+                <input
+                  checked={settingsForm.refundRequestEnabled}
+                  onChange={(event) => updateSettings('refundRequestEnabled', event.target.checked)}
+                  type="checkbox"
+                />
+                แสดงศูนย์ขอคืนเงินในหน้าสมาชิก
+              </label>
+              <AdminField
+                label="หัวข้อศูนย์ขอคืนเงิน"
+                name="refundContactTitle"
+                onChange={updateSettings}
+                placeholder="ศูนย์ช่วยเหลือและขอคืนเงิน"
+                value={settingsForm.refundContactTitle}
+              />
+              <AdminField
+                label="URL แบบฟอร์มขอคืนเงิน"
+                name="refundFormUrl"
+                onChange={updateSettings}
+                placeholder="https://forms.google.com/..."
+                value={settingsForm.refundFormUrl}
+              />
+              <AdminField
+                label="อีเมลรับคำขอคืนเงิน"
+                name="refundContactEmail"
+                onChange={updateSettings}
+                placeholder="support@example.com"
+                type="email"
+                value={settingsForm.refundContactEmail}
+              />
+              <AdminField
+                label="URL LINE สำหรับติดต่อ"
+                name="refundLineUrl"
+                onChange={updateSettings}
+                placeholder="https://line.me/..."
+                value={settingsForm.refundLineUrl}
+              />
+              <AdminField
+                label="เบอร์โทรติดต่อคืนเงิน"
+                name="refundContactPhone"
+                onChange={updateSettings}
+                placeholder="08x-xxx-xxxx"
+                value={settingsForm.refundContactPhone}
+              />
+              <label className="md:col-span-2">
+                <span className="text-sm font-black text-slate-200">คำแนะนำก่อนส่งคำขอคืนเงิน</span>
+                <textarea
+                  className="mt-2 min-h-28 w-full rounded-2xl border border-white/10 bg-black/24 px-4 py-3 text-base text-white outline-none transition placeholder:text-slate-500 focus:border-rose-300 focus:ring-4 focus:ring-rose-300/10"
+                  maxLength={1500}
+                  onChange={(event) => updateSettings('refundInstructions', event.target.value)}
+                  placeholder="แจ้งข้อมูลที่สมาชิกควรเตรียมและข้อควรระวัง"
+                  value={settingsForm.refundInstructions}
+                />
+              </label>
               <label className="md:col-span-2">
                 <span className="text-sm font-black text-slate-200">เงื่อนไขการซื้อและคืนเงิน</span>
                 <textarea

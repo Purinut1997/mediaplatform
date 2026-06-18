@@ -35,6 +35,13 @@ type SiteSettings = {
   orderExpiryHours: number
   paymentReviewHours: number
   commercePolicyText: string
+  refundRequestEnabled: boolean
+  refundContactTitle: string
+  refundInstructions: string
+  refundFormUrl: string
+  refundContactEmail: string
+  refundLineUrl: string
+  refundContactPhone: string
   vipQrUrl: string
   vipBankName: string
   vipAccountNumber: string
@@ -78,6 +85,13 @@ const defaultSettings: SiteSettings = {
   orderExpiryHours: 24,
   paymentReviewHours: 24,
   commercePolicyText: 'สิทธิ์ผูกกับบัญชีผู้ซื้อ ห้ามเผยแพร่หรือจำหน่ายต่อ การคืนเงินพิจารณาตามเงื่อนไขที่แสดงก่อนชำระเงิน',
+  refundRequestEnabled: true,
+  refundContactTitle: 'ศูนย์ช่วยเหลือและขอคืนเงิน',
+  refundInstructions: 'กรุณาแจ้งอีเมลบัญชี รายการหรือสื่อที่ต้องการคืนเงิน วันที่ชำระเงิน เหตุผล และหลักฐานที่เกี่ยวข้อง ผู้ดูแลจะตรวจสอบตามลำดับโดยไม่ขอรหัสผ่านหรือข้อมูลบัตรของคุณ',
+  refundFormUrl: '',
+  refundContactEmail: '',
+  refundLineUrl: '',
+  refundContactPhone: '',
   vipQrUrl: '',
   vipBankName: 'พร้อมเพย์ (PromptPay)',
   vipAccountNumber: '',
@@ -87,6 +101,14 @@ const defaultSettings: SiteSettings = {
   vipSlipLabel: 'แนบสลิปโอนเงิน',
   vipAgreementLabel: 'ข้อมูลถูกต้องและยอมรับเงื่อนไขการใช้งาน',
   vipSubmitLabel: 'ลงทะเบียนสมาชิก',
+}
+
+function optionalEmail(value: unknown) {
+  const email = boundedText(value, 'อีเมลติดต่อคืนเงิน', { max: 160 }).toLowerCase()
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    throw new InputValidationError('รูปแบบอีเมลติดต่อคืนเงินไม่ถูกต้อง')
+  }
+  return email
 }
 
 function normalizeSettings(value?: Partial<SiteSettings>) {
@@ -104,6 +126,9 @@ function normalizeSettings(value?: Partial<SiteSettings>) {
     purchaseRefundDays: boundedInteger(value?.purchaseRefundDays ?? defaultSettings.purchaseRefundDays, 'ระยะเวลาขอคืนเงินซื้อแยก', { max: 365 }),
     orderExpiryHours: boundedInteger(value?.orderExpiryHours ?? defaultSettings.orderExpiryHours, 'อายุคำสั่งซื้อ', { min: 1, max: 720 }),
     paymentReviewHours: boundedInteger(value?.paymentReviewHours ?? defaultSettings.paymentReviewHours, 'เวลาตรวจสอบการชำระเงิน', { min: 1, max: 720 }),
+    refundRequestEnabled: value?.refundRequestEnabled === undefined
+      ? defaultSettings.refundRequestEnabled
+      : Boolean(value.refundRequestEnabled),
     heroImageUrl: safeHttpUrl(value?.heroImageUrl, defaultSettings.heroImageUrl),
     vipQrUrl: safeHttpUrl(value?.vipQrUrl),
   }
@@ -140,6 +165,13 @@ function readSettings(body: Partial<SiteSettings>): SiteSettings {
     orderExpiryHours: boundedInteger(body.orderExpiryHours ?? defaultSettings.orderExpiryHours, 'อายุคำสั่งซื้อ', { min: 1, max: 720 }),
     paymentReviewHours: boundedInteger(body.paymentReviewHours ?? defaultSettings.paymentReviewHours, 'เวลาตรวจสอบการชำระเงิน', { min: 1, max: 720 }),
     commercePolicyText: boundedText(body.commercePolicyText ?? defaultSettings.commercePolicyText, 'เงื่อนไขการซื้อและคืนเงิน', { max: 2000 }),
+    refundRequestEnabled: Boolean(body.refundRequestEnabled),
+    refundContactTitle: boundedText(body.refundContactTitle ?? defaultSettings.refundContactTitle, 'หัวข้อขอคืนเงิน', { min: 1, max: 120 }),
+    refundInstructions: boundedText(body.refundInstructions ?? defaultSettings.refundInstructions, 'คำแนะนำขอคืนเงิน', { min: 1, max: 1500 }),
+    refundFormUrl: optionalHttpUrl(body.refundFormUrl, 'ลิงก์แบบฟอร์มขอคืนเงิน'),
+    refundContactEmail: optionalEmail(body.refundContactEmail),
+    refundLineUrl: optionalHttpUrl(body.refundLineUrl, 'ลิงก์ LINE สำหรับคืนเงิน'),
+    refundContactPhone: boundedText(body.refundContactPhone, 'เบอร์โทรติดต่อคืนเงิน', { max: 40 }),
     vipQrUrl: optionalHttpUrl(body.vipQrUrl, 'ลิงก์ QR Code'),
     vipBankName: boundedText(body.vipBankName ?? defaultSettings.vipBankName, 'ชื่อช่องทางชำระเงิน', { max: 120 }),
     vipAccountNumber: boundedText(body.vipAccountNumber, 'เลขบัญชี', { max: 80 }),
