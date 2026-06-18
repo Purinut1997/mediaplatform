@@ -97,7 +97,7 @@ export type VipRequest = {
   email: string
   phone: string
   slipName: string
-  slipDataUrl: string
+  hasSlipData: boolean
   status: 'pending' | 'approved' | 'rejected'
   createdAt: string
 }

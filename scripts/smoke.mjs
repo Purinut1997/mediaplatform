@@ -85,6 +85,11 @@ const checks = [
     validate: (data) => data.ok === false && data.error === 'Unauthorized',
   },
   {
+    path: '/api/admin/vip-proof?id=1',
+    expectedStatus: 401,
+    validate: (data) => data.ok === false && data.error === 'Unauthorized',
+  },
+  {
     path: '/api/admin/notifications?page=1&pageSize=8',
     expectedStatus: 401,
     validate: (data) => data.ok === false && data.error === 'Unauthorized',

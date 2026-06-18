@@ -95,7 +95,9 @@ export const onRequestGet = async ({ env, request }: { env: Env; request: Reques
     where role <> 'superadmin'
   `
   const vipRequests = await sql`
-    select id, user_id, name, email, phone, slip_name, slip_data_url, status, created_at
+    select id, user_id, name, email, phone, slip_name,
+           (slip_data_url is not null and slip_data_url <> '') as has_slip_data,
+           status, created_at
     from vip_requests
     order by created_at desc
     limit 200
@@ -137,7 +139,7 @@ export const onRequestGet = async ({ env, request }: { env: Env; request: Reques
       email: request.email,
       phone: request.phone ?? '',
       slipName: request.slip_name ?? '',
-      slipDataUrl: request.slip_data_url ?? '',
+      hasSlipData: Boolean(request.has_slip_data),
       status: request.status,
       createdAt: request.created_at,
     })),

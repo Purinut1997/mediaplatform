@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { boundedInteger, boundedText, normalizedEmail, passwordInput } from './input'
 import { emailHtmlText, emailStatus } from './email'
 import { mediaAccess, mediaPrice, mediaStatus, mediaText } from './media-validation'
-import { paymentProofDataUrl } from './payment-proof'
+import { decodePaymentProof, paymentProofDataUrl } from './payment-proof'
 
 describe('account input validation', () => {
   it('normalizes email and preserves password whitespace', () => {
@@ -68,6 +68,9 @@ describe('payment proof validation', () => {
   it('accepts supported payment proof data URLs', () => {
     expect(paymentProofDataUrl('data:image/png;base64,aGVsbG8=')).toBe('data:image/png;base64,aGVsbG8=')
     expect(paymentProofDataUrl('data:application/pdf;base64,JVBERi0=')).toBe('data:application/pdf;base64,JVBERi0=')
+    const proof = decodePaymentProof('data:image/png;base64,aGVsbG8=')
+    expect(proof.mimeType).toBe('image/png')
+    expect(Array.from(proof.bytes)).toEqual([104, 101, 108, 108, 111])
   })
 
   it('rejects unsupported payment proof formats', () => {

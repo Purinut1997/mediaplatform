@@ -1475,10 +1475,10 @@ export function AdminPanel({
                           {request.slipName && (
                             <p className="mt-1 text-xs font-bold text-cyan-200">สลิป: {request.slipName}</p>
                           )}
-                          {request.slipDataUrl && (
+                          {request.hasSlipData && (
                             <a
                               className="mt-2 inline-flex min-h-9 items-center gap-2 rounded-xl bg-cyan-300/10 px-3 text-xs font-black text-cyan-100"
-                              href={request.slipDataUrl}
+                              href={`/api/admin/vip-proof?id=${request.id}`}
                               rel="noreferrer"
                               target="_blank"
                             >
