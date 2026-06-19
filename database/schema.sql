@@ -151,6 +151,19 @@ create table if not exists app_settings (
   updated_at timestamptz not null default now()
 );
 
+create table if not exists media_issue_reports (
+  id serial primary key,
+  media_id integer not null references media(id) on delete cascade,
+  user_id integer not null references users(id) on delete cascade,
+  issue_type text not null check (issue_type in ('broken_link', 'incorrect_content', 'copyright', 'other')),
+  detail text not null,
+  contact text not null default '',
+  status text not null default 'pending' check (status in ('pending', 'reviewing', 'resolved', 'rejected')),
+  admin_note text not null default '',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 create index if not exists media_status_topic_idx on media(status, topic);
 create index if not exists media_deleted_updated_idx on media(deleted_at, updated_at desc);
 create index if not exists media_access_idx on media(access_level);
@@ -163,3 +176,5 @@ create index if not exists user_favorites_user_created_idx on user_favorites(use
 create index if not exists password_reset_tokens_user_idx on password_reset_tokens(user_id, expires_at desc);
 create index if not exists media_reviews_media_idx on media_reviews(media_id, updated_at desc);
 create index if not exists request_limits_updated_idx on request_limits(updated_at);
+create index if not exists media_issue_reports_user_idx on media_issue_reports(user_id, created_at desc);
+create index if not exists media_issue_reports_status_idx on media_issue_reports(status, created_at desc);

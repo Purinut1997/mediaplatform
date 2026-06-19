@@ -21,7 +21,7 @@ export type Env = {
 }
 
 let schemaReady = false
-const SCHEMA_VERSION = '2026.06.19.1'
+const SCHEMA_VERSION = '2026.06.19.2'
 
 export function getSql(env: Env) {
   if (!env.DATABASE_URL) {
@@ -60,6 +60,22 @@ export async function ensureSchema(env: Env) {
       await sql`alter table media add column if not exists available_until timestamptz`
       await sql`alter table media add column if not exists download_limit integer not null default 0`
       await sql`create index if not exists media_deleted_updated_idx on media(deleted_at, updated_at desc)`
+      await sql`
+        create table if not exists media_issue_reports (
+          id serial primary key,
+          media_id integer not null references media(id) on delete cascade,
+          user_id integer not null references users(id) on delete cascade,
+          issue_type text not null check (issue_type in ('broken_link', 'incorrect_content', 'copyright', 'other')),
+          detail text not null,
+          contact text not null default '',
+          status text not null default 'pending' check (status in ('pending', 'reviewing', 'resolved', 'rejected')),
+          admin_note text not null default '',
+          created_at timestamptz not null default now(),
+          updated_at timestamptz not null default now()
+        )
+      `
+      await sql`create index if not exists media_issue_reports_user_idx on media_issue_reports(user_id, created_at desc)`
+      await sql`create index if not exists media_issue_reports_status_idx on media_issue_reports(status, created_at desc)`
       await sql`alter table users add column if not exists vip_expires_at timestamptz`
       await sql`alter table vip_requests add column if not exists slip_data_url text`
       await sql`alter table purchase_requests add column if not exists slip_data_url text`
@@ -355,6 +371,21 @@ export async function ensureSchema(env: Env) {
   `
 
   await sql`
+    create table if not exists media_issue_reports (
+      id serial primary key,
+      media_id integer not null references media(id) on delete cascade,
+      user_id integer not null references users(id) on delete cascade,
+      issue_type text not null check (issue_type in ('broken_link', 'incorrect_content', 'copyright', 'other')),
+      detail text not null,
+      contact text not null default '',
+      status text not null default 'pending' check (status in ('pending', 'reviewing', 'resolved', 'rejected')),
+      admin_note text not null default '',
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now()
+    )
+  `
+
+  await sql`
     create table if not exists app_settings (
       key text primary key,
       value jsonb not null,
@@ -466,6 +497,8 @@ export async function ensureSchema(env: Env) {
   `
   await sql`create index if not exists refund_requests_user_idx on refund_requests(user_id, created_at desc)`
   await sql`create index if not exists refund_requests_status_idx on refund_requests(status, created_at desc)`
+  await sql`create index if not exists media_issue_reports_user_idx on media_issue_reports(user_id, created_at desc)`
+  await sql`create index if not exists media_issue_reports_status_idx on media_issue_reports(status, created_at desc)`
   await sql`
     create index if not exists users_vip_expiry_idx on users(access_level, vip_expires_at)
   `

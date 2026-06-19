@@ -10,8 +10,8 @@ type BackupPayload = {
   mode?: 'merge' | 'replace'
   replaceTables?: string[]
   backup?: {
-    data?: Partial<Record<'media' | 'mediaLinks' | 'mediaEvents' | 'mediaReviews' | 'userFavorites' | 'tags' | 'mediaTags' | 'categories' | 'users' | 'vipRequests' | 'purchaseRequests' | 'mediaPurchases' | 'refundRequests' | 'notifications' | 'settings', BackupRow[]>>
-  } & Partial<Record<'media' | 'mediaLinks' | 'mediaEvents' | 'mediaReviews' | 'userFavorites' | 'tags' | 'mediaTags' | 'categories' | 'users' | 'vipRequests' | 'purchaseRequests' | 'mediaPurchases' | 'refundRequests' | 'notifications' | 'settings', BackupRow[]>>
+    data?: Partial<Record<'media' | 'mediaLinks' | 'mediaEvents' | 'mediaReviews' | 'mediaIssues' | 'userFavorites' | 'tags' | 'mediaTags' | 'categories' | 'users' | 'vipRequests' | 'purchaseRequests' | 'mediaPurchases' | 'refundRequests' | 'notifications' | 'settings', BackupRow[]>>
+  } & Partial<Record<'media' | 'mediaLinks' | 'mediaEvents' | 'mediaReviews' | 'mediaIssues' | 'userFavorites' | 'tags' | 'mediaTags' | 'categories' | 'users' | 'vipRequests' | 'purchaseRequests' | 'mediaPurchases' | 'refundRequests' | 'notifications' | 'settings', BackupRow[]>>
 }
 
 const text = (value: unknown, fallback = '') => String(value ?? fallback).trim()
@@ -27,6 +27,8 @@ const VIP_STATUSES = ['pending', 'approved', 'rejected'] as const
 const PURCHASE_REQUEST_STATUSES = ['pending', 'approved', 'rejected', 'cancelled', 'refunded'] as const
 const PURCHASE_STATUSES = ['active', 'refunded', 'revoked'] as const
 const REFUND_STATUSES = ['pending', 'reviewing', 'approved', 'rejected', 'completed'] as const
+const MEDIA_ISSUE_TYPES = ['broken_link', 'incorrect_content', 'copyright', 'other'] as const
+const MEDIA_ISSUE_STATUSES = ['pending', 'reviewing', 'resolved', 'rejected'] as const
 const DEFAULT_COVER_URL =
   'https://raw.githubusercontent.com/Purinut1997/web-images/ab67fea68788dc5db9514475e8f2b8cb1c32d8b3/ChatGPT%20Image%2023%20%E0%B8%9E.%E0%B8%84.%202569%2008_05_56.png'
 const replaceableTables = new Set([
@@ -42,6 +44,7 @@ const replaceableTables = new Set([
   'purchaseRequests',
   'mediaPurchases',
   'refundRequests',
+  'mediaIssues',
   'notifications',
   'settings',
 ])
@@ -72,6 +75,7 @@ function readData(payload: BackupPayload) {
     purchaseRequests: Array.isArray(source.purchaseRequests) ? source.purchaseRequests : [],
     mediaPurchases: Array.isArray(source.mediaPurchases) ? source.mediaPurchases : [],
     refundRequests: Array.isArray(source.refundRequests) ? source.refundRequests : [],
+    mediaIssues: Array.isArray(source.mediaIssues) ? source.mediaIssues : [],
     notifications: Array.isArray(source.notifications) ? source.notifications : [],
     settings: Array.isArray(source.settings) ? source.settings : [],
   }
@@ -97,6 +101,7 @@ function preview(data: ReturnType<typeof readData>, replaceTables: string[] = []
     purchaseRequests: data.purchaseRequests.length,
     mediaPurchases: data.mediaPurchases.length,
     refundRequests: data.refundRequests.length,
+    mediaIssues: data.mediaIssues.length,
     notifications: data.notifications.length,
     settings: data.settings.length,
     mode: replaceTables.length ? 'replace' : 'merge',
@@ -415,6 +420,18 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
         insert into refund_requests (user_id, request_type, reference_text, reason, detail, contact, status, admin_note, created_at, updated_at)
         select ${userId}, ${text(refundRow.request_type) === 'media' ? 'media' : 'vip'}, ${text(refundRow.reference_text)}, ${text(refundRow.reason)}, ${text(refundRow.detail)}, ${text(refundRow.contact)}, ${choice(refundRow.status, REFUND_STATUSES, 'pending')}, ${text(refundRow.admin_note)}, ${createdAt}, ${text(refundRow.updated_at) || createdAt}
         where not exists (select 1 from refund_requests where user_id = ${userId} and created_at = ${createdAt})
+      `
+    }
+
+    for (const issueRow of data.mediaIssues) {
+      const userId = userIdMap.get(Number(issueRow.user_id))
+      const mediaId = mediaIdMap.get(Number(issueRow.media_id))
+      const createdAt = text(issueRow.created_at) || new Date().toISOString()
+      if (!userId || !mediaId || !text(issueRow.detail)) continue
+      await sql`
+        insert into media_issue_reports (media_id, user_id, issue_type, detail, contact, status, admin_note, created_at, updated_at)
+        select ${mediaId}, ${userId}, ${choice(issueRow.issue_type, MEDIA_ISSUE_TYPES, 'other')}, ${text(issueRow.detail)}, ${text(issueRow.contact)}, ${choice(issueRow.status, MEDIA_ISSUE_STATUSES, 'pending')}, ${text(issueRow.admin_note)}, ${createdAt}, ${text(issueRow.updated_at) || createdAt}
+        where not exists (select 1 from media_issue_reports where user_id = ${userId} and media_id = ${mediaId} and created_at = ${createdAt})
       `
     }
 

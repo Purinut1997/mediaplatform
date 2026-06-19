@@ -145,6 +145,21 @@ export type RefundRequest = {
   updatedAt: string
 }
 
+export type MediaIssueReport = {
+  id: number
+  mediaId: number
+  mediaTitle: string
+  name?: string
+  email?: string
+  issueType: 'broken_link' | 'incorrect_content' | 'copyright' | 'other'
+  detail: string
+  contact: string
+  status: 'pending' | 'reviewing' | 'resolved' | 'rejected'
+  adminNote: string
+  createdAt: string
+  updatedAt: string
+}
+
 export type AuditLog = {
   id: number
   actor: string
@@ -265,6 +280,7 @@ export type RestorePreview = {
   purchaseRequests: number
   mediaPurchases: number
   refundRequests: number
+  mediaIssues: number
   notifications: number
   settings: number
   mode?: 'merge' | 'replace'

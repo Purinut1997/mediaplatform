@@ -1,7 +1,7 @@
 import { requireSuperAdmin, writeAuditLog } from '../../_lib/admin'
 import { ensureSchema, getSql, type Env } from '../../_lib/db'
 
-const allowedTables = ['media', 'media_links', 'media_events', 'media_reviews', 'user_favorites', 'tags', 'media_tags', 'categories', 'users', 'vip_requests', 'purchase_requests', 'media_purchases', 'refund_requests', 'notifications', 'app_settings'] as const
+const allowedTables = ['media', 'media_links', 'media_events', 'media_reviews', 'media_issue_reports', 'user_favorites', 'tags', 'media_tags', 'categories', 'users', 'vip_requests', 'purchase_requests', 'media_purchases', 'refund_requests', 'notifications', 'app_settings'] as const
 type BackupTable = (typeof allowedTables)[number]
 
 function toCsv(rows: Record<string, unknown>[]) {
@@ -21,6 +21,8 @@ async function readTable(sql: ReturnType<typeof getSql>, table: BackupTable) {
       return sql`select * from media_events order by id desc`
     case 'media_reviews':
       return sql`select * from media_reviews order by updated_at desc`
+    case 'media_issue_reports':
+      return sql`select * from media_issue_reports order by created_at desc`
     case 'user_favorites':
       return sql`select * from user_favorites order by created_at desc`
     case 'tags':
@@ -73,7 +75,7 @@ export const onRequestGet = async ({ env, request }: { env: Env; request: Reques
     })
   }
 
-  const [media, mediaLinks, tags, mediaTags, categories, users, vipRequests, purchaseRequests, mediaPurchases, refundRequests, settings] = await Promise.all([
+  const [media, mediaLinks, tags, mediaTags, categories, users, vipRequests, purchaseRequests, mediaPurchases, refundRequests, mediaIssues, settings] = await Promise.all([
     readTable(sql, 'media'),
     readTable(sql, 'media_links'),
     readTable(sql, 'tags'),
@@ -84,6 +86,7 @@ export const onRequestGet = async ({ env, request }: { env: Env; request: Reques
     readTable(sql, 'purchase_requests'),
     readTable(sql, 'media_purchases'),
     readTable(sql, 'refund_requests'),
+    readTable(sql, 'media_issue_reports'),
     readTable(sql, 'app_settings'),
   ])
   const [mediaEvents, mediaReviews, userFavorites, notifications] = scope === 'full'
@@ -114,6 +117,7 @@ export const onRequestGet = async ({ env, request }: { env: Env; request: Reques
       purchaseRequests,
       mediaPurchases,
       refundRequests,
+      mediaIssues,
       notifications,
       settings,
     },

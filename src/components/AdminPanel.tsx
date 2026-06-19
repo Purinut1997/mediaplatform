@@ -46,6 +46,7 @@ import type {
   LinkCheckResult,
   MediaFormState,
   MediaItem,
+  MediaIssueReport,
   MediaLink,
   MediaSource,
   MediaStatus,
@@ -135,6 +136,7 @@ export function AdminPanel({
   const [vipApprovalOptions, setVipApprovalOptions] = useState<Record<number, { days: string; lifetime: boolean }>>({})
   const [purchaseRequests, setPurchaseRequests] = useState<PurchaseRequest[]>([])
   const [refundRequests, setRefundRequests] = useState<RefundRequest[]>([])
+  const [mediaIssues, setMediaIssues] = useState<MediaIssueReport[]>([])
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([])
   const [activityPage, setActivityPage] = useState(1)
   const [activityTotal, setActivityTotal] = useState(0)
@@ -175,6 +177,7 @@ export function AdminPanel({
   const resolvedVipRequests = vipRequests.filter((request) => request.status !== 'pending')
   const pendingPurchaseRequests = purchaseRequests.filter((request) => request.status === 'pending')
   const activeRefundRequests = refundRequests.filter((request) => ['pending', 'reviewing'].includes(request.status))
+  const activeMediaIssues = mediaIssues.filter((issue) => ['pending', 'reviewing'].includes(issue.status))
   const linkedMedia = mediaItems.filter((item) => item.resourceUrl || item.previewUrl || item.links?.some((link) => link.url || link.previewUrl))
   const publishedMediaCount = mediaItems.filter((item) => normalizeMediaStatus(item.status) === 'เผยแพร่แล้ว').length
   const tagStats = Array.from(
@@ -302,6 +305,7 @@ export function AdminPanel({
     ['mediaLinks', 'ลิงก์สื่อ'],
     ['mediaEvents', 'Event สื่อ'],
     ['mediaReviews', 'รีวิวสื่อ'],
+    ['mediaIssues', 'รายงานปัญหาสื่อ'],
     ['userFavorites', 'รายการโปรดสมาชิก'],
     ['tags', 'แท็ก'],
     ['mediaTags', 'แท็กของสื่อ'],
@@ -452,13 +456,17 @@ export function AdminPanel({
     setLoadingOps(true)
     setOpsError('')
     try {
-      const [healthResponse] = await Promise.all([
+      const [healthResponse, issuesResponse] = await Promise.all([
         fetch('/api/admin/health', { credentials: 'include' }),
+        fetch('/api/media/issues', { credentials: 'include' }),
         loadNotifications(),
         loadAnalytics(),
       ])
       const health = await readJson<{ health?: SystemHealth; error?: string }>(healthResponse)
       if (!healthResponse.ok) throw new Error(health.error ?? 'โหลด System Health ไม่สำเร็จ')
+      const issueResult = await readJson<{ issues?: MediaIssueReport[]; error?: string }>(issuesResponse)
+      if (!issuesResponse.ok) throw new Error(issueResult.error ?? 'โหลดรายงานปัญหาสื่อไม่สำเร็จ')
+      setMediaIssues(issueResult.issues ?? [])
 
       if (isSuperAdmin) {
         const [, , telegramResponse, emailResponse] = await Promise.all([
@@ -491,6 +499,7 @@ export function AdminPanel({
 
   const jumpFromNotification = (notice: AdminNotification) => {
     if (notice.targetType === 'vip_request' && isSuperAdmin) setAdminSection('members')
+    else if (notice.targetType === 'media_issue') { setAdminSection('members'); setMemberView('requests') }
     else if (notice.targetType === 'media') setAdminSection('media')
     else if (notice.targetType === 'media_links') setAdminSection('links')
     else if (notice.targetType === 'error_logs' && isSuperAdmin) setAdminSection('errors')
@@ -511,6 +520,22 @@ export function AdminPanel({
       await loadNotifications(payload.action === 'mark-all-read' ? 1 : notificationPage)
     } catch (notificationError) {
       setOpsError(notificationError instanceof Error ? notificationError.message : 'อัปเดตแจ้งเตือนไม่สำเร็จ')
+    }
+  }
+
+  const updateMediaIssue = async (issue: MediaIssueReport, status: MediaIssueReport['status']) => {
+    const adminNote = window.prompt('หมายเหตุถึงสมาชิก (เว้นว่างได้)', issue.adminNote) ?? issue.adminNote
+    setLoadingMembers(true)
+    setMemberError('')
+    try {
+      const response = await fetch('/api/media/issues', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ id: issue.id, status, adminNote }) })
+      const result = await readJson<{ error?: string }>(response)
+      if (!response.ok) throw new Error(result.error ?? 'อัปเดตรายงานไม่สำเร็จ')
+      await loadOpsData()
+    } catch (issueError) {
+      setMemberError(issueError instanceof Error ? issueError.message : 'อัปเดตรายงานไม่สำเร็จ')
+    } finally {
+      setLoadingMembers(false)
     }
   }
 
@@ -1466,7 +1491,7 @@ export function AdminPanel({
               {([
                 ['directory', Users, 'รายชื่อสมาชิก', 'ค้นหาและจัดการบัญชี'],
                 ['vip', Crown, 'จัดการ VIP', `${vipMemberSummary.active.toLocaleString('th-TH')} ใช้งาน`],
-                ['requests', AlertCircle, 'คำขอรอตรวจ', `${(pendingVipRequests.length + pendingPurchaseRequests.length + activeRefundRequests.length).toLocaleString('th-TH')} รายการ`],
+                ['requests', AlertCircle, 'คำขอรอตรวจ', `${(pendingVipRequests.length + pendingPurchaseRequests.length + activeRefundRequests.length + activeMediaIssues.length).toLocaleString('th-TH')} รายการ`],
                 ['admins', ShieldCheck, 'ผู้ดูแลระบบ', 'Admin และเจ้าของระบบ'],
               ] as const).map(([view, Icon, label, detail]) => (
                 <button
@@ -1623,6 +1648,18 @@ export function AdminPanel({
                       </article>
                     ))}
                     {refundRequests.length === 0 && <p className="text-sm font-semibold text-slate-400">ยังไม่มีคำขอคืนเงิน</p>}
+                  </div>
+                </div>
+                <div className="mt-5 border-t border-white/10 pt-5">
+                  <div className="flex items-center justify-between gap-3"><p className="font-black text-white">รายงานปัญหาสื่อ</p><span className="rounded-full bg-amber-300 px-3 py-1 text-xs font-black text-slate-950">{activeMediaIssues.length}</span></div>
+                  <div className="mt-3 grid gap-3">
+                    {mediaIssues.slice(0, 50).map((issue) => (
+                      <article className="rounded-2xl border border-white/10 bg-white/[0.05] p-4" key={issue.id}>
+                        <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="font-black text-white">{issue.mediaTitle}</p><p className="text-xs font-semibold text-slate-400">#{issue.id} · {issue.name} · {issue.email}</p><p className="mt-2 text-sm text-slate-300">{issue.detail}</p>{issue.contact && <p className="mt-1 text-xs font-bold text-cyan-200">ติดต่อ: {issue.contact}</p>}{issue.adminNote && <p className="mt-1 text-xs font-bold text-emerald-200">หมายเหตุ: {issue.adminNote}</p>}</div><span className="rounded-full bg-white/10 px-3 py-1 text-xs font-black text-white">{issue.status}</span></div>
+                        <div className="mt-3 grid grid-cols-3 gap-2">{([['reviewing','กำลังตรวจ'],['resolved','แก้ไขแล้ว'],['rejected','ปิดรายงาน']] as const).map(([status,label]) => <button className="min-h-10 rounded-xl bg-white/10 px-2 text-xs font-black text-white disabled:opacity-40" disabled={loadingMembers || issue.status === status} key={status} onClick={() => void updateMediaIssue(issue, status)} type="button">{label}</button>)}</div>
+                      </article>
+                    ))}
+                    {mediaIssues.length === 0 && <p className="text-sm font-semibold text-slate-400">ยังไม่มีรายงานปัญหาสื่อ</p>}
                   </div>
                 </div>
                 <div className="mt-5 border-t border-white/10 pt-5">
@@ -2993,7 +3030,7 @@ export function AdminPanel({
                 <Archive size={20} />
                 JSON ทั้งระบบ
               </button>
-              {['media', 'media_links', 'media_events', 'media_reviews', 'user_favorites', 'tags', 'media_tags', 'categories', 'users', 'vip_requests', 'purchase_requests', 'media_purchases', 'refund_requests', 'notifications', 'app_settings'].map((table) => (
+              {['media', 'media_links', 'media_events', 'media_reviews', 'media_issue_reports', 'user_favorites', 'tags', 'media_tags', 'categories', 'users', 'vip_requests', 'purchase_requests', 'media_purchases', 'refund_requests', 'notifications', 'app_settings'].map((table) => (
                 <button
                   className="inline-flex min-h-16 items-center justify-center gap-2 rounded-2xl border border-white/10 bg-black/20 px-5 font-black text-white disabled:opacity-60"
                   disabled={loadingOps}
@@ -3132,6 +3169,7 @@ export function AdminPanel({
                         ['ผู้ใช้', restorePreview.users],
                         ['คำขอ VIP', restorePreview.vipRequests],
                         ['คำขอคืนเงิน', restorePreview.refundRequests],
+                        ['รายงานปัญหาสื่อ', restorePreview.mediaIssues],
                         ['แจ้งเตือน', restorePreview.notifications],
                         ['Settings', restorePreview.settings],
                       ].map(([label, value]) => (

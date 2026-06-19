@@ -22,6 +22,7 @@ export const onRequestGet = async ({ env }: { env: Env }) => {
       to_regclass('public.media_purchases') is not null as media_purchases_ready,
       to_regclass('public.purchase_requests') is not null as purchase_requests_ready,
       to_regclass('public.refund_requests') is not null as refund_requests_ready,
+      to_regclass('public.media_issue_reports') is not null as media_issue_reports_ready,
       exists (
         select 1 from information_schema.columns
         where table_schema = 'public' and table_name = 'users' and column_name = 'vip_expires_at'
@@ -49,6 +50,7 @@ export const onRequestGet = async ({ env }: { env: Env }) => {
       vipExpiry: Boolean(result.vip_expiry_ready),
       mediaTrash: Boolean(result.media_trash_ready),
       mediaDownloadPolicy: Boolean(result.media_download_policy_ready),
+      mediaIssueReports: Boolean(result.media_issue_reports_ready),
     },
     schemaVersion: String(result.schema_version ?? ''),
     waitingLocks: Number(result.waiting_locks ?? 0),

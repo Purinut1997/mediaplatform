@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
-import { Download, ExternalLink, Eye, FileText, Heart, LockKeyhole, PlayCircle, Star } from 'lucide-react'
+import { AlertTriangle, Download, ExternalLink, Eye, FileText, Heart, LockKeyhole, PlayCircle, Send, Star } from 'lucide-react'
 import { readJson } from '../lib/api'
 import { canViewAccess, getPreviewUrl } from '../lib/media'
 import { paymentProofAccept, paymentProofHelpText, readPaymentProof } from '../lib/payment-proof'
-import type { CurrentUser, MediaItem, SiteSettings } from '../types'
+import type { CurrentUser, MediaIssueReport, MediaItem, SiteSettings } from '../types'
 
 export function MediaDetail({
   canDownload,
@@ -197,7 +197,66 @@ export function MediaDetail({
           )}
         </aside>
       </div>
+      <MediaIssuePanel currentUser={currentUser} item={item} />
       <ReviewPanel currentUser={currentUser} mediaId={item.id} />
+    </section>
+  )
+}
+
+function MediaIssuePanel({ currentUser, item }: { currentUser: CurrentUser | null; item: MediaItem }) {
+  const [issueType, setIssueType] = useState<MediaIssueReport['issueType']>('broken_link')
+  const [detail, setDetail] = useState('')
+  const [contact, setContact] = useState('')
+  const [issues, setIssues] = useState<MediaIssueReport[]>([])
+  const [notice, setNotice] = useState('')
+  const [sending, setSending] = useState(false)
+  const loadIssues = () => {
+    if (!currentUser) return setIssues([])
+    void fetch('/api/media/issues', { credentials: 'include' })
+      .then((response) => readJson<{ issues?: MediaIssueReport[] }>(response))
+      .then((result) => setIssues((result.issues ?? []).filter((issue) => issue.mediaId === item.id)))
+      .catch(() => setIssues([]))
+  }
+  useEffect(() => {
+    if (!currentUser) return
+    let active = true
+    void fetch('/api/media/issues', { credentials: 'include' })
+      .then((response) => readJson<{ issues?: MediaIssueReport[] }>(response))
+      .then((result) => { if (active) setIssues((result.issues ?? []).filter((issue) => issue.mediaId === item.id)) })
+      .catch(() => { if (active) setIssues([]) })
+    return () => { active = false }
+  }, [currentUser, item.id])
+  const submit = async () => {
+    if (!currentUser) return setNotice('กรุณาเข้าสู่ระบบก่อนแจ้งปัญหา')
+    setSending(true)
+    setNotice('')
+    try {
+      const response = await fetch('/api/media/issues', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ mediaId: item.id, issueType, detail, contact }) })
+      const result = await readJson<{ error?: string }>(response)
+      if (!response.ok) throw new Error(result.error || 'ส่งรายงานไม่สำเร็จ')
+      setDetail('')
+      setContact('')
+      setNotice('ส่งรายงานแล้ว ผู้ดูแลจะตรวจสอบและอัปเดตสถานะในหน้านี้')
+      loadIssues()
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'ส่งรายงานไม่สำเร็จ')
+    } finally {
+      setSending(false)
+    }
+  }
+  const statusLabel = { pending: 'รอตรวจสอบ', reviewing: 'กำลังตรวจสอบ', resolved: 'แก้ไขแล้ว', rejected: 'ปิดรายงาน' }
+  return (
+    <section className="nexus-glass mt-6 rounded-3xl border p-5 backdrop-blur sm:p-6">
+      <h3 className="flex items-center gap-2 text-xl font-black text-slate-950 dark:text-white"><AlertTriangle className="text-amber-500" />แจ้งปัญหาสื่อนี้</h3>
+      <p className="mt-2 text-sm font-semibold text-slate-500 dark:text-slate-400">แจ้งไฟล์เสีย เนื้อหาผิด หรือข้อกังวลด้านลิขสิทธิ์ พร้อมติดตามผลได้ในหน้าเดิม</p>
+      {currentUser ? <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <select className="min-h-12 rounded-2xl border border-slate-200 bg-white px-4 dark:border-white/10 dark:bg-white/10" onChange={(event) => setIssueType(event.target.value as MediaIssueReport['issueType'])} value={issueType}><option value="broken_link">ลิงก์หรือไฟล์เปิดไม่ได้</option><option value="incorrect_content">ข้อมูลหรือเนื้อหาไม่ถูกต้อง</option><option value="copyright">ลิขสิทธิ์หรือความเหมาะสม</option><option value="other">ปัญหาอื่น</option></select>
+        <input className="min-h-12 rounded-2xl border border-slate-200 bg-white px-4 dark:border-white/10 dark:bg-white/10" maxLength={160} onChange={(event) => setContact(event.target.value)} placeholder="ช่องทางติดต่อกลับ (ไม่บังคับ)" value={contact} />
+        <textarea className="min-h-28 rounded-2xl border border-slate-200 bg-white px-4 py-3 sm:col-span-2 dark:border-white/10 dark:bg-white/10" maxLength={1500} onChange={(event) => setDetail(event.target.value)} placeholder="อธิบายปัญหาอย่างน้อย 10 ตัวอักษร" value={detail} />
+        <button className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-amber-400 px-5 font-black text-slate-950 disabled:opacity-50 sm:col-span-2 sm:justify-self-start" disabled={sending || detail.trim().length < 10} onClick={() => void submit()} type="button"><Send size={18} />{sending ? 'กำลังส่ง...' : 'ส่งรายงานปัญหา'}</button>
+      </div> : <p className="mt-4 rounded-2xl bg-amber-50 p-4 font-bold text-amber-900 dark:bg-amber-300/10 dark:text-amber-100">เข้าสู่ระบบเพื่อแจ้งและติดตามปัญหา</p>}
+      {notice && <p className="mt-3 text-sm font-bold text-amber-700 dark:text-amber-200">{notice}</p>}
+      {issues.length > 0 && <div className="mt-5 grid gap-3"><p className="font-black text-slate-950 dark:text-white">ประวัติรายงานของคุณ</p>{issues.map((issue) => <article className="rounded-2xl border border-slate-200 bg-white/70 p-4 dark:border-white/10 dark:bg-white/[0.04]" key={issue.id}><div className="flex flex-wrap items-center justify-between gap-2"><strong>รายงาน #{issue.id}</strong><span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-black text-amber-900 dark:bg-amber-300/10 dark:text-amber-100">{statusLabel[issue.status]}</span></div><p className="mt-2 text-sm text-slate-600 dark:text-slate-300">{issue.detail}</p>{issue.adminNote && <p className="mt-2 text-sm font-bold text-cyan-700 dark:text-cyan-200">ผู้ดูแล: {issue.adminNote}</p>}</article>)}</div>}
     </section>
   )
 }
