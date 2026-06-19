@@ -21,6 +21,7 @@ export const onRequestGet = async ({ env }: { env: Env }) => {
       now() as now,
       to_regclass('public.media_purchases') is not null as media_purchases_ready,
       to_regclass('public.purchase_requests') is not null as purchase_requests_ready,
+      to_regclass('public.refund_requests') is not null as refund_requests_ready,
       exists (
         select 1 from information_schema.columns
         where table_schema = 'public' and table_name = 'users' and column_name = 'vip_expires_at'
@@ -36,6 +37,7 @@ export const onRequestGet = async ({ env }: { env: Env }) => {
     commerceSchema: {
       mediaPurchases: Boolean(result.media_purchases_ready),
       purchaseRequests: Boolean(result.purchase_requests_ready),
+      refundRequests: Boolean(result.refund_requests_ready),
       vipExpiry: Boolean(result.vip_expiry_ready),
     },
     schemaVersion: String(result.schema_version ?? ''),

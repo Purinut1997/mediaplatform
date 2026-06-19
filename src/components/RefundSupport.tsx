@@ -1,7 +1,44 @@
-import { ExternalLink, FileText, Mail, MessageCircle, Phone, RotateCcw, ShieldCheck } from 'lucide-react'
-import type { SiteSettings } from '../types'
+import { useEffect, useState } from 'react'
+import { ExternalLink, FileText, Loader2, Mail, MessageCircle, Phone, RotateCcw, ShieldCheck } from 'lucide-react'
+import { readJson } from '../lib/api'
+import type { RefundRequest, SiteSettings } from '../types'
 
 export function RefundSupport({ settings }: { settings: SiteSettings }) {
+  const [requestType, setRequestType] = useState<'vip' | 'media'>('vip')
+  const [referenceText, setReferenceText] = useState('')
+  const [reason, setReason] = useState('')
+  const [detail, setDetail] = useState('')
+  const [contact, setContact] = useState('')
+  const [requests, setRequests] = useState<RefundRequest[]>([])
+  const [notice, setNotice] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  const loadRequests = async () => {
+    const response = await fetch('/api/refunds', { credentials: 'include' })
+    const result = await readJson<{ requests?: RefundRequest[] }>(response)
+    if (response.ok) setRequests(result.requests ?? [])
+  }
+  useEffect(() => {
+    let active = true
+    fetch('/api/refunds', { credentials: 'include' })
+      .then(async (response) => ({ response, result: await readJson<{ requests?: RefundRequest[] }>(response) }))
+      .then(({ response, result }) => { if (active && response.ok) setRequests(result.requests ?? []) })
+      .catch(() => undefined)
+    return () => { active = false }
+  }, [])
+
+  const submitRefund = async () => {
+    setBusy(true); setNotice('')
+    try {
+      const response = await fetch('/api/refunds', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ requestType, referenceText, reason, detail, contact }) })
+      const result = await readJson<{ error?: string }>(response)
+      if (!response.ok) throw new Error(result.error || 'ส่งคำขอคืนเงินไม่สำเร็จ')
+      setNotice('ส่งคำขอคืนเงินแล้ว ผู้ดูแลจะอัปเดตสถานะในหน้านี้')
+      setReferenceText(''); setReason(''); setDetail('')
+      await loadRequests()
+    } catch (error) { setNotice(error instanceof Error ? error.message : 'ส่งคำขอคืนเงินไม่สำเร็จ') } finally { setBusy(false) }
+  }
+
   if (!settings.refundRequestEnabled) return null
 
   const channels = [
@@ -49,6 +86,19 @@ export function RefundSupport({ settings }: { settings: SiteSettings }) {
             <p className="mt-3 rounded-2xl border border-dashed border-amber-300 bg-amber-50 p-4 text-sm font-bold text-amber-800 dark:border-amber-300/20 dark:bg-amber-300/10 dark:text-amber-100">ผู้ดูแลกำลังตั้งค่าช่องทางติดต่อ กรุณากลับมาตรวจสอบอีกครั้ง</p>
           )}
         </div>
+      </div>
+      <div className="border-t border-slate-200 p-5 dark:border-white/10 sm:p-6">
+        <h3 className="text-xl font-black text-slate-950 dark:text-white">ส่งคำขอผ่านระบบ</h3>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <select className="min-h-12 rounded-2xl border border-slate-200 bg-white px-4 dark:border-white/10 dark:bg-white/10" onChange={(event) => setRequestType(event.target.value as 'vip' | 'media')} value={requestType}><option value="vip">สมาชิก VIP</option><option value="media">ซื้อสื่อแยก</option></select>
+          <input className="min-h-12 rounded-2xl border border-slate-200 bg-white px-4 dark:border-white/10 dark:bg-white/10" onChange={(event) => setReferenceText(event.target.value)} placeholder="รายการอ้างอิง เช่น VIP #123 หรือชื่อสื่อ" value={referenceText} />
+          <input className="min-h-12 rounded-2xl border border-slate-200 bg-white px-4 dark:border-white/10 dark:bg-white/10" onChange={(event) => setReason(event.target.value)} placeholder="เหตุผลที่ขอคืนเงิน" value={reason} />
+          <input className="min-h-12 rounded-2xl border border-slate-200 bg-white px-4 dark:border-white/10 dark:bg-white/10" onChange={(event) => setContact(event.target.value)} placeholder="อีเมลหรือเบอร์โทรติดต่อกลับ" value={contact} />
+          <textarea className="min-h-24 rounded-2xl border border-slate-200 bg-white px-4 py-3 dark:border-white/10 dark:bg-white/10 sm:col-span-2" onChange={(event) => setDetail(event.target.value)} placeholder="รายละเอียดเพิ่มเติม (ถ้ามี)" value={detail} />
+        </div>
+        {notice && <p className="mt-3 rounded-2xl bg-slate-100 p-3 text-sm font-bold text-slate-700 dark:bg-white/[0.06] dark:text-slate-200">{notice}</p>}
+        <button className="mt-4 inline-flex min-h-12 items-center gap-2 rounded-2xl bg-rose-500 px-5 font-black text-white disabled:opacity-50" disabled={busy || referenceText.trim().length < 2 || reason.trim().length < 3 || contact.trim().length < 3} onClick={() => void submitRefund()} type="button">{busy && <Loader2 className="animate-spin" size={18} />}ส่งคำขอคืนเงิน</button>
+        {requests.length > 0 && <div className="mt-6 grid gap-2"><h3 className="font-black text-slate-950 dark:text-white">ประวัติคำขอคืนเงิน</h3>{requests.map((request) => <article className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 p-3 dark:border-white/10" key={request.id}><div><p className="font-black text-slate-900 dark:text-white">#{request.id} · {request.referenceText}</p><p className="text-xs font-semibold text-slate-500">{new Date(request.createdAt).toLocaleDateString('th-TH')}{request.adminNote ? ` · ${request.adminNote}` : ''}</p></div><span className="rounded-full bg-rose-100 px-3 py-1 text-xs font-black text-rose-800 dark:bg-rose-300/10 dark:text-rose-100">{request.status}</span></article>)}</div>}
       </div>
       {settings.commercePolicyText && <p className="border-t border-slate-200 px-5 py-4 text-xs font-semibold leading-6 text-slate-500 dark:border-white/10 dark:text-slate-400 sm:px-6"><strong>นโยบาย:</strong> {settings.commercePolicyText}</p>}
     </section>

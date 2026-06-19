@@ -71,6 +71,14 @@ export type MemberLibrary = {
     createdAt: string
     updatedAt: string
   } | null
+  vipRequests: Array<{
+    id: number
+    phone: string
+    slipName: string
+    status: 'pending' | 'approved' | 'rejected'
+    createdAt: string
+    updatedAt: string
+  }>
 }
 
 export type AdminUser = {
@@ -111,8 +119,25 @@ export type PurchaseRequest = {
   mediaTitle: string
   amount: number
   slipName: string
+  hasSlipData: boolean
   status: 'pending' | 'approved' | 'rejected' | 'cancelled' | 'refunded'
   createdAt: string
+}
+
+export type RefundRequest = {
+  id: number
+  userId: number
+  name?: string
+  email?: string
+  requestType: 'vip' | 'media'
+  referenceText: string
+  reason: string
+  detail: string
+  contact: string
+  status: 'pending' | 'reviewing' | 'approved' | 'rejected' | 'completed'
+  adminNote: string
+  createdAt: string
+  updatedAt: string
 }
 
 export type AuditLog = {
@@ -234,6 +259,7 @@ export type RestorePreview = {
   vipRequests: number
   purchaseRequests: number
   mediaPurchases: number
+  refundRequests: number
   notifications: number
   settings: number
   mode?: 'merge' | 'replace'

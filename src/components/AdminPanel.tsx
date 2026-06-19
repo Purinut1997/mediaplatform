@@ -50,6 +50,7 @@ import type {
   MediaSource,
   MediaStatus,
   PurchaseRequest,
+  RefundRequest,
   RestorePreview,
   SiteSettings,
   SystemHealth,
@@ -132,6 +133,7 @@ export function AdminPanel({
   const [vipRequests, setVipRequests] = useState<VipRequest[]>([])
   const [vipApprovalOptions, setVipApprovalOptions] = useState<Record<number, { days: string; lifetime: boolean }>>({})
   const [purchaseRequests, setPurchaseRequests] = useState<PurchaseRequest[]>([])
+  const [refundRequests, setRefundRequests] = useState<RefundRequest[]>([])
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([])
   const [activityPage, setActivityPage] = useState(1)
   const [activityTotal, setActivityTotal] = useState(0)
@@ -169,7 +171,9 @@ export function AdminPanel({
   const isSuperAdmin = currentUser.role === 'superadmin'
 
   const pendingVipRequests = vipRequests.filter((request) => request.status === 'pending')
+  const resolvedVipRequests = vipRequests.filter((request) => request.status !== 'pending')
   const pendingPurchaseRequests = purchaseRequests.filter((request) => request.status === 'pending')
+  const activeRefundRequests = refundRequests.filter((request) => ['pending', 'reviewing'].includes(request.status))
   const linkedMedia = mediaItems.filter((item) => item.resourceUrl || item.previewUrl || item.links?.some((link) => link.url || link.previewUrl))
   const publishedMediaCount = mediaItems.filter((item) => normalizeMediaStatus(item.status) === 'เผยแพร่แล้ว').length
   const tagStats = Array.from(
@@ -324,6 +328,7 @@ export function AdminPanel({
         users?: AdminUser[]
         vipRequests?: VipRequest[]
         purchaseRequests?: PurchaseRequest[]
+        refundRequests?: RefundRequest[]
         vipSummary?: VipMemberSummary
         total?: number
         page?: number
@@ -334,6 +339,7 @@ export function AdminPanel({
       setAdminUsers(result.users ?? [])
       setVipRequests(result.vipRequests ?? [])
       setPurchaseRequests(result.purchaseRequests ?? [])
+      setRefundRequests(result.refundRequests ?? [])
       setVipMemberSummary(result.vipSummary ?? { active: 0, expiringSoon: 0, expired: 0 })
       setMemberTotal(result.total ?? 0)
       setMemberPage(result.page ?? page)
@@ -1430,7 +1436,7 @@ export function AdminPanel({
               {([
                 ['directory', Users, 'รายชื่อสมาชิก', 'ค้นหาและจัดการบัญชี'],
                 ['vip', Crown, 'จัดการ VIP', `${vipMemberSummary.active.toLocaleString('th-TH')} ใช้งาน`],
-                ['requests', AlertCircle, 'คำขอรอตรวจ', `${(pendingVipRequests.length + pendingPurchaseRequests.length).toLocaleString('th-TH')} รายการ`],
+                ['requests', AlertCircle, 'คำขอรอตรวจ', `${(pendingVipRequests.length + pendingPurchaseRequests.length + activeRefundRequests.length).toLocaleString('th-TH')} รายการ`],
                 ['admins', ShieldCheck, 'ผู้ดูแลระบบ', 'Admin และเจ้าของระบบ'],
               ] as const).map(([view, Icon, label, detail]) => (
                 <button
@@ -1563,12 +1569,44 @@ export function AdminPanel({
                         <p className="mt-1 text-sm font-semibold text-slate-400">{request.name} · {request.email}</p>
                         <p className="mt-1 text-sm font-black text-cyan-200">{request.amount.toLocaleString('th-TH')} บาท</p>
                         {request.slipName && <p className="mt-1 text-xs font-bold text-slate-400">สลิป: {request.slipName}</p>}
+                        {request.hasSlipData ? <a className="mt-2 inline-flex min-h-9 items-center gap-2 rounded-xl bg-cyan-300/10 px-3 text-xs font-black text-cyan-100" href={`/api/admin/purchase-proof?id=${request.id}`} rel="noreferrer" target="_blank"><ExternalLink size={14} />เปิดหลักฐานการโอน</a> : <p className="mt-2 text-xs font-black text-red-200">ไม่มีหลักฐานแนบ</p>}
                         <div className="mt-4 grid gap-2 sm:grid-cols-2">
-                          <button className="min-h-11 rounded-xl bg-emerald-300 px-3 font-black text-slate-950 disabled:opacity-60" disabled={loadingMembers} onClick={() => submitMemberAction({ action: 'approve-purchase', requestId: request.id })} type="button">อนุมัติซื้อสื่อ</button>
+                          <button className="min-h-11 rounded-xl bg-emerald-300 px-3 font-black text-slate-950 disabled:opacity-60" disabled={loadingMembers || !request.hasSlipData} onClick={() => submitMemberAction({ action: 'approve-purchase', requestId: request.id })} type="button">อนุมัติซื้อสื่อ</button>
                           <button className="min-h-11 rounded-xl bg-white/10 px-3 font-black text-white disabled:opacity-60" disabled={loadingMembers} onClick={() => submitMemberAction({ action: 'reject-purchase', requestId: request.id })} type="button">ปฏิเสธ</button>
                         </div>
                       </article>
                     ))}
+                  </div>
+                </div>
+                <div className="mt-5 border-t border-white/10 pt-5">
+                  <div className="flex items-center justify-between gap-3"><p className="font-black text-white">คำขอคืนเงิน</p><span className="rounded-full bg-rose-300 px-3 py-1 text-xs font-black text-slate-950">{activeRefundRequests.length}</span></div>
+                  <div className="mt-3 grid gap-3">
+                    {refundRequests.slice(0, 30).map((request) => (
+                      <article className="rounded-2xl border border-white/10 bg-white/[0.05] p-4" key={request.id}>
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div><p className="font-black text-white">{request.referenceText}</p><p className="text-xs font-semibold text-slate-400">#{request.id} · {request.name} · {request.email}</p><p className="mt-2 text-sm text-slate-300">{request.reason}{request.detail ? ` — ${request.detail}` : ''}</p><p className="mt-1 text-xs font-bold text-cyan-200">ติดต่อ: {request.contact}</p></div>
+                          <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-black text-white">{request.status}</span>
+                        </div>
+                        <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                          {([['reviewing','กำลังตรวจ'],['approved','อนุมัติ'],['rejected','ปฏิเสธ'],['completed','เสร็จสิ้น']] as const).map(([status,label]) => <button className="min-h-10 rounded-xl bg-white/10 px-2 text-xs font-black text-white disabled:opacity-40" disabled={loadingMembers || request.status === status} key={status} onClick={() => void submitMemberAction({ action: 'set-refund-status', requestId: request.id, refundStatus: status })} type="button">{label}</button>)}
+                        </div>
+                      </article>
+                    ))}
+                    {refundRequests.length === 0 && <p className="text-sm font-semibold text-slate-400">ยังไม่มีคำขอคืนเงิน</p>}
+                  </div>
+                </div>
+                <div className="mt-5 border-t border-white/10 pt-5">
+                  <p className="font-black text-white">ประวัติคำขอ VIP ล่าสุด</p>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                    {resolvedVipRequests.slice(0, 20).map((request) => (
+                      <article className="rounded-2xl border border-white/10 bg-black/20 p-3" key={request.id}>
+                        <div className="flex items-start justify-between gap-3">
+                          <div><p className="font-black text-white">{request.name}</p><p className="text-xs font-semibold text-slate-400">#{request.id} · {request.email}</p></div>
+                          <span className={`rounded-full px-2 py-1 text-xs font-black ${request.status === 'approved' ? 'bg-emerald-300/15 text-emerald-100' : 'bg-red-300/15 text-red-100'}`}>{request.status === 'approved' ? 'อนุมัติ' : 'ปฏิเสธ'}</span>
+                        </div>
+                      </article>
+                    ))}
+                    {resolvedVipRequests.length === 0 && <p className="text-sm font-semibold text-slate-400">ยังไม่มีประวัติที่ดำเนินการแล้ว</p>}
                   </div>
                 </div>
               </div>
@@ -2925,7 +2963,7 @@ export function AdminPanel({
                 <Archive size={20} />
                 JSON ทั้งระบบ
               </button>
-              {['media', 'media_links', 'media_events', 'media_reviews', 'user_favorites', 'tags', 'media_tags', 'categories', 'users', 'vip_requests', 'notifications', 'app_settings'].map((table) => (
+              {['media', 'media_links', 'media_events', 'media_reviews', 'user_favorites', 'tags', 'media_tags', 'categories', 'users', 'vip_requests', 'purchase_requests', 'media_purchases', 'refund_requests', 'notifications', 'app_settings'].map((table) => (
                 <button
                   className="inline-flex min-h-16 items-center justify-center gap-2 rounded-2xl border border-white/10 bg-black/20 px-5 font-black text-white disabled:opacity-60"
                   disabled={loadingOps}
@@ -3063,6 +3101,7 @@ export function AdminPanel({
                         ['แท็กของสื่อ', restorePreview.mediaTags],
                         ['ผู้ใช้', restorePreview.users],
                         ['คำขอ VIP', restorePreview.vipRequests],
+                        ['คำขอคืนเงิน', restorePreview.refundRequests],
                         ['แจ้งเตือน', restorePreview.notifications],
                         ['Settings', restorePreview.settings],
                       ].map(([label, value]) => (

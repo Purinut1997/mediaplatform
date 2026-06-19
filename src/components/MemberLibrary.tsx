@@ -150,6 +150,25 @@ export function MemberLibraryPanel({
 
       <RefundSupport settings={settings} />
 
+      {Boolean(library?.vipRequests?.length) && (
+        <section className="mt-8 rounded-3xl border border-violet-200/80 bg-white/75 p-5 shadow-lg backdrop-blur dark:border-violet-300/15 dark:bg-white/[0.05]">
+          <h2 className="inline-flex items-center gap-2 text-2xl font-black text-slate-950 dark:text-white"><Clock3 className="text-violet-500" />ประวัติการสมัคร VIP</h2>
+          <div className="mt-4 grid gap-3">
+            {library!.vipRequests!.map((request) => (
+              <article className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white/80 p-4 dark:border-white/10 dark:bg-white/[0.04]" key={request.id}>
+                <div>
+                  <p className="font-black text-slate-950 dark:text-white">คำขอ VIP #{request.id}</p>
+                  <p className="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400">ส่งเมื่อ {formatDate(request.createdAt)}{request.slipName ? ` · ${request.slipName}` : ''}</p>
+                </div>
+                <span className={`rounded-full px-3 py-1 text-xs font-black ${request.status === 'approved' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-300/10 dark:text-emerald-100' : request.status === 'rejected' ? 'bg-red-100 text-red-700 dark:bg-red-300/10 dark:text-red-100' : 'bg-amber-100 text-amber-800 dark:bg-amber-300/10 dark:text-amber-100'}`}>
+                  {request.status === 'approved' ? 'อนุมัติแล้ว' : request.status === 'rejected' ? 'ปฏิเสธ' : 'รอตรวจสอบ'}
+                </span>
+              </article>
+            ))}
+          </div>
+        </section>
+      )}
+
       {purchases.length > 0 && (
         <section className="mt-8 rounded-3xl border border-amber-200/80 bg-amber-50/75 p-5 shadow-lg backdrop-blur dark:border-amber-300/15 dark:bg-amber-300/[0.06]">
           <div className="flex flex-wrap items-end justify-between gap-3">
@@ -351,7 +370,7 @@ function MembershipUpgradePanel({
           )}
         </div>
 
-        {settings.vipRegistrationEnabled ? (
+        {settings.vipRegistrationEnabled && settings.vipPrice > 0 ? (
           <div className="rounded-3xl border border-violet-200 bg-white/75 p-4 dark:border-white/10 dark:bg-white/[0.05]">
             <div className="grid gap-4 sm:grid-cols-[112px_1fr] sm:items-center">
               {settings.vipQrUrl ? (
@@ -394,8 +413,8 @@ function MembershipUpgradePanel({
           <div className="grid min-h-48 place-items-center rounded-3xl border border-dashed border-slate-300 bg-white/55 p-6 text-center dark:border-white/15 dark:bg-white/[0.04]">
             <div>
               <Clock3 className="mx-auto text-violet-500" size={32} />
-              <p className="mt-3 text-lg font-black text-slate-950 dark:text-white">ยังไม่เปิดรับสมัคร VIP</p>
-              <p className="mt-1 text-sm font-semibold text-slate-500 dark:text-slate-400">เมื่อผู้ดูแลเปิดรับสมัคร ข้อมูลและปุ่มส่งคำขอจะแสดงที่นี่อัตโนมัติ</p>
+              <p className="mt-3 text-lg font-black text-slate-950 dark:text-white">{settings.vipRegistrationEnabled ? 'กำลังเตรียมข้อมูลชำระเงิน VIP' : 'ยังไม่เปิดรับสมัคร VIP'}</p>
+              <p className="mt-1 text-sm font-semibold text-slate-500 dark:text-slate-400">{settings.vipRegistrationEnabled ? 'ผู้ดูแลเปิดรับสมัครแล้ว แต่ยังต้องกำหนดราคาให้เรียบร้อยก่อนรับคำขอ' : 'เมื่อผู้ดูแลเปิดรับสมัคร ข้อมูลและปุ่มส่งคำขอจะแสดงที่นี่อัตโนมัติ'}</p>
             </div>
           </div>
         )}

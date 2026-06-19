@@ -12,7 +12,7 @@ export const onRequest = async ({ request, next }: Context) => {
   const contentLength = Number(request.headers.get('Content-Length') ?? 0)
   const maxBodyBytes = url.pathname === '/api/admin/restore'
     ? 25_000_000
-    : ['/api/auth/register', '/api/member/vip'].includes(url.pathname)
+    : ['/api/auth/register', '/api/member/vip', '/api/purchases'].includes(url.pathname)
       ? 1_250_000
       : 512_000
 

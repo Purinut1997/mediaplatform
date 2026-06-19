@@ -129,6 +129,13 @@ function normalizeSettings(value?: Partial<SiteSettings>) {
     refundRequestEnabled: value?.refundRequestEnabled === undefined
       ? defaultSettings.refundRequestEnabled
       : Boolean(value.refundRequestEnabled),
+    vipBankName: value?.vipBankName?.trim() || defaultSettings.vipBankName,
+    vipAccountName: value?.vipAccountName?.trim() || defaultSettings.vipAccountName,
+    vipPaymentTitle: value?.vipPaymentTitle?.trim() || defaultSettings.vipPaymentTitle,
+    vipPaymentSubtitle: value?.vipPaymentSubtitle?.trim() || defaultSettings.vipPaymentSubtitle,
+    vipSlipLabel: value?.vipSlipLabel?.trim() || defaultSettings.vipSlipLabel,
+    vipAgreementLabel: value?.vipAgreementLabel?.trim() || defaultSettings.vipAgreementLabel,
+    vipSubmitLabel: value?.vipSubmitLabel?.trim() || defaultSettings.vipSubmitLabel,
     heroImageUrl: safeHttpUrl(value?.heroImageUrl, defaultSettings.heroImageUrl),
     vipQrUrl: safeHttpUrl(value?.vipQrUrl),
   }

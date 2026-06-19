@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Download, ExternalLink, Eye, FileText, Heart, LockKeyhole, PlayCircle, Star } from 'lucide-react'
 import { readJson } from '../lib/api'
 import { canViewAccess, getPreviewUrl } from '../lib/media'
+import { paymentProofAccept, paymentProofHelpText, readPaymentProof } from '../lib/payment-proof'
 import type { CurrentUser, MediaItem, SiteSettings } from '../types'
 
 export function MediaDetail({
@@ -28,6 +29,7 @@ export function MediaDetail({
   const previewUrl = getPreviewUrl(item)
   const primaryLink = item.links?.find((link) => canViewAccess(currentUser, link.access) && link.url) ?? item.links?.[0]
   const [purchaseSlipName, setPurchaseSlipName] = useState('')
+  const [purchaseSlipDataUrl, setPurchaseSlipDataUrl] = useState('')
   const [purchaseNotice, setPurchaseNotice] = useState('')
   const [requestingPurchase, setRequestingPurchase] = useState(false)
   const canCheckPurchasedAccess = item.access === 'ซื้อแยก' && Boolean(currentUser)
@@ -53,6 +55,10 @@ export function MediaDetail({
 
   const requestPurchase = async () => {
     if (!currentUser) return onError()
+    if (!purchaseSlipDataUrl) {
+      setPurchaseNotice('กรุณาแนบหลักฐานการชำระเงินก่อนส่งคำขอซื้อ')
+      return
+    }
     setRequestingPurchase(true)
     setPurchaseNotice('')
     try {
@@ -60,11 +66,13 @@ export function MediaDetail({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ mediaId: item.id, slipName: purchaseSlipName }),
+        body: JSON.stringify({ mediaId: item.id, slipName: purchaseSlipName, slipDataUrl: purchaseSlipDataUrl }),
       })
       const result = await readJson<{ error?: string }>(response)
       if (!response.ok) throw new Error(result.error || 'ส่งคำขอซื้อไม่สำเร็จ')
       setPurchaseNotice('ส่งคำขอซื้อแล้ว ผู้ดูแลจะตรวจสอบและเปิดสิทธิ์ให้บัญชีนี้')
+      setPurchaseSlipName('')
+      setPurchaseSlipDataUrl('')
     } catch (error) {
       setPurchaseNotice(error instanceof Error ? error.message : 'ส่งคำขอซื้อไม่สำเร็จ')
     } finally {
@@ -126,11 +134,12 @@ export function MediaDetail({
                     </div>
                   )}
                   <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-                    <input className="min-h-11 flex-1 rounded-xl border border-amber-200 bg-white px-3 text-sm dark:border-white/10 dark:bg-white/10" onChange={(event) => setPurchaseSlipName(event.target.files?.[0]?.name ?? '')} type="file" />
-                    <button className="min-h-11 rounded-xl bg-amber-400 px-4 font-black text-slate-950 disabled:opacity-60" disabled={requestingPurchase || !currentUser} onClick={() => void requestPurchase()} type="button">
+                    <input accept={paymentProofAccept()} className="min-h-11 flex-1 rounded-xl border border-amber-200 bg-white px-3 text-sm dark:border-white/10 dark:bg-white/10" onChange={(event) => { const file = event.target.files?.[0]; setPurchaseNotice(''); setPurchaseSlipName(''); setPurchaseSlipDataUrl(''); if (file) void readPaymentProof(file).then((proof) => { setPurchaseSlipName(proof.name); setPurchaseSlipDataUrl(proof.dataUrl) }).catch((error) => setPurchaseNotice(error instanceof Error ? error.message : 'แนบหลักฐานไม่สำเร็จ')) }} type="file" />
+                    <button className="min-h-11 rounded-xl bg-amber-400 px-4 font-black text-slate-950 disabled:opacity-60" disabled={requestingPurchase || !currentUser || !purchaseSlipDataUrl} onClick={() => void requestPurchase()} type="button">
                       {currentUser ? (requestingPurchase ? 'กำลังส่ง...' : 'ส่งคำขอซื้อ') : 'เข้าสู่ระบบเพื่อซื้อ'}
                     </button>
                   </div>
+                  <p className="mt-2 text-xs font-bold text-amber-800/80 dark:text-amber-100/70">{purchaseSlipDataUrl ? `แนบแล้ว: ${purchaseSlipName}` : `ต้องแนบหลักฐาน ${paymentProofHelpText()}`}</p>
                   {settings.commercePolicyText && <p className="mt-3 text-xs font-semibold leading-5 text-amber-800/80 dark:text-amber-100/65">{settings.commercePolicyText}</p>}
                 </>
               ) : (

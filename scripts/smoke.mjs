@@ -61,6 +61,11 @@ const checks = [
     expectedStatus: 401,
     validate: (data) => data.ok === false,
   },
+  {
+    path: '/api/refunds',
+    expectedStatus: 401,
+    validate: (data) => data.ok === false && data.error === 'Unauthorized',
+  },
   { path: '/api/settings', validate: (data) => data.ok === true && typeof data.settings === 'object' },
   {
     path: '/api/media?page=1&pageSize=10',
@@ -86,6 +91,11 @@ const checks = [
   },
   {
     path: '/api/admin/vip-proof?id=1',
+    expectedStatus: 401,
+    validate: (data) => data.ok === false && data.error === 'Unauthorized',
+  },
+  {
+    path: '/api/admin/purchase-proof?id=1',
     expectedStatus: 401,
     validate: (data) => data.ok === false && data.error === 'Unauthorized',
   },

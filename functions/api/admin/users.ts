@@ -4,9 +4,10 @@ import { ensureSchema, getSql, type Env } from '../../_lib/db'
 import { notifyTelegram } from '../../_lib/notify'
 import { writeNotification } from '../../_lib/notifications'
 import { readPagination } from '../../_lib/pagination'
+import { emailHtmlText, sendEmail } from '../../_lib/email'
 
 type AdminAction = {
-  action?: 'approve-vip' | 'reject-vip' | 'approve-purchase' | 'reject-purchase' | 'set-access' | 'set-vip-expiry' | 'set-vip-lifetime' | 'extend-vip' | 'set-status' | 'set-role' | 'grant-purchase' | 'revoke-purchase'
+  action?: 'approve-vip' | 'reject-vip' | 'approve-purchase' | 'reject-purchase' | 'set-refund-status' | 'set-access' | 'set-vip-expiry' | 'set-vip-lifetime' | 'extend-vip' | 'set-status' | 'set-role' | 'grant-purchase' | 'revoke-purchase'
   requestId?: number
   userId?: number
   access?: 'สมาชิก' | 'VIP'
@@ -16,6 +17,8 @@ type AdminAction = {
   days?: number
   vipLifetime?: boolean
   vipExpiresAt?: string
+  refundStatus?: 'reviewing' | 'approved' | 'rejected' | 'completed'
+  adminNote?: string
 }
 
 async function requireSuperAdmin(env: Env, request: Request) {
@@ -106,11 +109,18 @@ export const onRequestGet = async ({ env, request }: { env: Env; request: Reques
   const purchaseRequests = await sql`
     select purchase_requests.id, purchase_requests.user_id, purchase_requests.media_id,
            users.name, users.email, media.title as media_title, purchase_requests.amount,
-           purchase_requests.slip_name, purchase_requests.status, purchase_requests.created_at
+           purchase_requests.slip_name,
+           (purchase_requests.slip_data_url is not null and purchase_requests.slip_data_url <> '') as has_slip_data,
+           purchase_requests.status, purchase_requests.created_at
     from purchase_requests
     join users on users.id = purchase_requests.user_id
     join media on media.id = purchase_requests.media_id
     order by purchase_requests.created_at desc limit 200
+  `
+  const refundRequests = await sql`
+    select refund_requests.*, users.name, users.email
+    from refund_requests join users on users.id = refund_requests.user_id
+    order by refund_requests.created_at desc limit 200
   `
 
   return Response.json({
@@ -153,9 +163,11 @@ export const onRequestGet = async ({ env, request }: { env: Env; request: Reques
       mediaTitle: item.media_title,
       amount: Number(item.amount ?? 0),
       slipName: item.slip_name ?? '',
+      hasSlipData: Boolean(item.has_slip_data),
       status: item.status,
       createdAt: item.created_at,
     })),
+    refundRequests: refundRequests.map((item) => ({ id: item.id, userId: item.user_id, name: item.name, email: item.email, requestType: item.request_type, referenceText: item.reference_text, reason: item.reason, detail: item.detail, contact: item.contact, status: item.status, adminNote: item.admin_note, createdAt: item.created_at, updatedAt: item.updated_at })),
   })
 }
 
@@ -195,7 +207,7 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
           where id = ${requestId}
             and status = 'pending'
             and coalesce(slip_data_url, '') <> ''
-          returning user_id
+          returning user_id, email
         ),
         activated as (
           update users
@@ -210,7 +222,7 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
             and role <> 'superadmin'
           returning id
         )
-        select approved.user_id, activated.id as activated_user_id
+        select approved.user_id, approved.email, activated.id as activated_user_id
         from approved left join activated on activated.id = approved.user_id
       `
       if (!vipRequest) return Response.json({ ok: false, error: 'ไม่พบคำขอ VIP ที่รอตรวจสอบหรือคำขอนี้ไม่มีหลักฐาน' }, { status: 409 })
@@ -229,12 +241,13 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
         fingerprint: `vip_request:${requestId}:approved`,
       })
       await notifyTelegram(env, `MIKPURINUT Media Platform\nอนุมัติคำขอ VIP แล้ว\nRequest ID: ${requestId}`)
+      await sendEmail(env, String(vipRequest.email), 'คำขอ VIP ได้รับการอนุมัติ', `<h2>คำขอ VIP ได้รับการอนุมัติแล้ว</h2><p>บัญชี ${emailHtmlText(vipRequest.email)} สามารถเข้าสู่ระบบเพื่อตรวจสอบสิทธิ์ได้ทันที</p>`).catch(() => false)
     } else if (body.action === 'reject-vip' && requestId) {
       const [vipRequest] = await sql`
         update vip_requests
         set status = 'rejected', updated_at = now()
         where id = ${requestId} and status = 'pending'
-        returning id
+        returning id, email
       `
       if (!vipRequest) return Response.json({ ok: false, error: 'ไม่พบคำขอ VIP ที่รอตรวจสอบ' }, { status: 409 })
       await writeAuditLog(env, currentUser, 'reject_vip', 'vip_request', requestId)
@@ -249,11 +262,12 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
         fingerprint: `vip_request:${requestId}:rejected`,
       })
       await notifyTelegram(env, `MIKPURINUT Media Platform\nปฏิเสธคำขอ VIP\nRequest ID: ${requestId}`)
+      await sendEmail(env, String(vipRequest.email), 'ผลการตรวจสอบคำขอ VIP', `<h2>คำขอ VIP ยังไม่ได้รับการอนุมัติ</h2><p>กรุณาเข้าสู่ระบบเพื่อตรวจข้อมูลและส่งคำขอใหม่ หรือติดต่อผู้ดูแลหากต้องการรายละเอียดเพิ่มเติม</p>`).catch(() => false)
     } else if (body.action === 'approve-purchase' && requestId) {
       const [purchase] = await sql`
         with approved as (
           update purchase_requests set status = 'approved', updated_at = now()
-          where id = ${requestId} and status = 'pending'
+          where id = ${requestId} and status = 'pending' and coalesce(slip_data_url, '') <> ''
           returning user_id, media_id, amount
         )
         insert into media_purchases (user_id, media_id, amount, status, granted_by)
@@ -265,13 +279,24 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
       `
       if (!purchase) return Response.json({ ok: false, error: 'ไม่พบคำขอซื้อที่รอตรวจสอบ' }, { status: 409 })
       await writeAuditLog(env, currentUser, 'approve_media_purchase', 'purchase_request', requestId, purchase)
+      const [purchaseUser] = await sql`select users.email, media.title from users join media on media.id = ${purchase.media_id} where users.id = ${purchase.user_id} limit 1`
+      if (purchaseUser?.email) await sendEmail(env, String(purchaseUser.email), 'คำขอซื้อสื่อได้รับการอนุมัติ', `<h2>เปิดสิทธิ์สื่อให้แล้ว</h2><p>${emailHtmlText(purchaseUser.title)} พร้อมใช้งานในคลังของคุณ</p>`).catch(() => false)
     } else if (body.action === 'reject-purchase' && requestId) {
       const [purchase] = await sql`
         update purchase_requests set status = 'rejected', updated_at = now()
-        where id = ${requestId} and status = 'pending' returning id
+        where id = ${requestId} and status = 'pending' returning id, user_id, media_id
       `
       if (!purchase) return Response.json({ ok: false, error: 'ไม่พบคำขอซื้อที่รอตรวจสอบ' }, { status: 409 })
       await writeAuditLog(env, currentUser, 'reject_media_purchase', 'purchase_request', requestId)
+      const [purchaseUser] = await sql`select users.email, media.title from users join media on media.id = ${purchase.media_id} where users.id = ${purchase.user_id} limit 1`
+      if (purchaseUser?.email) await sendEmail(env, String(purchaseUser.email), 'ผลการตรวจสอบคำขอซื้อสื่อ', `<h2>คำขอซื้อสื่อยังไม่ได้รับการอนุมัติ</h2><p>รายการ: ${emailHtmlText(purchaseUser.title)}</p><p>กรุณาติดต่อผู้ดูแลหากต้องการรายละเอียดเพิ่มเติม</p>`).catch(() => false)
+    } else if (body.action === 'set-refund-status' && requestId && ['reviewing', 'approved', 'rejected', 'completed'].includes(String(body.refundStatus))) {
+      const note = String(body.adminNote ?? '').trim().slice(0, 1000)
+      const [refund] = await sql`update refund_requests set status = ${body.refundStatus}, admin_note = ${note}, updated_at = now() where id = ${requestId} returning user_id, status`
+      if (!refund) return Response.json({ ok: false, error: 'ไม่พบคำขอคืนเงิน' }, { status: 404 })
+      await writeAuditLog(env, currentUser, 'set_refund_status', 'refund_request', requestId, { status: body.refundStatus, note })
+      const [refundUser] = await sql`select email from users where id = ${refund.user_id} limit 1`
+      if (refundUser?.email) await sendEmail(env, String(refundUser.email), 'อัปเดตสถานะคำขอคืนเงิน', `<h2>สถานะคำขอคืนเงิน: ${emailHtmlText(body.refundStatus)}</h2>${note ? `<p>${emailHtmlText(note)}</p>` : ''}<p>เข้าสู่ระบบเพื่อตรวจสอบรายละเอียดล่าสุด</p>`).catch(() => false)
     } else if (body.action === 'set-access' && userId && ['สมาชิก', 'VIP'].includes(String(body.access))) {
       const [siteSettings] = await sql`
         select

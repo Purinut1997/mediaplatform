@@ -196,13 +196,14 @@ export const onRequestGet = async ({ env, request }: { env: Env; request: Reques
       [user.id],
     )) as Array<MediaRow & { purchased_at?: string; purchase_amount?: number | string }>
 
-    const [vipRequest] = await sql`
+    const vipRequests = await sql`
       select id, phone, slip_name, slip_data_url, status, created_at, updated_at
       from vip_requests
       where user_id = ${user.id}
       order by created_at desc
-      limit 1
+      limit 100
     `
+    const vipRequest = vipRequests[0]
 
     return Response.json({
       ok: true,
@@ -234,6 +235,14 @@ export const onRequestGet = async ({ env, request }: { env: Env; request: Reques
         createdAt: vipRequest.created_at,
         updatedAt: vipRequest.updated_at,
       } : null,
+      vipRequests: vipRequests.map((request) => ({
+        id: request.id,
+        phone: request.phone ?? '',
+        slipName: request.slip_name ?? '',
+        status: request.status,
+        createdAt: request.created_at,
+        updatedAt: request.updated_at,
+      })),
     })
   } catch (error) {
     await writeErrorLog(env, 'member.library.read', error)

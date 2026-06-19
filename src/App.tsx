@@ -993,6 +993,7 @@ function LoginPanel({
               value={password}
             />
             <button
+              aria-label={showPassword ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน'}
               className="grid place-items-center text-slate-500 hover:text-blue-600 dark:text-slate-300"
               onClick={() => setShowPassword((value) => !value)}
               type="button"
@@ -1307,9 +1308,9 @@ function RegisterPanel({
               />
               <div>
                 <p className="text-sm font-black text-cyan-200">MIKPURINUT Membership</p>
-                <h2 className="text-3xl font-black sm:text-4xl">
+                <h1 className="text-3xl font-black sm:text-4xl">
                   เลือกสิทธิ์ แล้วเริ่มใช้งานคลังสื่อ
-                </h2>
+                </h1>
               </div>
             </div>
             <p className="mt-5 max-w-3xl leading-8 text-slate-300">
@@ -1408,11 +1409,13 @@ function RegisterPanel({
             active={vipSelected}
             badge="แนะนำ"
             detail={
-              settings.vipRegistrationEnabled && settings.vipPrice > 0
-                ? `${settings.vipPrice.toLocaleString('th-TH')} บาท / ${vipDurationText}`
+              settings.vipRegistrationEnabled
+                ? settings.vipPrice > 0
+                  ? `${settings.vipPrice.toLocaleString('th-TH')} บาท / ${vipDurationText}`
+                  : 'ยังไม่ได้กำหนดราคา VIP'
                 : 'รอเปิดรับจากผู้ดูแล'
             }
-            disabled={!settings.vipRegistrationEnabled}
+            disabled={!settings.vipRegistrationEnabled || settings.vipPrice <= 0}
             icon={<Crown size={36} />}
             onClick={() => updateForm('membership', 'vip')}
             title="สมาชิก VIP"

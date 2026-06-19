@@ -4,8 +4,9 @@ import { ensureSchema, getSql, type Env } from '../_lib/db'
 import { boundedText, InputValidationError } from '../_lib/input'
 import { writeNotification } from '../_lib/notifications'
 import { enforceRateLimits, rateLimitResponse } from '../_lib/rate-limit'
+import { paymentProofDataUrl } from '../_lib/payment-proof'
 
-type PurchasePayload = { mediaId?: number; slipName?: string }
+type PurchasePayload = { mediaId?: number; slipName?: string; slipDataUrl?: string }
 
 export const onRequestGet = async ({ env, request }: { env: Env; request: Request }) => {
   await ensureSchema(env)
@@ -43,6 +44,8 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
       return Response.json({ ok: false, error: 'ข้อมูลสื่อไม่ถูกต้อง' }, { status: 400 })
     }
     const slipName = boundedText(body.slipName, 'ชื่อไฟล์สลิป', { max: 200 })
+    const slipDataUrl = paymentProofDataUrl(body.slipDataUrl)
+    if (!slipName || !slipDataUrl) return Response.json({ ok: false, error: 'กรุณาแนบหลักฐานการชำระเงินก่อนส่งคำขอซื้อ' }, { status: 400 })
     const rateLimit = await enforceRateLimits(env, [{
       action: 'purchase-request:account',
       identifier: currentUser.email,
@@ -75,8 +78,8 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
     `
     if (pending) return Response.json({ ok: false, error: 'มีคำขอซื้อรายการนี้รอตรวจสอบอยู่แล้ว' }, { status: 409 })
     const [created] = await sql`
-      insert into purchase_requests (user_id, media_id, amount, slip_name)
-      values (${user.id}, ${mediaId}, ${Number(media.price ?? 0)}, ${slipName || null})
+      insert into purchase_requests (user_id, media_id, amount, slip_name, slip_data_url)
+      values (${user.id}, ${mediaId}, ${Number(media.price ?? 0)}, ${slipName}, ${slipDataUrl})
       returning id
     `
     await writeAuditLog(env, currentUser, 'request_media_purchase', 'media', mediaId, { requestId: created.id })

@@ -21,7 +21,7 @@ export type Env = {
 }
 
 let schemaReady = false
-const SCHEMA_VERSION = '2026.06.16.1'
+const SCHEMA_VERSION = '2026.06.18.2'
 
 export function getSql(env: Env) {
   if (!env.DATABASE_URL) {
@@ -56,6 +56,24 @@ export async function ensureSchema(env: Env) {
     if (state?.version) {
       await sql`alter table users add column if not exists vip_expires_at timestamptz`
       await sql`alter table vip_requests add column if not exists slip_data_url text`
+      await sql`alter table purchase_requests add column if not exists slip_data_url text`
+      await sql`
+        create table if not exists refund_requests (
+          id serial primary key,
+          user_id integer not null references users(id) on delete cascade,
+          request_type text not null check (request_type in ('vip', 'media')),
+          reference_text text not null,
+          reason text not null,
+          detail text not null default '',
+          contact text not null default '',
+          status text not null default 'pending' check (status in ('pending', 'reviewing', 'approved', 'rejected', 'completed')),
+          admin_note text not null default '',
+          created_at timestamptz not null default now(),
+          updated_at timestamptz not null default now()
+        )
+      `
+      await sql`create index if not exists refund_requests_user_idx on refund_requests(user_id, created_at desc)`
+      await sql`create index if not exists refund_requests_status_idx on refund_requests(status, created_at desc)`
       await sql`
         update app_settings
         set value = jsonb_set(value, '{vipLifetimeEnabled}', 'false'::jsonb, true),
@@ -302,7 +320,24 @@ export async function ensureSchema(env: Env) {
       media_id integer not null references media(id) on delete cascade,
       amount integer not null default 0 check (amount between 0 and 10000000),
       slip_name text,
+      slip_data_url text,
       status text not null default 'pending' check (status in ('pending', 'approved', 'rejected', 'cancelled', 'refunded')),
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now()
+    )
+  `
+
+  await sql`
+    create table if not exists refund_requests (
+      id serial primary key,
+      user_id integer not null references users(id) on delete cascade,
+      request_type text not null check (request_type in ('vip', 'media')),
+      reference_text text not null,
+      reason text not null,
+      detail text not null default '',
+      contact text not null default '',
+      status text not null default 'pending' check (status in ('pending', 'reviewing', 'approved', 'rejected', 'completed')),
+      admin_note text not null default '',
       created_at timestamptz not null default now(),
       updated_at timestamptz not null default now()
     )
@@ -349,6 +384,7 @@ export async function ensureSchema(env: Env) {
   `
   await sql`alter table users add column if not exists vip_expires_at timestamptz`
   await sql`alter table vip_requests add column if not exists slip_data_url text`
+  await sql`alter table purchase_requests add column if not exists slip_data_url text`
   await sql`
     update vip_requests
     set status = 'pending'
@@ -414,6 +450,8 @@ export async function ensureSchema(env: Env) {
   await sql`
     create index if not exists purchase_requests_status_idx on purchase_requests(status, created_at desc)
   `
+  await sql`create index if not exists refund_requests_user_idx on refund_requests(user_id, created_at desc)`
+  await sql`create index if not exists refund_requests_status_idx on refund_requests(status, created_at desc)`
   await sql`
     create index if not exists users_vip_expiry_idx on users(access_level, vip_expires_at)
   `
