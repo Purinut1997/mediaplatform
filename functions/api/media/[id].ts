@@ -30,6 +30,9 @@ type MediaPayload = {
   }>
   tags?: string[] | string
   description?: string
+  availableFrom?: string
+  availableUntil?: string
+  downloadLimit?: number
 }
 
 type Context = {
@@ -87,6 +90,13 @@ function readTags(body: MediaPayload) {
 }
 
 function readMediaFields(body: MediaPayload) {
+  const availableFrom = body.availableFrom ? new Date(body.availableFrom) : null
+  const availableUntil = body.availableUntil ? new Date(body.availableUntil) : null
+  const maxDownloads = Number(body.downloadLimit ?? 0)
+  if (availableFrom && Number.isNaN(availableFrom.getTime())) throw new Error('วันเริ่มเผยแพร่ไม่ถูกต้อง')
+  if (availableUntil && Number.isNaN(availableUntil.getTime())) throw new Error('วันสิ้นสุดเผยแพร่ไม่ถูกต้อง')
+  if (availableFrom && availableUntil && availableFrom >= availableUntil) throw new Error('วันสิ้นสุดต้องอยู่หลังวันเริ่มเผยแพร่')
+  if (!Number.isInteger(maxDownloads) || maxDownloads < 0 || maxDownloads > 1_000_000) throw new Error('จำนวนดาวน์โหลดสูงสุดไม่ถูกต้อง')
   return {
     title: mediaText(body.title, 'ชื่อสื่อ', 200),
     description: mediaText(body.description, 'รายละเอียดสื่อ', 10_000),
@@ -95,6 +105,9 @@ function readMediaFields(body: MediaPayload) {
     status: mediaStatus(body.status),
     price: mediaPrice(body.price),
     source: mediaText(body.source, 'ชนิดสื่อ', 80, 'Google Drive') || 'Google Drive',
+    availableFrom: availableFrom?.toISOString() ?? null,
+    availableUntil: availableUntil?.toISOString() ?? null,
+    maxDownloads,
   }
 }
 
@@ -127,7 +140,7 @@ export const onRequestPut = async ({ env, request, params }: Context) => {
       { status: 400 },
     )
   }
-  const { title, description, topic, access, status, price, source } = fields
+  const { title, description, topic, access, status, price, source, availableFrom, availableUntil, maxDownloads } = fields
   if (!title) {
     return Response.json({ ok: false, error: 'กรุณากรอกชื่อสื่อไม่เกิน 200 ตัวอักษร' }, { status: 400 })
   }
@@ -144,7 +157,7 @@ export const onRequestPut = async ({ env, request, params }: Context) => {
   }
 
   const tags = readTags(body)
-  const [existing] = await sql`select id from media where id = ${id} limit 1`
+  const [existing] = await sql`select id from media where id = ${id} and deleted_at is null limit 1`
   if (!existing) return Response.json({ ok: false, error: 'Media not found' }, { status: 404 })
 
   await sql.transaction((tx) => [
@@ -152,8 +165,9 @@ export const onRequestPut = async ({ env, request, params }: Context) => {
       update media
       set title = ${title}, topic = ${topic}, access_level = ${access}, status = ${status},
         price = ${price}, cover_url = ${coverUrl}, source_type = ${source},
-        description = ${description}, updated_at = now()
-      where id = ${id}
+        description = ${description}, available_from = ${availableFrom}, available_until = ${availableUntil},
+        download_limit = ${maxDownloads}, updated_at = now()
+      where id = ${id} and deleted_at is null
     `,
     tx`delete from media_links where media_id = ${id}`,
     ...links.map((link, index) => tx`
@@ -191,12 +205,15 @@ export const onRequestDelete = async ({ env, request, params }: Context) => {
 
   await ensureSchema(env)
   const sql = getSql(env)
-  const [row] = await sql`delete from media where id = ${id} returning title`
+  const [row] = await sql`
+    update media set deleted_at = now(), deleted_by = ${auth.actor}, updated_at = now()
+    where id = ${id} and deleted_at is null returning title
+  `
   if (!row) return Response.json({ ok: false, error: 'Media not found' }, { status: 404 })
 
   await sql`
     insert into audit_logs (actor, action, target_type, target_id, detail)
-    values (${auth.actor}, 'delete', 'media', ${String(id)}, ${JSON.stringify({ title: row.title })}::jsonb)
+    values (${auth.actor}, 'trash', 'media', ${String(id)}, ${JSON.stringify({ title: row.title })}::jsonb)
   `
 
   return Response.json({ ok: true })

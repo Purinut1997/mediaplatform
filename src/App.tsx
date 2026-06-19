@@ -85,6 +85,11 @@ function App() {
   const [selected, setSelected] = useState<MediaItem>(mediaItems[0])
   const [query, setQuery] = useState('')
   const [topic, setTopic] = useState('ทั้งหมด')
+  const [mediaAccess, setMediaAccess] = useState('ทั้งหมด')
+  const [mediaSource, setMediaSource] = useState('ทั้งหมด')
+  const [mediaSort, setMediaSort] = useState('latest')
+  const [mediaDays, setMediaDays] = useState('0')
+  const [mediaTag, setMediaTag] = useState('')
   const [toast, setToast] = useState(() => {
     if (oauthResult === 'success') return 'เข้าสู่ระบบด้วย Google สำเร็จ'
     if (oauthResult === 'not_configured') return 'Google Login ยังไม่ได้ตั้งค่าครบ'
@@ -154,10 +159,14 @@ function App() {
         const mediaParams = new URLSearchParams({ page: '1', pageSize: '40' })
         if (currentUser?.role === 'superadmin' || currentUser?.role === 'admin') {
           mediaParams.set('status', 'all')
-        } else {
-          if (query.trim()) mediaParams.set('query', query.trim())
-          if (topic !== 'ทั้งหมด') mediaParams.set('topic', topic)
         }
+        if (query.trim()) mediaParams.set('query', query.trim())
+        if (topic !== 'ทั้งหมด') mediaParams.set('topic', topic)
+        if (mediaAccess !== 'ทั้งหมด') mediaParams.set('access', mediaAccess)
+        if (mediaSource !== 'ทั้งหมด') mediaParams.set('source', mediaSource)
+        if (mediaSort !== 'latest') mediaParams.set('sort', mediaSort)
+        if (mediaDays !== '0') mediaParams.set('days', mediaDays)
+        if (mediaTag.trim()) mediaParams.set('tag', mediaTag.trim())
         const [mediaResponse, categoriesResponse, settingsResponse] = await Promise.all([
           fetch(`/api/media?${mediaParams}`),
           fetch('/api/categories'),
@@ -210,7 +219,7 @@ function App() {
       active = false
       window.clearTimeout(timer)
     }
-  }, [currentUser?.role, query, refreshToken, topic])
+  }, [currentUser?.role, mediaAccess, mediaDays, mediaSort, mediaSource, mediaTag, query, refreshToken, topic])
 
   const loadMoreMedia = async () => {
     if (loadingMoreMedia || mediaRecords.length >= mediaTotal) return
@@ -219,10 +228,13 @@ function App() {
       const nextPage = mediaPage + 1
       const mediaParams = new URLSearchParams({ page: String(nextPage), pageSize: '40' })
       if (currentUser?.role === 'superadmin' || currentUser?.role === 'admin') mediaParams.set('status', 'all')
-      else {
-        if (query.trim()) mediaParams.set('query', query.trim())
-        if (topic !== 'ทั้งหมด') mediaParams.set('topic', topic)
-      }
+      if (query.trim()) mediaParams.set('query', query.trim())
+      if (topic !== 'ทั้งหมด') mediaParams.set('topic', topic)
+      if (mediaAccess !== 'ทั้งหมด') mediaParams.set('access', mediaAccess)
+      if (mediaSource !== 'ทั้งหมด') mediaParams.set('source', mediaSource)
+      if (mediaSort !== 'latest') mediaParams.set('sort', mediaSort)
+      if (mediaDays !== '0') mediaParams.set('days', mediaDays)
+      if (mediaTag.trim()) mediaParams.set('tag', mediaTag.trim())
       const response = await fetch(`/api/media?${mediaParams}`)
       const result = await readJson<{ media?: MediaItem[]; page?: number; total?: number; error?: string }>(response)
       if (!response.ok) throw new Error(result.error || 'โหลดสื่อเพิ่มเติมไม่สำเร็จ')
@@ -268,7 +280,7 @@ function App() {
   const filteredMedia = useMemo(
     () =>
       mediaRecords.filter((item) => {
-        const text = `${item.title} ${item.description}`.toLowerCase()
+        const text = `${item.title} ${item.description} ${item.topic} ${item.source} ${(item.tags ?? []).join(' ')}`.toLowerCase()
         const matchQuery = text.includes(query.toLowerCase())
         const matchTopic = topic === 'ทั้งหมด' || item.topic === topic
         return matchQuery && matchTopic && canViewMedia(currentUser, item)
@@ -381,10 +393,20 @@ function App() {
                 loadingMore={loadingMoreMedia}
                 mediaLoadedCount={mediaRecords.length}
                 mediaTotal={mediaTotal}
+                mediaAccess={mediaAccess}
+                mediaDays={mediaDays}
+                mediaSort={mediaSort}
+                mediaSource={mediaSource}
+                mediaTag={mediaTag}
                 onLoadMore={() => void loadMoreMedia()}
                 openDetail={openDetail}
                 query={query}
                 setQuery={setQuery}
+                setMediaAccess={setMediaAccess}
+                setMediaDays={setMediaDays}
+                setMediaSort={setMediaSort}
+                setMediaSource={setMediaSource}
+                setMediaTag={setMediaTag}
                 setTopic={setTopic}
                 topic={topic}
                 topics={topicOptions}
@@ -401,10 +423,20 @@ function App() {
               loadingMore={loadingMoreMedia}
               mediaLoadedCount={mediaRecords.length}
               mediaTotal={mediaTotal}
+              mediaAccess={mediaAccess}
+              mediaDays={mediaDays}
+              mediaSort={mediaSort}
+              mediaSource={mediaSource}
+              mediaTag={mediaTag}
               onLoadMore={() => void loadMoreMedia()}
               openDetail={openDetail}
               query={query}
               setQuery={setQuery}
+              setMediaAccess={setMediaAccess}
+              setMediaDays={setMediaDays}
+              setMediaSort={setMediaSort}
+              setMediaSource={setMediaSource}
+              setMediaTag={setMediaTag}
               setTopic={setTopic}
               topic={topic}
               topics={topicOptions}
@@ -532,9 +564,19 @@ function MediaSection({
   loadingMore,
   mediaLoadedCount,
   mediaTotal,
+  mediaAccess,
+  mediaDays,
+  mediaSort,
+  mediaSource,
+  mediaTag,
   onLoadMore,
   query,
   setQuery,
+  setMediaAccess,
+  setMediaDays,
+  setMediaSort,
+  setMediaSource,
+  setMediaTag,
   setTopic,
   topic,
   topics,
@@ -548,15 +590,41 @@ function MediaSection({
   loadingMore: boolean
   mediaLoadedCount: number
   mediaTotal: number
+  mediaAccess: string
+  mediaDays: string
+  mediaSort: string
+  mediaSource: string
+  mediaTag: string
   onLoadMore: () => void
   query: string
   setQuery: (value: string) => void
+  setMediaAccess: (value: string) => void
+  setMediaDays: (value: string) => void
+  setMediaSort: (value: string) => void
+  setMediaSource: (value: string) => void
+  setMediaTag: (value: string) => void
   setTopic: (value: string) => void
   topic: string
   topics: string[]
   openDetail: (item: MediaItem) => void
   expanded?: boolean
 }) {
+  const [showFilters, setShowFilters] = useState(false)
+  const [recentSearches, setRecentSearches] = useState<string[]>(() => {
+    try { return JSON.parse(window.localStorage.getItem('media-recent-searches') ?? '[]') as string[] } catch { return [] }
+  })
+  useEffect(() => {
+    const value = query.trim()
+    if (value.length < 2) return
+    const timer = window.setTimeout(() => {
+      setRecentSearches((current) => {
+        const next = [value, ...current.filter((item) => item !== value)].slice(0, 6)
+        window.localStorage.setItem('media-recent-searches', JSON.stringify(next))
+        return next
+      })
+    }, 900)
+    return () => window.clearTimeout(timer)
+  }, [query])
   return (
     <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
       <div className="mb-6 grid gap-4 lg:grid-cols-[1fr_520px] lg:items-end">
@@ -589,12 +657,23 @@ function MediaSection({
               value={query}
             />
           </label>
-          <button className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-white/70 bg-white/78 px-5 font-black text-slate-700 dark:border-white/10 dark:bg-white/10 dark:text-white">
+          <button className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-white/70 bg-white/78 px-5 font-black text-slate-700 dark:border-white/10 dark:bg-white/10 dark:text-white" onClick={() => setShowFilters((value) => !value)} type="button">
             <ListFilter size={18} />
-            ตัวกรอง
+            ตัวกรอง{showFilters ? ' ▲' : ' ▼'}
           </button>
         </div>
       </div>
+
+      {recentSearches.length > 0 && <div className="mb-3 flex flex-wrap items-center gap-2 text-xs font-bold text-slate-500"><span>ค้นหาล่าสุด:</span>{recentSearches.map((item) => <button className="rounded-full bg-slate-100 px-3 py-1 dark:bg-white/10" key={item} onClick={() => setQuery(item)} type="button">{item}</button>)}</div>}
+      {showFilters && (
+        <div className="mb-4 grid gap-3 rounded-3xl border border-slate-200 bg-white/70 p-4 dark:border-white/10 dark:bg-white/[0.06] sm:grid-cols-2 lg:grid-cols-5">
+          <select className="min-h-11 rounded-xl border border-slate-200 bg-white px-3 dark:border-white/10 dark:bg-slate-900" onChange={(event) => setMediaAccess(event.target.value)} value={mediaAccess}><option>ทั้งหมด</option><option>สาธารณะ</option><option>สมาชิก</option><option>VIP</option><option>ซื้อแยก</option></select>
+          <select className="min-h-11 rounded-xl border border-slate-200 bg-white px-3 dark:border-white/10 dark:bg-slate-900" onChange={(event) => setMediaSource(event.target.value)} value={mediaSource}><option>ทั้งหมด</option><option>Google Drive</option><option>Google Sheet</option><option>YouTube</option><option>External Link</option></select>
+          <select className="min-h-11 rounded-xl border border-slate-200 bg-white px-3 dark:border-white/10 dark:bg-slate-900" onChange={(event) => setMediaDays(event.target.value)} value={mediaDays}><option value="0">ทุกช่วงเวลา</option><option value="7">7 วันล่าสุด</option><option value="30">30 วันล่าสุด</option><option value="365">1 ปีล่าสุด</option></select>
+          <select className="min-h-11 rounded-xl border border-slate-200 bg-white px-3 dark:border-white/10 dark:bg-slate-900" onChange={(event) => setMediaSort(event.target.value)} value={mediaSort}><option value="latest">ล่าสุด</option><option value="downloads">ดาวน์โหลดมากสุด</option><option value="views">เข้าชมมากสุด</option><option value="rating">คะแนนสูงสุด</option><option value="title">ชื่อ A-Z</option></select>
+          <input className="min-h-11 rounded-xl border border-slate-200 bg-white px-3 dark:border-white/10 dark:bg-slate-900" onChange={(event) => setMediaTag(event.target.value)} placeholder="กรองด้วยแท็ก" value={mediaTag} />
+        </div>
+      )}
 
       <FilterRow
         items={topics}

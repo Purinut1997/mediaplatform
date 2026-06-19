@@ -40,6 +40,9 @@ export function createEmptyMediaForm(topic = 'โรงเรียน'): MediaF
     links: [createEmptyMediaLink()],
     tags: '',
     description: '',
+    availableFrom: '',
+    availableUntil: '',
+    downloadLimit: '0',
   }
 }
 

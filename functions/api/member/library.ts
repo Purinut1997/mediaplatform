@@ -131,7 +131,7 @@ export const onRequestGet = async ({ env, request }: { env: Env; request: Reques
           from media_tags join tags on tags.id = media_tags.tag_id
           where media_tags.media_id = media.id
         ) tagset on true
-        where user_favorites.user_id = $1 and media.status in ('เผยแพร่', 'เผยแพร่แล้ว')
+        where user_favorites.user_id = $1 and media.deleted_at is null and media.status in ('เผยแพร่', 'เผยแพร่แล้ว')
         order by user_favorites.created_at desc
         limit 60
       `,
@@ -160,7 +160,7 @@ export const onRequestGet = async ({ env, request }: { env: Env; request: Reques
           where media_tags.media_id = media.id
         ) tagset on true
         where lower(media_events.user_email) = $1 and media_events.event_type = 'download'
-          and media.status in ('เผยแพร่', 'เผยแพร่แล้ว')
+          and media.deleted_at is null and media.status in ('เผยแพร่', 'เผยแพร่แล้ว')
         group by media.id, link.links, tagset.tags
         order by last_downloaded_at desc
         limit 30
@@ -189,7 +189,7 @@ export const onRequestGet = async ({ env, request }: { env: Env; request: Reques
           where media_tags.media_id = media.id
         ) tagset on true
         where media_purchases.user_id = $1 and media_purchases.status = 'active'
-          and media.status in ('เผยแพร่', 'เผยแพร่แล้ว')
+          and media.deleted_at is null and media.status in ('เผยแพร่', 'เผยแพร่แล้ว')
         order by media_purchases.granted_at desc
         limit 60
       `,
@@ -269,7 +269,7 @@ export const onRequestPatch = async ({ env, request }: { env: Env; request: Requ
     const [media] = await sql`
       select id, title, access_level
       from media
-      where id = ${mediaId} and status in ('เผยแพร่', 'เผยแพร่แล้ว')
+      where id = ${mediaId} and deleted_at is null and status in ('เผยแพร่', 'เผยแพร่แล้ว')
       limit 1
     `
     if (!user || !media) {

@@ -22,7 +22,7 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
   const [media] = await sql`
     select id
     from media
-    where id = ${mediaId} and status in ('เผยแพร่', 'เผยแพร่แล้ว')
+    where id = ${mediaId} and deleted_at is null and status in ('เผยแพร่', 'เผยแพร่แล้ว')
     limit 1
   `
   if (!media) {

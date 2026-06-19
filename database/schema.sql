@@ -20,6 +20,11 @@ create table if not exists media (
   cover_url text not null,
   source_type text not null default 'Google Drive',
   description text not null default '',
+  available_from timestamptz,
+  available_until timestamptz,
+  download_limit integer not null default 0 check (download_limit between 0 and 1000000),
+  deleted_at timestamptz,
+  deleted_by text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -147,6 +152,7 @@ create table if not exists app_settings (
 );
 
 create index if not exists media_status_topic_idx on media(status, topic);
+create index if not exists media_deleted_updated_idx on media(deleted_at, updated_at desc);
 create index if not exists media_access_idx on media(access_level);
 create index if not exists sessions_user_idx on sessions(user_id, expires_at);
 create index if not exists vip_requests_status_idx on vip_requests(status, created_at);

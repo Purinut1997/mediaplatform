@@ -21,7 +21,7 @@ export type Env = {
 }
 
 let schemaReady = false
-const SCHEMA_VERSION = '2026.06.18.2'
+const SCHEMA_VERSION = '2026.06.19.1'
 
 export function getSql(env: Env) {
   if (!env.DATABASE_URL) {
@@ -54,6 +54,12 @@ export async function ensureSchema(env: Env) {
       return
     }
     if (state?.version) {
+      await sql`alter table media add column if not exists deleted_at timestamptz`
+      await sql`alter table media add column if not exists deleted_by text`
+      await sql`alter table media add column if not exists available_from timestamptz`
+      await sql`alter table media add column if not exists available_until timestamptz`
+      await sql`alter table media add column if not exists download_limit integer not null default 0`
+      await sql`create index if not exists media_deleted_updated_idx on media(deleted_at, updated_at desc)`
       await sql`alter table users add column if not exists vip_expires_at timestamptz`
       await sql`alter table vip_requests add column if not exists slip_data_url text`
       await sql`alter table purchase_requests add column if not exists slip_data_url text`
@@ -114,6 +120,11 @@ export async function ensureSchema(env: Env) {
       cover_url text not null,
       source_type text not null default 'Google Drive',
       description text not null default '',
+      available_from timestamptz,
+      available_until timestamptz,
+      download_limit integer not null default 0 check (download_limit between 0 and 1000000),
+      deleted_at timestamptz,
+      deleted_by text,
       created_at timestamptz not null default now(),
       updated_at timestamptz not null default now()
     )
@@ -431,6 +442,9 @@ export async function ensureSchema(env: Env) {
 
   await sql`
     create index if not exists media_status_topic_idx on media(status, topic)
+  `
+  await sql`
+    create index if not exists media_deleted_updated_idx on media(deleted_at, updated_at desc)
   `
 
   await sql`

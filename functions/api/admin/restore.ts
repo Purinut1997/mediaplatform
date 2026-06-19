@@ -178,7 +178,8 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
       const [row] = await sql`
         insert into media (
           title, slug, topic, access_level, status, price, downloads, views, rating,
-          cover_url, source_type, description, created_at, updated_at
+          cover_url, source_type, description, available_from, available_until, download_limit,
+          deleted_at, deleted_by, created_at, updated_at
         )
         values (
           ${title},
@@ -193,6 +194,11 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
           ${safeHttpUrl(item.cover_url, DEFAULT_COVER_URL)},
           ${text(item.source_type, 'Google Drive')},
           ${text(item.description)},
+          ${text(item.available_from) || null},
+          ${text(item.available_until) || null},
+          ${Math.max(0, int(item.download_limit))},
+          ${text(item.deleted_at) || null},
+          ${text(item.deleted_by) || null},
           ${text(item.created_at) || new Date().toISOString()},
           ${text(item.updated_at) || new Date().toISOString()}
         )
@@ -208,6 +214,11 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
           cover_url = excluded.cover_url,
           source_type = excluded.source_type,
           description = excluded.description,
+          available_from = excluded.available_from,
+          available_until = excluded.available_until,
+          download_limit = excluded.download_limit,
+          deleted_at = excluded.deleted_at,
+          deleted_by = excluded.deleted_by,
           updated_at = now()
         returning id
       `

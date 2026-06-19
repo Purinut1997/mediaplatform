@@ -40,7 +40,7 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
     const [user] = await sql`select id from users where lower(email) = ${currentUser.email.toLowerCase()} limit 1`
     const [media] = await sql`
       select id, access_level from media
-      where id = ${mediaId} and status in ('เผยแพร่', 'เผยแพร่แล้ว')
+      where id = ${mediaId} and deleted_at is null and status in ('เผยแพร่', 'เผยแพร่แล้ว')
       limit 1
     `
     if (!user || !media) return Response.json({ ok: false, error: 'ไม่พบข้อมูล' }, { status: 404 })

@@ -31,6 +31,11 @@ type MediaRow = {
   cover_url: string
   source_type: string
   description: string
+  available_from?: string | null
+  available_until?: string | null
+  download_limit?: number
+  deleted_at?: string | null
+  deleted_by?: string | null
   resource_url?: string | null
   preview_url?: string | null
   links?: Array<{
@@ -141,7 +146,28 @@ function toMedia(row: MediaRow) {
     tags: Array.isArray(row.tags) ? row.tags : [],
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    availableFrom: row.available_from ?? null,
+    availableUntil: row.available_until ?? null,
+    downloadLimit: Number(row.download_limit ?? 0),
+    deletedAt: row.deleted_at ?? null,
+    deletedBy: row.deleted_by ?? null,
   }
+}
+
+function optionalDate(value: unknown, label: string) {
+  const text = String(value ?? '').trim()
+  if (!text) return null
+  const date = new Date(text)
+  if (Number.isNaN(date.getTime())) throw new MediaValidationError(`${label}ไม่ถูกต้อง`)
+  return date.toISOString()
+}
+
+function downloadLimit(value: unknown) {
+  const limit = Number(value ?? 0)
+  if (!Number.isInteger(limit) || limit < 0 || limit > 1_000_000) {
+    throw new MediaValidationError('จำนวนดาวน์โหลดสูงสุดต้องเป็นเลขจำนวนเต็ม 0-1,000,000')
+  }
+  return limit
 }
 
 export const onRequestGet = async ({ env, request }: { env: Env; request: Request }) => {
@@ -155,16 +181,18 @@ export const onRequestGet = async ({ env, request }: { env: Env; request: Reques
   const canReadAll = Boolean(adminUser)
   const currentUser = adminUser ?? await getCurrentUser(env, request)
   const requestedAccess = url.searchParams.get('access')?.trim() ?? ''
-  const access = canReadAll && MEDIA_ACCESS_LEVELS.includes(requestedAccess as (typeof MEDIA_ACCESS_LEVELS)[number])
+  const access = MEDIA_ACCESS_LEVELS.includes(requestedAccess as (typeof MEDIA_ACCESS_LEVELS)[number])
     ? requestedAccess
     : ''
-  const tag = canReadAll ? url.searchParams.get('tag')?.trim().slice(0, 60) ?? '' : ''
+  const tag = url.searchParams.get('tag')?.trim().slice(0, 60) ?? ''
   const tagPattern = `%${tag}%`
   const requestedDays = Number(url.searchParams.get('days') ?? 0)
-  const days = canReadAll && Number.isFinite(requestedDays) && requestedDays > 0 ? Math.min(Math.trunc(requestedDays), 365) : 0
-  const sort = canReadAll && ['downloads', 'views', 'title'].includes(url.searchParams.get('sort') ?? '')
+  const days = Number.isFinite(requestedDays) && requestedDays > 0 ? Math.min(Math.trunc(requestedDays), 365) : 0
+  const sort = ['downloads', 'views', 'rating', 'title'].includes(url.searchParams.get('sort') ?? '')
     ? url.searchParams.get('sort')
     : 'latest'
+  const source = url.searchParams.get('source')?.trim().slice(0, 80) ?? ''
+  const trashMode = canReadAll && url.searchParams.get('trash') === 'only' ? 'only' : 'active'
   const requestedStatus = url.searchParams.get('status')
   const { page, pageSize, offset } = readPagination(url, { defaultPageSize: 40 })
   const status =
@@ -206,8 +234,11 @@ export const onRequestGet = async ({ env, request }: { env: Env; request: Reques
             where media_tags.media_id = media.id
           ) tagset on true
           where (${isAllStatus} or media.status = any(${statusList}))
+            and ((${trashMode} = 'only' and media.deleted_at is not null) or (${trashMode} = 'active' and media.deleted_at is null))
+            and (${canReadAll} or ((media.available_from is null or media.available_from <= now()) and (media.available_until is null or media.available_until > now())))
             and media.topic = ${topic}
             and (${access} = '' or media.access_level = ${access})
+            and (${source} = '' or media.source_type = ${source})
             and (${days} = 0 or media.created_at >= now() - make_interval(days => ${days}))
             and (${query} = '' or media.title ilike ${pattern} or media.topic ilike ${pattern} or media.description ilike ${pattern}
               or exists (select 1 from media_links where media_links.media_id = media.id and (label ilike ${pattern} or type ilike ${pattern} or url ilike ${pattern}))
@@ -219,6 +250,7 @@ export const onRequestGet = async ({ env, request }: { env: Env; request: Reques
           order by
             case when ${sort} = 'downloads' then media.downloads end desc,
             case when ${sort} = 'views' then media.views end desc,
+            case when ${sort} = 'rating' then media.rating end desc,
             case when ${sort} = 'title' then media.title end asc,
             media.updated_at desc, media.id desc
           limit ${pageSize} offset ${offset}
@@ -251,7 +283,10 @@ export const onRequestGet = async ({ env, request }: { env: Env; request: Reques
             where media_tags.media_id = media.id
           ) tagset on true
           where (${isAllStatus} or media.status = any(${statusList}))
+            and ((${trashMode} = 'only' and media.deleted_at is not null) or (${trashMode} = 'active' and media.deleted_at is null))
+            and (${canReadAll} or ((media.available_from is null or media.available_from <= now()) and (media.available_until is null or media.available_until > now())))
             and (${access} = '' or media.access_level = ${access})
+            and (${source} = '' or media.source_type = ${source})
             and (${days} = 0 or media.created_at >= now() - make_interval(days => ${days}))
             and (${query} = '' or media.title ilike ${pattern} or media.topic ilike ${pattern} or media.description ilike ${pattern}
               or exists (select 1 from media_links where media_links.media_id = media.id and (label ilike ${pattern} or type ilike ${pattern} or url ilike ${pattern}))
@@ -263,6 +298,7 @@ export const onRequestGet = async ({ env, request }: { env: Env; request: Reques
           order by
             case when ${sort} = 'downloads' then media.downloads end desc,
             case when ${sort} = 'views' then media.views end desc,
+            case when ${sort} = 'rating' then media.rating end desc,
             case when ${sort} = 'title' then media.title end asc,
             media.updated_at desc, media.id desc
           limit ${pageSize} offset ${offset}
@@ -271,7 +307,10 @@ export const onRequestGet = async ({ env, request }: { env: Env; request: Reques
     ? await sql`
         select count(*)::int as total from media
         where (${isAllStatus} or status = any(${statusList})) and topic = ${topic}
+          and ((${trashMode} = 'only' and deleted_at is not null) or (${trashMode} = 'active' and deleted_at is null))
+          and (${canReadAll} or ((available_from is null or available_from <= now()) and (available_until is null or available_until > now())))
           and (${access} = '' or access_level = ${access})
+          and (${source} = '' or source_type = ${source})
           and (${days} = 0 or created_at >= now() - make_interval(days => ${days}))
           and (${query} = '' or title ilike ${pattern} or topic ilike ${pattern} or description ilike ${pattern}
             or exists (select 1 from media_links where media_links.media_id = media.id and (label ilike ${pattern} or type ilike ${pattern} or url ilike ${pattern}))
@@ -284,7 +323,10 @@ export const onRequestGet = async ({ env, request }: { env: Env; request: Reques
     : await sql`
         select count(*)::int as total from media
         where (${isAllStatus} or status = any(${statusList}))
+          and ((${trashMode} = 'only' and deleted_at is not null) or (${trashMode} = 'active' and deleted_at is null))
+          and (${canReadAll} or ((available_from is null or available_from <= now()) and (available_until is null or available_until > now())))
           and (${access} = '' or access_level = ${access})
+          and (${source} = '' or source_type = ${source})
           and (${days} = 0 or created_at >= now() - make_interval(days => ${days}))
           and (${query} = '' or title ilike ${pattern} or topic ilike ${pattern} or description ilike ${pattern}
             or exists (select 1 from media_links where media_links.media_id = media.id and (label ilike ${pattern} or type ilike ${pattern} or url ilike ${pattern}))
@@ -334,6 +376,12 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
     const status = mediaStatus(body.status)
     const price = mediaPrice(body.price)
     const source = mediaText(body.source, 'ชนิดสื่อ', 80, 'Google Drive') || 'Google Drive'
+    const availableFrom = optionalDate(body.availableFrom, 'วันเริ่มเผยแพร่')
+    const availableUntil = optionalDate(body.availableUntil, 'วันสิ้นสุดเผยแพร่')
+    const maxDownloads = downloadLimit(body.downloadLimit)
+    if (availableFrom && availableUntil && availableFrom >= availableUntil) {
+      throw new MediaValidationError('วันสิ้นสุดต้องอยู่หลังวันเริ่มเผยแพร่')
+    }
 
     const slugBase =
       String(body.slug || title)
@@ -349,9 +397,11 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
     await sql.transaction((tx) => [
       tx`
         insert into media (
-          title, slug, topic, access_level, status, price, cover_url, source_type, description
+          title, slug, topic, access_level, status, price, cover_url, source_type, description,
+          available_from, available_until, download_limit
         )
-        values (${title}, ${slug}, ${topic}, ${access}, ${status}, ${price}, ${coverUrl}, ${source}, ${description})
+        values (${title}, ${slug}, ${topic}, ${access}, ${status}, ${price}, ${coverUrl}, ${source}, ${description},
+          ${availableFrom}, ${availableUntil}, ${maxDownloads})
       `,
       ...links.map((link, index) => tx`
         insert into media_links (media_id, label, type, url, preview_url, access_level, sort_order)

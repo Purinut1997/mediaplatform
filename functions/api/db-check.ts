@@ -26,6 +26,14 @@ export const onRequestGet = async ({ env }: { env: Env }) => {
         select 1 from information_schema.columns
         where table_schema = 'public' and table_name = 'users' and column_name = 'vip_expires_at'
       ) as vip_expiry_ready,
+      exists (
+        select 1 from information_schema.columns
+        where table_schema = 'public' and table_name = 'media' and column_name = 'deleted_at'
+      ) as media_trash_ready,
+      exists (
+        select 1 from information_schema.columns
+        where table_schema = 'public' and table_name = 'media' and column_name = 'download_limit'
+      ) as media_download_policy_ready,
       (select value->>'version' from app_settings where key = 'schema_version' limit 1) as schema_version,
       (select count(*)::int from pg_stat_activity where datname = current_database() and wait_event_type = 'Lock') as waiting_locks
   `
@@ -39,6 +47,8 @@ export const onRequestGet = async ({ env }: { env: Env }) => {
       purchaseRequests: Boolean(result.purchase_requests_ready),
       refundRequests: Boolean(result.refund_requests_ready),
       vipExpiry: Boolean(result.vip_expiry_ready),
+      mediaTrash: Boolean(result.media_trash_ready),
+      mediaDownloadPolicy: Boolean(result.media_download_policy_ready),
     },
     schemaVersion: String(result.schema_version ?? ''),
     waitingLocks: Number(result.waiting_locks ?? 0),

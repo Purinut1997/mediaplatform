@@ -47,6 +47,11 @@ export type MediaItem = {
   tags?: string[]
   createdAt?: string
   updatedAt?: string
+  availableFrom?: string | null
+  availableUntil?: string | null
+  downloadLimit?: number
+  deletedAt?: string | null
+  deletedBy?: string | null
 }
 
 export type CurrentUser = {
@@ -281,6 +286,9 @@ export type MediaFormState = {
   links: MediaLink[]
   tags: string
   description: string
+  availableFrom: string
+  availableUntil: string
+  downloadLimit: string
 }
 
 export type SiteSettings = {

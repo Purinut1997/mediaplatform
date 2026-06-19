@@ -20,11 +20,16 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
     const sql = getSql(env)
     const user = await getCurrentUser(env, request)
     const [media] = await sql`
-      select id, title, access_level, status
-      from media where id = ${mediaId} limit 1
+      select id, title, access_level, status, available_from, available_until, download_limit
+      from media where id = ${mediaId} and deleted_at is null limit 1
     `
     if (!media || !['เผยแพร่', 'เผยแพร่แล้ว'].includes(String(media.status))) {
       return Response.json({ ok: false, error: 'ไม่พบสื่อที่เผยแพร่' }, { status: 404 })
+    }
+    const now = Date.now()
+    if ((media.available_from && Date.parse(String(media.available_from)) > now) ||
+        (media.available_until && Date.parse(String(media.available_until)) <= now)) {
+      return Response.json({ ok: false, error: 'สื่อนี้ยังไม่อยู่ในช่วงเวลาที่เปิดให้ดาวน์โหลด' }, { status: 403 })
     }
 
     const [link] = Number.isInteger(linkId) && linkId > 0
@@ -44,6 +49,17 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
     const canAccessLink = purchased || canAccessLevel(user, String(link.access_level || media.access_level))
     if (!canAccessMedia || !canAccessLink) {
       return Response.json({ ok: false, error: 'บัญชีนี้ยังไม่มีสิทธิ์เปิดสื่อ' }, { status: 403 })
+    }
+    const limit = Number(media.download_limit ?? 0)
+    if (limit > 0) {
+      if (!user) return Response.json({ ok: false, error: 'กรุณาเข้าสู่ระบบเพื่อดาวน์โหลดสื่อนี้' }, { status: 401 })
+      const [usage] = await sql`
+        select count(*)::int as count from media_events
+        where media_id = ${mediaId} and event_type = 'download' and lower(user_email) = ${user.email.toLowerCase()}
+      `
+      if (Number(usage?.count ?? 0) >= limit) {
+        return Response.json({ ok: false, error: `บัญชีนี้ใช้สิทธิ์ดาวน์โหลดครบ ${limit.toLocaleString('th-TH')} ครั้งแล้ว` }, { status: 429 })
+      }
     }
 
     const url = safeHttpUrl(link.url)

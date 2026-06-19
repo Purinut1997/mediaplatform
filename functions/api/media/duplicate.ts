@@ -15,7 +15,7 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
   try {
     await ensureSchema(env)
     const sql = getSql(env)
-    const [source] = await sql`select id, title, slug from media where id = ${id} limit 1`
+    const [source] = await sql`select id, title, slug from media where id = ${id} and deleted_at is null limit 1`
     if (!source) return Response.json({ ok: false, error: 'ไม่พบสื่อที่ต้องการทำสำเนา' }, { status: 404 })
 
     const title = duplicateMediaTitle(source.title)
@@ -24,12 +24,12 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
       tx`
         insert into media (
           title, slug, topic, access_level, status, price, downloads, views, rating,
-          cover_url, source_type, description
+          cover_url, source_type, description, available_from, available_until, download_limit
         )
         select
           ${title}, ${slug}, topic, access_level, 'ฉบับร่าง', price, 0, 0, rating,
-          cover_url, source_type, description
-        from media where id = ${id}
+          cover_url, source_type, description, available_from, available_until, download_limit
+        from media where id = ${id} and deleted_at is null
       `,
       tx`
         insert into media_links (media_id, label, type, url, preview_url, access_level, sort_order)

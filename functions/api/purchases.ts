@@ -64,7 +64,7 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
     const [user] = await sql`select id from users where lower(email) = ${currentUser.email.toLowerCase()} limit 1`
     const [media] = await sql`
       select id, title, price from media
-      where id = ${mediaId} and access_level = 'ซื้อแยก' and price > 0
+      where id = ${mediaId} and deleted_at is null and access_level = 'ซื้อแยก' and price > 0
         and status in ('เผยแพร่', 'เผยแพร่แล้ว')
       limit 1
     `

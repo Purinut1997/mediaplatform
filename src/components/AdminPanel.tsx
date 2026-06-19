@@ -101,6 +101,7 @@ export function AdminPanel({
   const [adminMediaPageSize, setAdminMediaPageSize] = useState(10)
   const [adminMediaTotal, setAdminMediaTotal] = useState(mediaItems.length)
   const [loadingAdminMedia, setLoadingAdminMedia] = useState(false)
+  const [showMediaTrash, setShowMediaTrash] = useState(false)
   const [selectedMediaIds, setSelectedMediaIds] = useState<Set<number>>(() => new Set())
   const [bulkMediaStatus, setBulkMediaStatus] = useState<MediaStatus>('ฉบับร่าง')
   const [bulkMediaTopic, setBulkMediaTopic] = useState(topics[0] ?? 'โรงเรียน')
@@ -391,6 +392,7 @@ export function AdminPanel({
       if (adminMediaSort !== 'ล่าสุด') {
         params.set('sort', adminMediaSort === 'ดาวน์โหลดมากสุด' ? 'downloads' : adminMediaSort === 'เข้าชมมากสุด' ? 'views' : 'title')
       }
+      if (showMediaTrash) params.set('trash', 'only')
       const response = await fetch(`/api/media?${params}`, { credentials: 'include' })
       const result = await readJson<{ media?: MediaItem[]; page?: number; total?: number; error?: string }>(response)
       if (!response.ok) throw new Error(result.error ?? 'โหลดรายการสื่อไม่สำเร็จ')
@@ -688,6 +690,7 @@ export function AdminPanel({
     adminMediaTagQuery,
     adminMediaTopic,
     adminMediaPageSize,
+    showMediaTrash,
     mediaItems.length,
   ])
 
@@ -867,6 +870,9 @@ export function AdminPanel({
           ],
       tags: item.tags?.join(', ') ?? '',
       description: item.description,
+      availableFrom: item.availableFrom ? item.availableFrom.slice(0, 16) : '',
+      availableUntil: item.availableUntil ? item.availableUntil.slice(0, 16) : '',
+      downloadLimit: String(item.downloadLimit ?? 0),
     })
     document.getElementById('admin-create-media')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
@@ -916,6 +922,9 @@ export function AdminPanel({
             .split(',')
             .map((tag) => tag.trim())
             .filter(Boolean),
+          availableFrom: form.availableFrom ? new Date(form.availableFrom).toISOString() : '',
+          availableUntil: form.availableUntil ? new Date(form.availableUntil).toISOString() : '',
+          downloadLimit: Number(form.downloadLimit || 0),
         }),
       })
 
@@ -969,6 +978,27 @@ export function AdminPanel({
       onCreated()
     } catch (duplicateError) {
       setError(duplicateError instanceof Error ? duplicateError.message : 'สร้างสำเนาสื่อไม่สำเร็จ')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const manageTrashedMedia = async (item: MediaItem, action: 'restore' | 'purge') => {
+    const label = action === 'restore' ? 'กู้คืน' : 'ลบถาวร'
+    if (!window.confirm(`${label}สื่อ "${item.title}" ใช่ไหม?`)) return
+    setSaving(true)
+    setError('')
+    try {
+      const response = await fetch('/api/media/trash', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+        body: JSON.stringify({ id: item.id, action }),
+      })
+      const result = await readJson<{ error?: string }>(response)
+      if (!response.ok) throw new Error(result.error ?? `${label}ไม่สำเร็จ`)
+      await loadAdminMediaPage(1)
+      onCreated()
+    } catch (trashError) {
+      setError(trashError instanceof Error ? trashError.message : `${label}ไม่สำเร็จ`)
     } finally {
       setSaving(false)
     }
@@ -3223,6 +3253,9 @@ export function AdminPanel({
                 placeholder="AI, อบรม, โรงเรียน"
                 value={form.tags}
               />
+              <AdminField label="เปิดให้ดาวน์โหลดตั้งแต่" name="availableFrom" onChange={updateForm} placeholder="ไม่กำหนด" type="datetime-local" value={form.availableFrom} />
+              <AdminField label="ปิดดาวน์โหลดเมื่อ" name="availableUntil" onChange={updateForm} placeholder="ไม่กำหนด" type="datetime-local" value={form.availableUntil} />
+              <AdminField label="จำกัดดาวน์โหลดต่อบัญชี (0 = ไม่จำกัด)" name="downloadLimit" onChange={updateForm} placeholder="0" type="number" value={form.downloadLimit} />
               <div className="md:col-span-2">
                 <div className="mb-3 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
                   <div>
@@ -3395,14 +3428,17 @@ export function AdminPanel({
           <section className="rounded-2xl border border-white/10 bg-white/[0.07] p-4 ring-1 ring-white/[0.03]">
             <div className="mb-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
               <div>
-                <h3 className="text-xl font-black">รายการสื่อ</h3>
+                <h3 className="text-xl font-black">{showMediaTrash ? 'ถังขยะสื่อ' : 'รายการสื่อ'}</h3>
                 <p className="mt-1 text-sm font-semibold text-slate-400">
                   ค้นหาและกรองสื่อก่อนแก้ไขหรือลบ
                 </p>
               </div>
-              <span className="rounded-xl bg-cyan-300/10 px-3 py-1 text-sm font-bold text-cyan-200">
-                {loadingAdminMedia ? 'กำลังค้นหา...' : `${adminMediaTotal.toLocaleString('th-TH')} รายการ`}
-              </span>
+              <div className="flex flex-wrap items-center gap-2">
+                <button className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-white/10 px-3 text-sm font-black text-white" onClick={() => setShowMediaTrash((value) => !value)} type="button">
+                  <Archive size={16} />{showMediaTrash ? 'กลับรายการสื่อ' : 'เปิดถังขยะ'}
+                </button>
+                <span className="rounded-xl bg-cyan-300/10 px-3 py-1 text-sm font-bold text-cyan-200">{loadingAdminMedia ? 'กำลังค้นหา...' : `${adminMediaTotal.toLocaleString('th-TH')} รายการ`}</span>
+              </div>
             </div>
 
             <div className="mb-4 grid gap-3 lg:grid-cols-[1.35fr_0.85fr_180px_180px]">
@@ -3579,15 +3615,15 @@ export function AdminPanel({
                       <td className="px-4 py-4">{item.downloads}</td>
                       <td className="px-4 py-4">
                         <div className="flex flex-wrap gap-2">
-                          <button
+                          {!showMediaTrash && <button
                             className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-cyan-300/10 px-3 text-sm font-black text-cyan-200"
                             onClick={() => startEditMedia(item)}
                             type="button"
                           >
                             <Pencil size={15} />
                             แก้ไข
-                          </button>
-                          <button
+                          </button>}
+                          {!showMediaTrash && <button
                             className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-sky-400/10 px-3 text-sm font-black text-sky-100 disabled:opacity-50"
                             disabled={saving}
                             onClick={() => void duplicateMedia(item)}
@@ -3595,15 +3631,18 @@ export function AdminPanel({
                           >
                             <Copy size={15} />
                             ทำสำเนา
-                          </button>
-                          <button
+                          </button>}
+                          {!showMediaTrash ? <button
                             className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-red-400/10 px-3 text-sm font-black text-red-200"
                             onClick={() => deleteMedia(item)}
                             type="button"
                           >
                             <Trash2 size={15} />
-                            ลบ
-                          </button>
+                            ย้ายไปถังขยะ
+                          </button> : <>
+                            <button className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-emerald-400/15 px-3 text-sm font-black text-emerald-100" onClick={() => void manageTrashedMedia(item, 'restore')} type="button"><Archive size={15} />กู้คืน</button>
+                            <button className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-red-500/20 px-3 text-sm font-black text-red-100" onClick={() => void manageTrashedMedia(item, 'purge')} type="button"><Trash2 size={15} />ลบถาวร</button>
+                          </>}
                         </div>
                       </td>
                     </tr>
@@ -3640,28 +3679,31 @@ export function AdminPanel({
                     </p>
                   )}
                   <div className="mt-3 grid gap-2 sm:grid-cols-3">
-                    <button
+                    {!showMediaTrash && <button
                       className="min-h-11 rounded-xl bg-cyan-300 px-4 font-black text-slate-950"
                       onClick={() => startEditMedia(item)}
                       type="button"
                     >
                       แก้ไข
-                    </button>
-                    <button
+                    </button>}
+                    {!showMediaTrash && <button
                       className="min-h-11 rounded-xl bg-sky-400/15 px-4 font-black text-sky-100 disabled:opacity-50"
                       disabled={saving}
                       onClick={() => void duplicateMedia(item)}
                       type="button"
                     >
                       ทำสำเนา
-                    </button>
-                    <button
+                    </button>}
+                    {!showMediaTrash ? <button
                       className="min-h-11 rounded-xl bg-red-400/15 px-4 font-black text-red-100"
                       onClick={() => deleteMedia(item)}
                       type="button"
                     >
-                      ลบ
-                    </button>
+                      ย้ายไปถังขยะ
+                    </button> : <>
+                      <button className="min-h-11 rounded-xl bg-emerald-400/15 px-4 font-black text-emerald-100" onClick={() => void manageTrashedMedia(item, 'restore')} type="button">กู้คืน</button>
+                      <button className="min-h-11 rounded-xl bg-red-500/20 px-4 font-black text-red-100" onClick={() => void manageTrashedMedia(item, 'purge')} type="button">ลบถาวร</button>
+                    </>}
                   </div>
                 </article>
               ))}

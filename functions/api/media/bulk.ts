@@ -21,15 +21,18 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
     const sql = getSql(env)
     const rows =
       command.action === 'delete'
-        ? await sql`delete from media where id = any(${command.ids}) returning id, title`
+        ? await sql`
+            update media set deleted_at = now(), deleted_by = ${user.email}, updated_at = now()
+            where id = any(${command.ids}) and deleted_at is null returning id, title
+          `
         : command.action === 'status'
           ? await sql`
               update media set status = ${command.value}, updated_at = now()
-              where id = any(${command.ids}) returning id, title
+              where id = any(${command.ids}) and deleted_at is null returning id, title
             `
           : await sql`
               update media set topic = ${command.value}, updated_at = now()
-              where id = any(${command.ids}) returning id, title
+              where id = any(${command.ids}) and deleted_at is null returning id, title
             `
 
     await writeAuditLog(env, user, `bulk_${command.action}`, 'media', null, {

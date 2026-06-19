@@ -124,6 +124,13 @@ const checks = [
     validate: (data) => data.ok === false && data.error === 'Unauthorized',
   },
   {
+    path: '/api/media/trash',
+    method: 'POST',
+    body: { id: 1, action: 'restore' },
+    expectedStatus: 401,
+    validate: (data) => data.ok === false && data.error === 'Unauthorized',
+  },
+  {
     path: '/api/cron/link-checks',
     method: 'POST',
     body: {},
