@@ -34,7 +34,7 @@ import { paymentProofAccept, paymentProofHelpText, readPaymentProof } from './li
 import { LOGO_URL } from './brand'
 import { TechBackground } from './components/TechBackground'
 import { CreditBadge, EmptyState, Footer, LoadingOverlay, Popup, Toast } from './components/SharedUI'
-import { PortalTiles } from './components/PortalTiles'
+import { PortalTiles, type HomeSection } from './components/PortalTiles'
 import { AuthBotCheck } from './components/AuthBotCheck'
 import { Header, Hero, HomeJourney, MaintenanceScreen } from './components/PublicShell'
 import { MemberLibraryPanel } from './components/MemberLibrary'
@@ -104,6 +104,7 @@ function App() {
   const [loading, setLoading] = useState(true)
   const [menuOpen, setMenuOpen] = useState(false)
   const [smartSearchOpen, setSmartSearchOpen] = useState(false)
+  const [homeSection, setHomeSection] = useState<HomeSection>('overview')
   const [previewItem, setPreviewItem] = useState<MediaItem | null>(null)
   const [recentMediaIds, setRecentMediaIds] = useState<number[]>(() => {
     try {
@@ -437,47 +438,25 @@ function App() {
                 setView={setView}
                 totalDownloads={(mediaRecords.length ? mediaRecords : mediaItems).reduce((sum, item) => sum + item.downloads, 0)}
               />
-              <PortalTiles setView={setView} />
-              <DiscoverySpotlight mediaItems={mediaRecords.length ? mediaRecords : mediaItems} openDetail={openDetail} openSearch={() => setSmartSearchOpen(true)} />
-              <LearningFlow
+              <PortalTiles active={homeSection} onSelect={setHomeSection} />
+              {(homeSection === 'overview' || homeSection === 'discover') && <DiscoverySpotlight mediaItems={mediaRecords.length ? mediaRecords : mediaItems} openDetail={openDetail} openSearch={() => setSmartSearchOpen(true)} />}
+              {homeSection === 'overview' && <LearningFlow
                 mediaItems={mediaRecords.length ? mediaRecords : mediaItems}
+                mode="continue"
                 openDetail={openDetail}
                 openPreview={setPreviewItem}
                 recentMediaIds={recentMediaIds}
-              />
-              <NexusExpansion
+              />}
+              {homeSection === 'learn' && <LearningFlow
                 mediaItems={mediaRecords.length ? mediaRecords : mediaItems}
-                openDetail={openDetail}
-                recentMediaIds={recentMediaIds}
-              />
-              <HomeJourney currentUser={currentUser} setView={setView} />
-              <MediaSection
-                currentUser={currentUser}
-                dataStatus={dataStatus}
-                filteredMedia={filteredMedia}
-                lockedPreviewMedia={lockedPreviewMedia}
-                loadingMore={loadingMoreMedia}
-                mediaLoadedCount={mediaRecords.length}
-                mediaTotal={mediaTotal}
-                mediaAccess={mediaAccess}
-                mediaDays={mediaDays}
-                mediaSort={mediaSort}
-                mediaSource={mediaSource}
-                mediaTag={mediaTag}
-                onLoadMore={() => void loadMoreMedia()}
+                mode="paths"
                 openDetail={openDetail}
                 openPreview={setPreviewItem}
-                query={query}
-                setQuery={setQuery}
-                setMediaAccess={setMediaAccess}
-                setMediaDays={setMediaDays}
-                setMediaSort={setMediaSort}
-                setMediaSource={setMediaSource}
-                setMediaTag={setMediaTag}
-                setTopic={setTopic}
-                topic={topic}
-                topics={topicOptions}
-              />
+                recentMediaIds={recentMediaIds}
+              />}
+              {homeSection === 'discover' && <NexusExpansion mediaItems={mediaRecords.length ? mediaRecords : mediaItems} mode="discover" openDetail={openDetail} recentMediaIds={recentMediaIds} />}
+              {homeSection === 'personal' && <NexusExpansion mediaItems={mediaRecords.length ? mediaRecords : mediaItems} mode="personal" openDetail={openDetail} recentMediaIds={recentMediaIds} />}
+              {homeSection === 'about' && <><NexusExpansion mediaItems={mediaRecords.length ? mediaRecords : mediaItems} mode="about" openDetail={openDetail} recentMediaIds={recentMediaIds} /><HomeJourney currentUser={currentUser} setView={setView} /></>}
             </>
           )}
           {view === 'media' && (

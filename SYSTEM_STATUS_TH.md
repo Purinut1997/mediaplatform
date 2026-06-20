@@ -536,3 +536,13 @@
 - เพิ่ม Creator Profile ของ MIKPURINUT พร้อมความเชี่ยวชาญและจำนวนผลงานในระบบ
 - รวมกับ Quick Preview, Learning Path และ Continue Learning ทำให้ชุด UX ที่วางแผนไว้ครบ 10 รายการ
 - ตรวจ interaction หลักและ responsive ที่ความกว้าง 390px แล้วไม่พบ horizontal overflow หรือ console error
+# อัปเดต 20 มิถุนายน 2569 — Experience Hub และเมนูหน้าแรก
+
+- ลดความหนาแน่นหน้าแรก โดยเหลือ Hero, เมนู Experience 4 หมวด, Spotlight และ Continue Learning เมื่อมีประวัติ
+- เพิ่มเมนู สำรวจ, เรียนรู้, พื้นที่ของฉัน และเกี่ยวกับ Nexus พร้อม active state และปุ่มกลับภาพรวม
+- หมวดสำรวจรวม Spotlight, Trending, Smart Search, AI Media Guide และ Nexus Pulse
+- หมวดเรียนรู้รวม Learning Path และ Quick Preview ส่วน Continue Learning แสดงย่อในภาพรวม
+- หมวดพื้นที่ของฉันรวม Collections, Achievement และ PWA Install
+- หมวดเกี่ยวกับ Nexus รวม Creator Profile, ขั้นตอนเริ่มใช้งาน และข้อมูลความน่าเชื่อถือของระบบ
+- ย้ายรายการคลังสื่อออกจากหน้าแรก โดยยังเปิดได้จากเมนูคลังสื่อหลัก ทำให้หน้าแรกสั้นและมีลำดับชัดขึ้น
+- `lint`, tests 57 รายการ และ production build ผ่าน; browser visual automation รอบนี้ถูก Windows sandbox ปฏิเสธการเริ่ม process จึงไม่ได้อ้างผล screenshot รอบล่าสุด

@@ -43,11 +43,13 @@ function buildLearningPaths(mediaItems: MediaItem[]): LearningPath[] {
 
 export function LearningFlow({
   mediaItems,
+  mode = 'all',
   openDetail,
   openPreview,
   recentMediaIds,
 }: {
   mediaItems: MediaItem[]
+  mode?: 'all' | 'continue' | 'paths'
   openDetail: (item: MediaItem) => void
   openPreview: (item: MediaItem) => void
   recentMediaIds: number[]
@@ -59,11 +61,14 @@ export function LearningFlow({
     .filter((item): item is MediaItem => Boolean(item))
     .slice(0, 3)
 
-  if (!paths.length) return null
+  const showContinue = mode !== 'paths' && recentItems.length > 0
+  const showPaths = mode !== 'continue' && paths.length > 0
+
+  if (!showContinue && !showPaths) return null
 
   return (
     <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:py-12">
-      {recentItems.length > 0 && (
+      {showContinue && (
         <div className="mb-8 overflow-hidden rounded-[2rem] border border-cyan-200/60 bg-gradient-to-r from-slate-950 via-cyan-950 to-slate-950 p-5 text-white shadow-2xl shadow-cyan-950/10 sm:p-7">
           <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
             <div>
@@ -87,7 +92,7 @@ export function LearningFlow({
         </div>
       )}
 
-      <div className="mb-5 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+      {showPaths && <><div className="mb-5 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
         <div>
           <p className="inline-flex items-center gap-2 text-sm font-black uppercase tracking-[0.18em] text-cyan-700 dark:text-cyan-300"><Route size={17} /> Nexus Learning Paths</p>
           <h2 className="mt-2 text-3xl font-black text-slate-950 sm:text-4xl dark:text-white">เรียนเป็นเส้นทาง ไม่หลงในกองไฟล์</h2>
@@ -133,7 +138,7 @@ export function LearningFlow({
             </article>
           )
         })}
-      </div>
+      </div></>}
     </section>
   )
 }

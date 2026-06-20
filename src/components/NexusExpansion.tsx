@@ -55,10 +55,12 @@ function scoreGuideResult(item: MediaItem, query: string) {
 
 export function NexusExpansion({
   mediaItems,
+  mode = 'all',
   openDetail,
   recentMediaIds,
 }: {
   mediaItems: MediaItem[]
+  mode?: 'all' | 'discover' | 'personal' | 'about'
   openDetail: (item: MediaItem) => void
   recentMediaIds: number[]
 }) {
@@ -142,7 +144,7 @@ export function NexusExpansion({
 
   return (
     <>
-      <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:py-12">
+      <section className={`mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:py-12 ${mode === 'all' || mode === 'discover' ? '' : 'hidden'}`}>
         <div className="grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
           <div className="overflow-hidden rounded-[2rem] border border-cyan-300/20 bg-slate-950 p-6 text-white shadow-2xl shadow-cyan-950/10 sm:p-8">
             <div className="flex items-start justify-between gap-4">
@@ -181,7 +183,7 @@ export function NexusExpansion({
         </div>
       </section>
 
-      <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:py-12">
+      <section className={`mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:py-12 ${mode === 'all' || mode === 'personal' ? '' : 'hidden'}`}>
         <div className="mb-5">
           <p className="inline-flex items-center gap-2 text-sm font-black uppercase tracking-[0.18em] text-cyan-700 dark:text-cyan-300"><LibraryBig size={17} /> Personal Collections</p>
           <h2 className="mt-2 text-3xl font-black text-slate-950 sm:text-4xl dark:text-white">จัดสื่อให้เข้ากับงานของคุณ</h2>
@@ -204,7 +206,7 @@ export function NexusExpansion({
         </div>
       </section>
 
-      <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:py-12">
+      <section className={`mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:py-12 ${mode === 'all' || mode === 'personal' ? '' : 'hidden'}`}>
         <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
           <div className="nexus-glass rounded-[2rem] border p-6 backdrop-blur-xl sm:p-8">
             <p className="inline-flex items-center gap-2 text-xs font-black tracking-[0.18em] text-amber-700 dark:text-amber-300"><Award size={16} /> ACHIEVEMENTS</p>
@@ -222,7 +224,7 @@ export function NexusExpansion({
         </div>
       </section>
 
-      <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:py-12">
+      <section className={`mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:py-12 ${mode === 'all' || mode === 'about' ? '' : 'hidden'}`}>
         <div className="relative overflow-hidden rounded-[2rem] border border-cyan-300/20 bg-slate-950 p-6 text-white shadow-2xl sm:p-10">
           <div className="absolute -right-20 -top-24 h-72 w-72 rounded-full bg-cyan-500/20 blur-3xl" />
           <div className="relative grid items-center gap-8 lg:grid-cols-[auto_1fr_auto]">
