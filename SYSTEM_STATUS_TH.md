@@ -546,3 +546,10 @@
 - หมวดเกี่ยวกับ Nexus รวม Creator Profile, ขั้นตอนเริ่มใช้งาน และข้อมูลความน่าเชื่อถือของระบบ
 - ย้ายรายการคลังสื่อออกจากหน้าแรก โดยยังเปิดได้จากเมนูคลังสื่อหลัก ทำให้หน้าแรกสั้นและมีลำดับชัดขึ้น
 - `lint`, tests 57 รายการ และ production build ผ่าน; browser visual automation รอบนี้ถูก Windows sandbox ปฏิเสธการเริ่ม process จึงไม่ได้อ้างผล screenshot รอบล่าสุด
+
+# อัปเดต 20 มิถุนายน 2569 — Dependency Security Maintenance
+
+- รัน `npm audit fix` เพื่อปิดช่องโหว่ใน development toolchain โดยไม่เปลี่ยน API หรือพฤติกรรมระบบ
+- อัปเดต Vite จาก `8.0.14` เป็น `8.0.16` และ Babel packages เป็นรุ่นที่มี security patch ผ่าน `package-lock.json`
+- `npm audit` เหลือ 0 vulnerabilities
+- หลังอัปเดต `lint`, tests 57 รายการ และ production build ผ่านครบ
