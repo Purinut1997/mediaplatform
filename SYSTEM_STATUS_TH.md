@@ -563,3 +563,4 @@
 - Super Admin มอบ E‑Service ให้ผู้ใช้จากหน้าจัดการสมาชิกได้ พร้อมจำนวนระบบเพิ่มเอง/ระบบที่มอบให้บนการ์ดสมาชิก
 - เพิ่มตาราง `user_services`, ฟิลด์ `users.eservice_limit_override`, Activity Log และรองรับ Backup/Restore
 - เพิ่ม smoke test สำหรับสิทธิ์ API `/api/member/services`; `lint`, tests 57 รายการ และ production build ผ่าน
+- Deploy Production เวอร์ชัน `2026.06.20.1` แล้ว, Neon migration พร้อม, ค่าจริง Member 6 / VIP 18 และ Production smoke ผ่านครบ 27 เส้นทาง
