@@ -41,6 +41,7 @@ import { MemberLibraryPanel } from './components/MemberLibrary'
 import { MediaDetail } from './components/MediaDetail'
 import { VipTermsDialog } from './components/VipTermsDialog'
 import { DiscoverySpotlight, SmartSearchDialog } from './components/HomeExperience'
+import { LearningFlow, QuickPreviewDialog } from './components/LearningFlow'
 import { defaultSiteSettings, mediaItems, topics } from './defaults'
 import './App.css'
 
@@ -102,6 +103,15 @@ function App() {
   const [loading, setLoading] = useState(true)
   const [menuOpen, setMenuOpen] = useState(false)
   const [smartSearchOpen, setSmartSearchOpen] = useState(false)
+  const [previewItem, setPreviewItem] = useState<MediaItem | null>(null)
+  const [recentMediaIds, setRecentMediaIds] = useState<number[]>(() => {
+    try {
+      const value = JSON.parse(window.localStorage.getItem('nexus-recent-media') ?? '[]')
+      return Array.isArray(value) ? value.filter((id): id is number => typeof id === 'number').slice(0, 6) : []
+    } catch {
+      return []
+    }
+  })
   const [memberLibrary, setMemberLibrary] = useState<MemberLibrary | null>(null)
   const [memberLibraryLoading, setMemberLibraryLoading] = useState(false)
   const [memberLibraryRefresh, setMemberLibraryRefresh] = useState(0)
@@ -312,6 +322,11 @@ function App() {
   )
 
   const openDetail = (item: MediaItem) => {
+    setRecentMediaIds((current) => {
+      const next = [item.id, ...current.filter((id) => id !== item.id)].slice(0, 6)
+      window.localStorage.setItem('nexus-recent-media', JSON.stringify(next))
+      return next
+    })
     setSelected(item)
     setView('detail')
     trackMediaEvent(item.id, 'view')
@@ -405,6 +420,12 @@ function App() {
               />
               <PortalTiles setView={setView} />
               <DiscoverySpotlight mediaItems={mediaRecords.length ? mediaRecords : mediaItems} openDetail={openDetail} openSearch={() => setSmartSearchOpen(true)} />
+              <LearningFlow
+                mediaItems={mediaRecords.length ? mediaRecords : mediaItems}
+                openDetail={openDetail}
+                openPreview={setPreviewItem}
+                recentMediaIds={recentMediaIds}
+              />
               <HomeJourney currentUser={currentUser} setView={setView} />
               <MediaSection
                 currentUser={currentUser}
@@ -421,6 +442,7 @@ function App() {
                 mediaTag={mediaTag}
                 onLoadMore={() => void loadMoreMedia()}
                 openDetail={openDetail}
+                openPreview={setPreviewItem}
                 query={query}
                 setQuery={setQuery}
                 setMediaAccess={setMediaAccess}
@@ -451,6 +473,7 @@ function App() {
               mediaTag={mediaTag}
               onLoadMore={() => void loadMoreMedia()}
               openDetail={openDetail}
+              openPreview={setPreviewItem}
               query={query}
               setQuery={setQuery}
               setMediaAccess={setMediaAccess}
@@ -562,6 +585,7 @@ function App() {
         open={smartSearchOpen}
         openDetail={openDetail}
       />
+      <QuickPreviewDialog item={previewItem} onClose={() => setPreviewItem(null)} openDetail={openDetail} />
       {toast && <Toast message={toast} />}
       {showSuccess && (
         <Popup
@@ -608,6 +632,7 @@ function MediaSection({
   topic,
   topics,
   openDetail,
+  openPreview,
   expanded,
 }: {
   currentUser: CurrentUser | null
@@ -634,6 +659,7 @@ function MediaSection({
   topic: string
   topics: string[]
   openDetail: (item: MediaItem) => void
+  openPreview: (item: MediaItem) => void
   expanded?: boolean
 }) {
   const [showFilters, setShowFilters] = useState(false)
@@ -715,7 +741,7 @@ function MediaSection({
       ) : (
         <div className="mt-6 grid gap-4 lg:grid-cols-2">
           {filteredMedia.map((item) => (
-            <MediaCard item={item} key={item.id} openDetail={openDetail} />
+            <MediaCard item={item} key={item.id} openDetail={openDetail} openPreview={openPreview} />
           ))}
         </div>
       )}
@@ -849,11 +875,13 @@ function MediaCard({
   isFavorite,
   item,
   openDetail,
+  openPreview,
   onToggleFavorite,
 }: {
   isFavorite?: boolean
   item: MediaItem
   openDetail: (item: MediaItem) => void
+  openPreview?: (item: MediaItem) => void
   onToggleFavorite?: (item: MediaItem) => void
 }) {
   return (
@@ -922,14 +950,17 @@ function MediaCard({
             {item.rating}
           </span>
         </div>
-        <button
-          className="mt-5 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-slate-950 px-4 font-black text-cyan-200 shadow-lg shadow-slate-900/10 transition hover:-translate-y-0.5 dark:bg-cyan-300 dark:text-slate-950"
-          onClick={() => openDetail(item)}
-          type="button"
-        >
-          เปิดแฟ้มสื่อ
-          <ChevronRight size={19} />
-        </button>
+        <div className="mt-5 grid gap-2 sm:grid-cols-2">
+          {openPreview && <button className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 font-black text-slate-700 transition hover:border-cyan-300 dark:border-white/10 dark:bg-white/5 dark:text-white" onClick={() => openPreview(item)} type="button"><Eye size={18} />ดูตัวอย่าง</button>}
+          <button
+            className={`inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-slate-950 px-4 font-black text-cyan-200 shadow-lg shadow-slate-900/10 transition hover:-translate-y-0.5 dark:bg-cyan-300 dark:text-slate-950 ${openPreview ? '' : 'sm:col-span-2'}`}
+            onClick={() => openDetail(item)}
+            type="button"
+          >
+            เปิดแฟ้มสื่อ
+            <ChevronRight size={19} />
+          </button>
+        </div>
       </div>
     </article>
   )
