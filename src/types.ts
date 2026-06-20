@@ -1,5 +1,5 @@
 export type Theme = 'light' | 'dark'
-export type View = 'home' | 'media' | 'services' | 'detail' | 'account' | 'admin' | 'login' | 'register' | 'forgot' | 'reset'
+export type View = 'home' | 'media' | 'services' | 'account' | 'profile' | 'detail' | 'admin' | 'login' | 'register' | 'forgot' | 'reset'
 export type AdminSection =
   | 'dashboard'
   | 'media'

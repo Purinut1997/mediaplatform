@@ -37,7 +37,7 @@ import { CreditBadge, EmptyState, Footer, LoadingOverlay, Popup, Toast } from '.
 import { PortalTiles, type HomeSection } from './components/PortalTiles'
 import { AuthBotCheck } from './components/AuthBotCheck'
 import { Header, Hero, HomeJourney, MaintenanceScreen } from './components/PublicShell'
-import { MemberLibraryPanel } from './components/MemberLibrary'
+import { MemberLibraryPanel, MemberProfilePanel } from './components/MemberLibrary'
 import { MediaDetail } from './components/MediaDetail'
 import { VipTermsDialog } from './components/VipTermsDialog'
 import { DiscoverySpotlight, SmartSearchDialog } from './components/HomeExperience'
@@ -509,13 +509,9 @@ function App() {
           )}
           {view === 'account' && currentUser && (
             <MemberLibraryPanel
-              currentUser={currentUser}
               library={memberLibrary}
               loading={memberLibraryLoading}
-              onLogout={logout}
               onOpenDetail={openDetail}
-              onLibraryRefresh={() => setMemberLibraryRefresh((value) => value + 1)}
-              onUserUpdated={setCurrentUser}
               renderFavorite={(media) => (
                 <MediaCard
                   isFavorite={favoriteIds.has(media.id)}
@@ -526,9 +522,20 @@ function App() {
                 />
               )}
               setView={setView}
+            />
+          )}
+          {view === 'profile' && currentUser && (
+            <MemberProfilePanel
+              currentUser={currentUser}
+              library={memberLibrary}
+              onLibraryRefresh={() => setMemberLibraryRefresh((value) => value + 1)}
+              onLogout={logout}
+              onUserUpdated={setCurrentUser}
+              setView={setView}
               settings={siteSettings}
             />
           )}
+          {view === 'profile' && !currentUser && <LoginPanel onLogin={handleLogin} setView={setView} />}
           {view === 'account' && !currentUser && (
             <LoginPanel onLogin={handleLogin} setView={setView} />
           )}

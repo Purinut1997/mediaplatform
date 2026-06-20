@@ -22,27 +22,17 @@ import { VipTermsDialog } from './VipTermsDialog'
 import { RefundSupport } from './RefundSupport'
 
 export function MemberLibraryPanel({
-  currentUser,
   library,
   loading,
-  onLogout,
   onOpenDetail,
-  onLibraryRefresh,
-  onUserUpdated,
   renderFavorite,
   setView,
-  settings,
 }: {
-  currentUser: CurrentUser
   library: MemberLibrary | null
   loading: boolean
-  onLogout: () => void
   onOpenDetail: (item: MediaItem) => void
-  onLibraryRefresh: () => void
-  onUserUpdated: (user: CurrentUser) => void
   renderFavorite: (media: MediaItem) => ReactNode
   setView: (view: View) => void
-  settings: SiteSettings
 }) {
   const formatDate = (value?: string) =>
     value
@@ -74,19 +64,12 @@ export function MemberLibraryPanel({
               <Search size={19} />
               เลือกดูสื่อเพิ่ม
             </button>
-            <button className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-white/20 bg-white/10 px-5 font-black text-white" onClick={onLogout} type="button">
-              <LogOut size={19} />
-              ออกจากระบบ
+            <button className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-white/20 bg-white/10 px-5 font-black text-white" onClick={() => setView('profile')} type="button">
+              <UserCircle2 size={19} />
+              เปิดโปรไฟล์
             </button>
           </div>
         </div>
-
-        <MembershipUpgradePanel
-          currentUser={currentUser}
-          library={library}
-          onLibraryRefresh={onLibraryRefresh}
-          settings={settings}
-        />
 
         <div className="grid gap-4 p-4 sm:p-6 lg:grid-cols-[1fr_1.4fr]">
           <div className="rounded-3xl border border-slate-200/80 bg-white/75 p-5 dark:border-white/10 dark:bg-black/20">
@@ -95,13 +78,12 @@ export function MemberLibraryPanel({
                 <UserCircle2 size={30} />
               </div>
               <div className="min-w-0">
-                <p className="truncate text-xl font-black text-slate-950 dark:text-white">{library?.profile.name ?? currentUser.name}</p>
-                <p className="truncate text-sm font-bold text-slate-500 dark:text-slate-400">{library?.profile.email ?? currentUser.email}</p>
+                <p className="truncate text-xl font-black text-slate-950 dark:text-white">ภาพรวมคลังสื่อ</p>
+                <p className="truncate text-sm font-bold text-slate-500 dark:text-slate-400">รายการที่ผูกกับบัญชีนี้</p>
               </div>
             </div>
-            <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="mt-5 grid gap-3 sm:grid-cols-3">
               {[
-                ['สิทธิ์', currentUser.access],
                 ['รายการโปรด', `${favorites.length} รายการ`],
                 ['เคยดาวน์โหลด', `${history.length} สื่อ`],
                 ['ซื้อแยก', `${purchases.length} สื่อ`],
@@ -145,29 +127,6 @@ export function MemberLibraryPanel({
           </div>
         </div>
       </div>
-
-      <AccountSecurity currentUser={currentUser} onLogout={onLogout} onUserUpdated={onUserUpdated} />
-
-      <RefundSupport settings={settings} />
-
-      {Boolean(library?.vipRequests?.length) && (
-        <section className="mt-8 rounded-3xl border border-violet-200/80 bg-white/75 p-5 shadow-lg backdrop-blur dark:border-violet-300/15 dark:bg-white/[0.05]">
-          <h2 className="inline-flex items-center gap-2 text-2xl font-black text-slate-950 dark:text-white"><Clock3 className="text-violet-500" />ประวัติการสมัคร VIP</h2>
-          <div className="mt-4 grid gap-3">
-            {library!.vipRequests!.map((request) => (
-              <article className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white/80 p-4 dark:border-white/10 dark:bg-white/[0.04]" key={request.id}>
-                <div>
-                  <p className="font-black text-slate-950 dark:text-white">คำขอ VIP #{request.id}</p>
-                  <p className="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400">ส่งเมื่อ {formatDate(request.createdAt)}{request.slipName ? ` · ${request.slipName}` : ''}</p>
-                </div>
-                <span className={`rounded-full px-3 py-1 text-xs font-black ${request.status === 'approved' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-300/10 dark:text-emerald-100' : request.status === 'rejected' ? 'bg-red-100 text-red-700 dark:bg-red-300/10 dark:text-red-100' : 'bg-amber-100 text-amber-800 dark:bg-amber-300/10 dark:text-amber-100'}`}>
-                  {request.status === 'approved' ? 'อนุมัติแล้ว' : request.status === 'rejected' ? 'ปฏิเสธ' : 'รอตรวจสอบ'}
-                </span>
-              </article>
-            ))}
-          </div>
-        </section>
-      )}
 
       {purchases.length > 0 && (
         <section className="mt-8 rounded-3xl border border-amber-200/80 bg-amber-50/75 p-5 shadow-lg backdrop-blur dark:border-amber-300/15 dark:bg-amber-300/[0.06]">
@@ -227,6 +186,74 @@ export function MemberLibraryPanel({
           </div>
         </div>
       )}
+    </section>
+  )
+}
+
+export function MemberProfilePanel({
+  currentUser,
+  library,
+  onLibraryRefresh,
+  onLogout,
+  onUserUpdated,
+  setView,
+  settings,
+}: {
+  currentUser: CurrentUser
+  library: MemberLibrary | null
+  onLibraryRefresh: () => void
+  onLogout: () => void
+  onUserUpdated: (user: CurrentUser) => void
+  setView: (view: View) => void
+  settings: SiteSettings
+}) {
+  const formatDate = (value?: string) => value
+    ? new Intl.DateTimeFormat('th-TH', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value))
+    : '-'
+  const profile = library?.profile ?? currentUser
+
+  return (
+    <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
+      <div className="overflow-hidden rounded-[2rem] border border-cyan-300/20 bg-[linear-gradient(125deg,#081427,#112d46_58%,#155e75)] text-white shadow-2xl">
+        <div className="grid gap-6 p-6 sm:p-8 lg:grid-cols-[1fr_auto] lg:items-center">
+          <div className="flex items-center gap-5">
+            <div className="grid h-20 w-20 shrink-0 place-items-center rounded-3xl border border-white/15 bg-cyan-300 text-slate-950 shadow-xl"><UserCircle2 size={42} /></div>
+            <div className="min-w-0">
+              <p className="text-xs font-black tracking-[0.18em] text-cyan-200">MY PROFILE</p>
+              <h1 className="mt-2 truncate text-3xl font-black sm:text-4xl">{profile.name}</h1>
+              <p className="mt-1 truncate font-semibold text-sky-100/70">{profile.email}</p>
+              <div className="mt-3 flex flex-wrap gap-2 text-xs font-black">
+                <span className="rounded-full bg-white/10 px-3 py-1">{currentUser.role}</span>
+                <span className="rounded-full bg-amber-300/15 px-3 py-1 text-amber-100">{currentUser.access}</span>
+                {library?.profile.createdAt && <span className="rounded-full bg-white/10 px-3 py-1">สมาชิกตั้งแต่ {new Date(library.profile.createdAt).toLocaleDateString('th-TH')}</span>}
+              </div>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-3">
+            <button className="inline-flex min-h-12 items-center gap-2 rounded-2xl bg-cyan-300 px-5 font-black text-slate-950" onClick={() => setView('account')} type="button"><BookmarkCheck size={18} />ไปคลังของฉัน</button>
+            <button className="inline-flex min-h-12 items-center gap-2 rounded-2xl border border-white/20 bg-white/10 px-5 font-black" onClick={onLogout} type="button"><LogOut size={18} />ออกจากระบบ</button>
+          </div>
+        </div>
+      </div>
+
+      <MembershipUpgradePanel currentUser={currentUser} library={library} onLibraryRefresh={onLibraryRefresh} settings={settings} />
+      <AccountSecurity currentUser={currentUser} onLogout={onLogout} onUserUpdated={onUserUpdated} />
+
+      {Boolean(library?.vipRequests?.length) && (
+        <section className="mt-6 rounded-3xl border border-violet-200/80 bg-white/75 p-5 shadow-lg backdrop-blur dark:border-violet-300/15 dark:bg-white/[0.05]">
+          <h2 className="inline-flex items-center gap-2 text-2xl font-black text-slate-950 dark:text-white"><Clock3 className="text-violet-500" />ประวัติการสมัคร VIP</h2>
+          <div className="mt-4 grid gap-3">
+            {library!.vipRequests.map((request) => (
+              <article className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white/80 p-4 dark:border-white/10 dark:bg-white/[0.04]" key={request.id}>
+                <div><p className="font-black text-slate-950 dark:text-white">คำขอ VIP #{request.id}</p><p className="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400">ส่งเมื่อ {formatDate(request.createdAt)}{request.slipName ? ` · ${request.slipName}` : ''}</p></div>
+                <span className={`rounded-full px-3 py-1 text-xs font-black ${request.status === 'approved' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-300/10 dark:text-emerald-100' : request.status === 'rejected' ? 'bg-red-100 text-red-700 dark:bg-red-300/10 dark:text-red-100' : 'bg-amber-100 text-amber-800 dark:bg-amber-300/10 dark:text-amber-100'}`}>{request.status === 'approved' ? 'อนุมัติแล้ว' : request.status === 'rejected' ? 'ปฏิเสธ' : 'รอตรวจสอบ'}</span>
+              </article>
+            ))}
+          </div>
+        </section>
+      )}
+
+      <RefundSupport settings={settings} />
     </section>
   )
 }

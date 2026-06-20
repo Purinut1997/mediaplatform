@@ -47,7 +47,7 @@ export function Header({
     { label: 'E-Service', value: 'services' as View },
   ]
   const memberNav = currentUser
-    ? [...nav, { label: 'คลังของฉัน', value: 'account' as View }]
+    ? [...nav, { label: 'คลังของฉัน', value: 'account' as View }, { label: 'โปรไฟล์', value: 'profile' as View }]
     : nav
   const visibleNav = canAccessAdmin(currentUser)
     ? [...memberNav, { label: 'หลังบ้าน', value: 'admin' as View }]
@@ -85,7 +85,7 @@ export function Header({
             {theme === 'dark' ? <Sun size={19} /> : <Moon size={19} />}
           </button>
           {currentUser ? (
-            <button className="hidden min-h-11 rounded-xl bg-slate-950 px-5 text-sm font-black text-cyan-200 shadow-lg shadow-slate-900/15 transition hover:-translate-y-0.5 dark:bg-cyan-300 dark:text-slate-950 sm:inline-flex sm:items-center" onClick={() => setView('account')} type="button">
+            <button className="hidden min-h-11 rounded-xl bg-slate-950 px-5 text-sm font-black text-cyan-200 shadow-lg shadow-slate-900/15 transition hover:-translate-y-0.5 dark:bg-cyan-300 dark:text-slate-950 sm:inline-flex sm:items-center" onClick={() => setView('profile')} type="button">
               <UserCircle2 className="mr-2" size={18} />
               {currentUser.name}
             </button>
