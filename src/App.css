@@ -395,6 +395,41 @@
   color: var(--admin-muted) !important;
 }
 
+html:not(.dark) .admin-content :is(span, div, a)[class*="text-white"],
+html:not(.dark) .admin-content :is(span, div, a)[class*="text-slate-200"],
+html:not(.dark) .admin-content :is(span, div, a)[class*="text-slate-300"] {
+  color: var(--admin-title) !important;
+}
+
+html:not(.dark) .admin-content [class*="text-cyan-100"],
+html:not(.dark) .admin-content [class*="text-cyan-200"] {
+  color: #0e7490 !important;
+}
+
+html:not(.dark) .admin-content [class*="text-emerald-100"],
+html:not(.dark) .admin-content [class*="text-emerald-200"] {
+  color: #047857 !important;
+}
+
+html:not(.dark) .admin-content [class*="text-amber-100"],
+html:not(.dark) .admin-content [class*="text-amber-200"] {
+  color: #92400e !important;
+}
+
+html:not(.dark) .admin-content [class*="text-violet-100"],
+html:not(.dark) .admin-content [class*="text-violet-200"] {
+  color: #6d28d9 !important;
+}
+
+html:not(.dark) .admin-content [class*="text-red-100"],
+html:not(.dark) .admin-content [class*="text-red-200"] {
+  color: #b91c1c !important;
+}
+
+html:not(.dark) .admin-content :is(button, input, select, textarea):disabled {
+  opacity: 0.72 !important;
+}
+
 .admin-content table {
   color: var(--admin-text);
 }

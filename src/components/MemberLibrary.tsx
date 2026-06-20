@@ -21,6 +21,26 @@ import type { CurrentUser, MediaItem, MemberLibrary, SiteSettings, View } from '
 import { VipTermsDialog } from './VipTermsDialog'
 import { RefundSupport } from './RefundSupport'
 
+function directImageUrl(value: string) {
+  try {
+    const url = new URL(value)
+    const parts = url.pathname.split('/').filter(Boolean)
+    if (url.hostname === 'github.com' && parts.length >= 5 && parts[2] === 'blob') {
+      return `https://raw.githubusercontent.com/${parts[0]}/${parts[1]}/${parts.slice(3).join('/')}`
+    }
+    return url.toString()
+  } catch {
+    return ''
+  }
+}
+
+function VipQrImage({ src }: { src: string }) {
+  const [failed, setFailed] = useState(false)
+  const imageUrl = directImageUrl(src)
+  if (!imageUrl || failed) return <div className="grid h-28 w-28 place-items-center rounded-2xl border border-dashed border-red-300 bg-red-50 p-2 text-center text-xs font-black text-red-700">เปิดภาพ QR ไม่สำเร็จ<br />ตรวจลิงก์ไฟล์ภาพ</div>
+  return <img alt="QR Code สมัคร VIP" className="h-28 w-28 rounded-2xl border border-slate-200 bg-white object-contain p-2" onError={() => setFailed(true)} src={imageUrl} />
+}
+
 export function MemberLibraryPanel({
   library,
   loading,
@@ -274,6 +294,7 @@ function MembershipUpgradePanel({
   const [slipDataUrl, setSlipDataUrl] = useState('')
   const [agree, setAgree] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [proofBusy, setProofBusy] = useState(false)
   const [notice, setNotice] = useState('')
   const request = library?.vipRequest
   const vipExpiresAt = library?.profile.vipExpiresAt ?? currentUser.vipExpiresAt
@@ -290,12 +311,17 @@ function MembershipUpgradePanel({
     setSlipName('')
     setSlipDataUrl('')
     if (!file) return
+    setProofBusy(true)
+    setNotice('กำลังเตรียมและตรวจสอบไฟล์หลักฐาน...')
     try {
       const proof = await readPaymentProof(file)
       setSlipName(proof.name)
       setSlipDataUrl(proof.dataUrl)
+      setNotice(`แนบหลักฐานสำเร็จ: ${proof.name}`)
     } catch (error) {
       setNotice(error instanceof Error ? error.message : 'แนบหลักฐานไม่สำเร็จ')
+    } finally {
+      setProofBusy(false)
     }
   }
 
@@ -401,7 +427,7 @@ function MembershipUpgradePanel({
           <div className="rounded-3xl border border-violet-200 bg-white/75 p-4 dark:border-white/10 dark:bg-white/[0.05]">
             <div className="grid gap-4 sm:grid-cols-[112px_1fr] sm:items-center">
               {settings.vipQrUrl ? (
-                <img alt="QR Code สมัคร VIP" className="h-28 w-28 rounded-2xl border border-slate-200 bg-white object-contain p-2" src={settings.vipQrUrl} />
+                <VipQrImage key={settings.vipQrUrl} src={settings.vipQrUrl} />
               ) : (
                 <div className="grid h-28 w-28 place-items-center rounded-2xl border border-dashed border-violet-300 bg-violet-50 text-center text-xs font-black text-violet-500 dark:bg-white/[0.04]">รอ QR Code</div>
               )}
@@ -420,18 +446,18 @@ function MembershipUpgradePanel({
               <label className="flex min-h-12 cursor-pointer items-center rounded-2xl border border-dashed border-violet-300 bg-violet-50/80 px-4 text-sm font-bold text-slate-600 transition hover:border-violet-400 hover:bg-violet-100 dark:border-violet-300/25 dark:bg-white/[0.04] dark:text-slate-300 dark:hover:bg-white/[0.07]">
                 <FileUp className="mr-2 shrink-0 text-violet-500" size={18} />
                 <span className="truncate">{slipName || `${slipLabel} (${paymentProofHelpText()})`}</span>
-                <input accept={paymentProofAccept()} className="hidden" onChange={(event) => void selectSlip(event.target.files?.[0])} type="file" />
+                <input accept={paymentProofAccept()} className="hidden" disabled={proofBusy} onChange={(event) => void selectSlip(event.target.files?.[0])} type="file" />
               </label>
             </div>
             <p className={`mt-2 text-xs font-black ${slipDataUrl ? 'text-emerald-600 dark:text-emerald-300' : 'text-amber-600 dark:text-amber-300'}`}>
-              {slipDataUrl ? `แนบหลักฐานแล้ว: ${slipName}` : `จำเป็นต้องแนบหลักฐาน (${paymentProofHelpText()})`}
+              {proofBusy ? 'กำลังย่อและตรวจสอบภาพหลักฐาน...' : slipDataUrl ? `แนบหลักฐานแล้ว: ${slipName}` : `จำเป็นต้องแนบหลักฐาน (${paymentProofHelpText()})`}
             </p>
             <label className="mt-4 flex items-start gap-3 text-sm font-bold text-slate-600 dark:text-slate-300">
               <input checked={agree} className="mt-1 h-4 w-4" onChange={(event) => setAgree(event.target.checked)} type="checkbox" />
               <span>{settings.vipAgreementLabel} <VipTermsDialog settings={settings} /></span>
             </label>
             {notice && <p className="mt-3 rounded-2xl bg-slate-100 p-3 text-sm font-bold text-slate-700 dark:bg-white/[0.06] dark:text-slate-200">{notice}</p>}
-            <button className="mt-4 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-violet-500 to-blue-500 px-5 font-black text-white shadow-lg shadow-violet-500/20 disabled:opacity-60" disabled={busy || !agree || !slipDataUrl} onClick={() => void submitRequest()} type="button">
+            <button className="mt-4 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-violet-500 to-blue-500 px-5 font-black text-white shadow-lg shadow-violet-500/20 disabled:cursor-not-allowed disabled:opacity-60" disabled={busy || proofBusy || !agree || !slipDataUrl} onClick={() => void submitRequest()} type="button">
               {busy ? <Loader2 className="animate-spin" size={19} /> : <Send size={19} />}
               ส่งคำขอสมัคร VIP
             </button>

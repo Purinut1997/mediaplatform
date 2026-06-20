@@ -107,6 +107,21 @@ const defaultSettings: SiteSettings = {
   eserviceVipLimit: 18,
 }
 
+function directImageUrl(value: unknown) {
+  const url = safeHttpUrl(value)
+  if (!url) return ''
+  try {
+    const parsed = new URL(url)
+    const parts = parsed.pathname.split('/').filter(Boolean)
+    if (parsed.hostname === 'github.com' && parts.length >= 5 && parts[2] === 'blob') {
+      return `https://raw.githubusercontent.com/${parts[0]}/${parts[1]}/${parts.slice(3).join('/')}`
+    }
+  } catch {
+    return ''
+  }
+  return url
+}
+
 function optionalEmail(value: unknown) {
   const email = boundedText(value, 'อีเมลติดต่อคืนเงิน', { max: 160 }).toLowerCase()
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
@@ -143,7 +158,7 @@ function normalizeSettings(value?: Partial<SiteSettings>) {
     vipAgreementLabel: value?.vipAgreementLabel?.trim() || defaultSettings.vipAgreementLabel,
     vipSubmitLabel: value?.vipSubmitLabel?.trim() || defaultSettings.vipSubmitLabel,
     heroImageUrl: safeHttpUrl(value?.heroImageUrl, defaultSettings.heroImageUrl),
-    vipQrUrl: safeHttpUrl(value?.vipQrUrl),
+    vipQrUrl: directImageUrl(value?.vipQrUrl),
   }
 }
 
@@ -185,7 +200,7 @@ function readSettings(body: Partial<SiteSettings>): SiteSettings {
     refundContactEmail: optionalEmail(body.refundContactEmail),
     refundLineUrl: optionalHttpUrl(body.refundLineUrl, 'ลิงก์ LINE สำหรับคืนเงิน'),
     refundContactPhone: boundedText(body.refundContactPhone, 'เบอร์โทรติดต่อคืนเงิน', { max: 40 }),
-    vipQrUrl: optionalHttpUrl(body.vipQrUrl, 'ลิงก์ QR Code'),
+    vipQrUrl: directImageUrl(optionalHttpUrl(body.vipQrUrl, 'ลิงก์ QR Code')),
     vipBankName: boundedText(body.vipBankName ?? defaultSettings.vipBankName, 'ชื่อช่องทางชำระเงิน', { max: 120 }),
     vipAccountNumber: boundedText(body.vipAccountNumber, 'เลขบัญชี', { max: 80 }),
     vipAccountName: boundedText(body.vipAccountName ?? defaultSettings.vipAccountName, 'ชื่อบัญชี', { max: 120 }),
