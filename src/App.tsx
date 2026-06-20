@@ -36,7 +36,7 @@ import { TechBackground } from './components/TechBackground'
 import { CreditBadge, EmptyState, Footer, LoadingOverlay, Popup, Toast } from './components/SharedUI'
 import { PortalTiles } from './components/PortalTiles'
 import { AuthBotCheck } from './components/AuthBotCheck'
-import { Header, Hero, MaintenanceScreen } from './components/PublicShell'
+import { Header, Hero, HomeJourney, MaintenanceScreen } from './components/PublicShell'
 import { MemberLibraryPanel } from './components/MemberLibrary'
 import { MediaDetail } from './components/MediaDetail'
 import { VipTermsDialog } from './components/VipTermsDialog'
@@ -383,8 +383,14 @@ function App() {
           <>
           {view === 'home' && (
             <>
-              <Hero settings={siteSettings} setView={setView} />
+              <Hero
+                mediaCount={mediaTotal || mediaRecords.length || mediaItems.length}
+                settings={siteSettings}
+                setView={setView}
+                totalDownloads={(mediaRecords.length ? mediaRecords : mediaItems).reduce((sum, item) => sum + item.downloads, 0)}
+              />
               <PortalTiles setView={setView} />
+              <HomeJourney currentUser={currentUser} setView={setView} />
               <MediaSection
                 currentUser={currentUser}
                 dataStatus={dataStatus}
