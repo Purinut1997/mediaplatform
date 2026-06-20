@@ -564,3 +564,4 @@
 - เพิ่มตาราง `user_services`, ฟิลด์ `users.eservice_limit_override`, Activity Log และรองรับ Backup/Restore
 - เพิ่ม smoke test สำหรับสิทธิ์ API `/api/member/services`; `lint`, tests 57 รายการ และ production build ผ่าน
 - Deploy Production เวอร์ชัน `2026.06.20.1` แล้ว, Neon migration พร้อม, ค่าจริง Member 6 / VIP 18 และ Production smoke ผ่านครบ 27 เส้นทาง
+- เพิ่มการย่อไอคอน E‑Service ฝั่งเบราว์เซอร์: รับ PNG/JPG/WebP ต้นฉบับไม่เกิน 12 MB, ครอปกึ่งกลางเป็นสี่เหลี่ยม, แปลง WebP สูงสุด 256×256px และลดคุณภาพ/มิติอัตโนมัติจนไม่เกิน 80 KB

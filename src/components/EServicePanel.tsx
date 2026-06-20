@@ -23,6 +23,8 @@ type ServiceItem = Omit<EServiceItem, 'id' | 'source' | 'createdAt' | 'updatedAt
 type ServiceForm = Pick<ServiceItem, 'category' | 'description' | 'iconDataUrl' | 'title' | 'url'>
 
 const emptyForm: ServiceForm = { category: 'งานทั่วไป', description: '', iconDataUrl: '', title: '', url: '' }
+const maxIconSourceBytes = 12 * 1024 * 1024
+const maxIconOutputBytes = 80 * 1024
 
 const demoServices: ServiceItem[] = [
   { id: 'demo-student', title: 'ระบบดูแลนักเรียน', description: 'ข้อมูลนักเรียนและงานดูแลช่วยเหลือ', category: 'นักเรียน', url: 'https://example.com', iconDataUrl: LOGO_URL, pinned: true, source: 'demo' },
@@ -48,6 +50,47 @@ function sourceLabel(source: ServiceSource) {
   return 'ตัวอย่างหน้าตา'
 }
 
+function canvasBlob(canvas: HTMLCanvasElement, quality: number) {
+  return new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/webp', quality))
+}
+
+function blobDataUrl(blob: Blob) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(String(reader.result ?? ''))
+    reader.onerror = () => reject(new Error('อ่านไฟล์ภาพไม่สำเร็จ'))
+    reader.readAsDataURL(blob)
+  })
+}
+
+async function optimizeIcon(file: File) {
+  const bitmap = await createImageBitmap(file)
+  try {
+    for (const size of [256, 192, 128]) {
+      const canvas = document.createElement('canvas')
+      canvas.width = size
+      canvas.height = size
+      const context = canvas.getContext('2d', { alpha: true })
+      if (!context) throw new Error('เบราว์เซอร์ไม่รองรับการย่อภาพ')
+      const scale = Math.max(size / bitmap.width, size / bitmap.height)
+      const width = bitmap.width * scale
+      const height = bitmap.height * scale
+      context.imageSmoothingEnabled = true
+      context.imageSmoothingQuality = 'high'
+      context.drawImage(bitmap, (size - width) / 2, (size - height) / 2, width, height)
+      for (const quality of [0.86, 0.72, 0.58, 0.44]) {
+        const blob = await canvasBlob(canvas, quality)
+        if (blob && blob.size <= maxIconOutputBytes) {
+          return { dataUrl: await blobDataUrl(blob), size, bytes: blob.size }
+        }
+      }
+    }
+  } finally {
+    bitmap.close()
+  }
+  throw new Error('ไม่สามารถบีบภาพให้เล็กกว่า 80 KB ได้ กรุณาเลือกภาพอื่น')
+}
+
 export function EServicePanel({ currentUser, setView }: { currentUser: CurrentUser | null; setView: (view: View) => void }) {
   const [services, setServices] = useState<ServiceItem[]>([])
   const [quota, setQuota] = useState<EServiceQuota>({ limit: currentUser?.role === 'member' ? (currentUser.access === 'VIP' ? 18 : 6) : null, used: 0, remaining: currentUser?.role === 'member' ? (currentUser.access === 'VIP' ? 18 : 6) : null })
@@ -58,6 +101,7 @@ export function EServicePanel({ currentUser, setView }: { currentUser: CurrentUs
   const [editingId, setEditingId] = useState('')
   const [form, setForm] = useState<ServiceForm>(emptyForm)
   const [error, setError] = useState('')
+  const [iconStatus, setIconStatus] = useState('')
 
   const allServices = currentUser ? services : demoServices
   const customLimit = quota.limit ?? Number.POSITIVE_INFINITY
@@ -93,6 +137,7 @@ export function EServicePanel({ currentUser, setView }: { currentUser: CurrentUs
     setForm(emptyForm)
     setEditingId('')
     setError('')
+    setIconStatus('')
     setFormOpen(false)
   }
 
@@ -144,13 +189,20 @@ export function EServicePanel({ currentUser, setView }: { currentUser: CurrentUs
     setFormOpen(true)
   }
 
-  const readIcon = (file?: File) => {
+  const readIcon = async (file?: File) => {
     if (!file) return
     if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) return setError('รองรับเฉพาะ PNG, JPG และ WebP')
-    if (file.size > 80 * 1024) return setError('ไอคอนต้องมีขนาดไม่เกิน 80 KB')
-    const reader = new FileReader()
-    reader.onload = () => setForm((current) => ({ ...current, iconDataUrl: String(reader.result ?? '') }))
-    reader.readAsDataURL(file)
+    if (file.size > maxIconSourceBytes) return setError('ภาพต้นฉบับต้องมีขนาดไม่เกิน 12 MB')
+    setError('')
+    setIconStatus('กำลังย่อและบีบอัดภาพ...')
+    try {
+      const optimized = await optimizeIcon(file)
+      setForm((current) => ({ ...current, iconDataUrl: optimized.dataUrl }))
+      setIconStatus(`ปรับเป็น WebP ${optimized.size}×${optimized.size}px · ${(optimized.bytes / 1024).toFixed(1)} KB แล้ว`)
+    } catch (reason) {
+      setIconStatus('')
+      setError(reason instanceof Error ? reason.message : 'ย่อภาพไม่สำเร็จ')
+    }
   }
 
   const openService = (item: ServiceItem) => {
@@ -185,7 +237,7 @@ export function EServicePanel({ currentUser, setView }: { currentUser: CurrentUs
 
       {loading && !services.length ? <div className="mt-6 rounded-[2rem] border border-dashed border-cyan-300/30 p-12 text-center font-black text-cyan-700">กำลังโหลด E‑Service...</div> : filtered.length ? <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">{filtered.map((item) => <ServiceCard item={item} key={item.id} onDelete={() => void deleteService(item)} onEdit={() => editService(item)} onOpen={() => openService(item)} onPin={() => void updatePin(item)} />)}</div> : <div className="mt-6 rounded-[2rem] border border-dashed border-slate-300 p-12 text-center dark:border-white/15"><ServerCog className="mx-auto text-slate-300" size={42} /><h2 className="mt-4 text-xl font-black">ยังไม่มี E‑Service ในหมวดนี้</h2><p className="mt-2 text-sm text-slate-500">เพิ่มลิงก์ระบบแรก หรือรอระบบที่ซื้อจาก MIKPURINUT ถูกมอบให้บัญชีของคุณ</p></div>}
 
-      {formOpen && <div aria-label={editingId ? 'แก้ไข E-Service' : 'เพิ่ม E-Service'} aria-modal="true" className="fixed inset-0 z-[90] grid place-items-center bg-slate-950/75 p-4 backdrop-blur-xl" role="dialog"><button aria-label="ปิดฟอร์ม" className="absolute inset-0 cursor-default" onClick={resetForm} type="button" /><div className="relative max-h-[92vh] w-full max-w-xl overflow-y-auto rounded-[2rem] bg-white p-6 shadow-2xl dark:bg-slate-950 sm:p-8"><button aria-label="ปิด" className="absolute right-4 top-4 grid h-10 w-10 place-items-center rounded-xl bg-slate-100 dark:bg-white/10" onClick={resetForm} type="button"><X size={18} /></button><p className="text-xs font-black tracking-[0.18em] text-cyan-700 dark:text-cyan-300">E-SERVICE SHORTCUT</p><h2 className="mt-2 text-2xl font-black">{editingId ? 'แก้ไขทางลัด' : 'เพิ่มระบบของคุณ'}</h2><div className="mt-6 grid gap-4"><label className="grid gap-2 text-sm font-black">ชื่อระบบ<input className="min-h-12 rounded-2xl border border-slate-200 bg-white px-4 font-semibold dark:border-white/10 dark:bg-white/5" maxLength={80} onChange={(event) => setForm({ ...form, title: event.target.value })} placeholder="เช่น ระบบเช็กชื่อออนไลน์" value={form.title} /></label><label className="grid gap-2 text-sm font-black">URL ระบบ<input className="min-h-12 rounded-2xl border border-slate-200 bg-white px-4 font-semibold dark:border-white/10 dark:bg-white/5" onChange={(event) => setForm({ ...form, url: event.target.value })} placeholder="https://..." value={form.url} /></label><label className="grid gap-2 text-sm font-black">หมวดหมู่<input className="min-h-12 rounded-2xl border border-slate-200 bg-white px-4 font-semibold dark:border-white/10 dark:bg-white/5" maxLength={40} onChange={(event) => setForm({ ...form, category: event.target.value })} value={form.category} /></label><label className="grid gap-2 text-sm font-black">คำอธิบาย<textarea className="min-h-24 rounded-2xl border border-slate-200 bg-white p-4 font-semibold dark:border-white/10 dark:bg-white/5" maxLength={160} onChange={(event) => setForm({ ...form, description: event.target.value })} placeholder="ระบบนี้ใช้สำหรับ..." value={form.description} /></label><label className="flex min-h-20 cursor-pointer items-center gap-4 rounded-2xl border border-dashed border-cyan-300 bg-cyan-50 p-4 dark:border-cyan-300/20 dark:bg-cyan-300/5">{form.iconDataUrl ? <img alt="ตัวอย่างไอคอน" className="h-14 w-14 rounded-2xl object-cover" src={form.iconDataUrl} /> : <span className="grid h-14 w-14 place-items-center rounded-2xl bg-cyan-100 text-cyan-700"><ImagePlus size={24} /></span>}<span><span className="block text-sm font-black">อัปโหลดไอคอน</span><span className="mt-1 block text-xs font-semibold text-slate-500">PNG, JPG, WebP ไม่เกิน 80 KB</span></span><input accept="image/png,image/jpeg,image/webp" className="hidden" onChange={(event) => readIcon(event.target.files?.[0])} type="file" /></label>{error && <p className="rounded-xl bg-rose-50 p-3 text-sm font-bold text-rose-700 dark:bg-rose-300/10 dark:text-rose-200">{error}</p>}<button className="min-h-12 rounded-2xl bg-slate-950 font-black text-cyan-200 dark:bg-cyan-300 dark:text-slate-950" onClick={saveService} type="button">{editingId ? 'บันทึกการแก้ไข' : 'เพิ่มใน E-Service ของฉัน'}</button></div></div></div>}
+      {formOpen && <div aria-label={editingId ? 'แก้ไข E-Service' : 'เพิ่ม E-Service'} aria-modal="true" className="fixed inset-0 z-[90] grid place-items-center bg-slate-950/75 p-4 backdrop-blur-xl" role="dialog"><button aria-label="ปิดฟอร์ม" className="absolute inset-0 cursor-default" onClick={resetForm} type="button" /><div className="relative max-h-[92vh] w-full max-w-xl overflow-y-auto rounded-[2rem] bg-white p-6 shadow-2xl dark:bg-slate-950 sm:p-8"><button aria-label="ปิด" className="absolute right-4 top-4 grid h-10 w-10 place-items-center rounded-xl bg-slate-100 dark:bg-white/10" onClick={resetForm} type="button"><X size={18} /></button><p className="text-xs font-black tracking-[0.18em] text-cyan-700 dark:text-cyan-300">E-SERVICE SHORTCUT</p><h2 className="mt-2 text-2xl font-black">{editingId ? 'แก้ไขทางลัด' : 'เพิ่มระบบของคุณ'}</h2><div className="mt-6 grid gap-4"><label className="grid gap-2 text-sm font-black">ชื่อระบบ<input className="min-h-12 rounded-2xl border border-slate-200 bg-white px-4 font-semibold dark:border-white/10 dark:bg-white/5" maxLength={80} onChange={(event) => setForm({ ...form, title: event.target.value })} placeholder="เช่น ระบบเช็กชื่อออนไลน์" value={form.title} /></label><label className="grid gap-2 text-sm font-black">URL ระบบ<input className="min-h-12 rounded-2xl border border-slate-200 bg-white px-4 font-semibold dark:border-white/10 dark:bg-white/5" onChange={(event) => setForm({ ...form, url: event.target.value })} placeholder="https://..." value={form.url} /></label><label className="grid gap-2 text-sm font-black">หมวดหมู่<input className="min-h-12 rounded-2xl border border-slate-200 bg-white px-4 font-semibold dark:border-white/10 dark:bg-white/5" maxLength={40} onChange={(event) => setForm({ ...form, category: event.target.value })} value={form.category} /></label><label className="grid gap-2 text-sm font-black">คำอธิบาย<textarea className="min-h-24 rounded-2xl border border-slate-200 bg-white p-4 font-semibold dark:border-white/10 dark:bg-white/5" maxLength={160} onChange={(event) => setForm({ ...form, description: event.target.value })} placeholder="ระบบนี้ใช้สำหรับ..." value={form.description} /></label><label className="flex min-h-20 cursor-pointer items-center gap-4 rounded-2xl border border-dashed border-cyan-300 bg-cyan-50 p-4 dark:border-cyan-300/20 dark:bg-cyan-300/5">{form.iconDataUrl ? <img alt="ตัวอย่างไอคอน" className="h-14 w-14 rounded-2xl object-cover" src={form.iconDataUrl} /> : <span className="grid h-14 w-14 place-items-center rounded-2xl bg-cyan-100 text-cyan-700"><ImagePlus size={24} /></span>}<span><span className="block text-sm font-black">อัปโหลดไอคอน</span><span className="mt-1 block text-xs font-semibold text-slate-500">รับภาพต้นฉบับไม่เกิน 12 MB · ย่อเป็น WebP ไม่เกิน 80 KB อัตโนมัติ</span></span><input accept="image/png,image/jpeg,image/webp" className="hidden" onChange={(event) => void readIcon(event.target.files?.[0])} type="file" /></label>{iconStatus && <p className="rounded-xl bg-emerald-50 p-3 text-sm font-bold text-emerald-700 dark:bg-emerald-300/10 dark:text-emerald-200">{iconStatus}</p>}{error && <p className="rounded-xl bg-rose-50 p-3 text-sm font-bold text-rose-700 dark:bg-rose-300/10 dark:text-rose-200">{error}</p>}<button className="min-h-12 rounded-2xl bg-slate-950 font-black text-cyan-200 dark:bg-cyan-300 dark:text-slate-950" onClick={saveService} type="button">{editingId ? 'บันทึกการแก้ไข' : 'เพิ่มใน E-Service ของฉัน'}</button></div></div></div>}
     </section>
   )
 }
