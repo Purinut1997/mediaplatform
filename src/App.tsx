@@ -43,6 +43,7 @@ import { VipTermsDialog } from './components/VipTermsDialog'
 import { DiscoverySpotlight, SmartSearchDialog } from './components/HomeExperience'
 import { LearningFlow, QuickPreviewDialog } from './components/LearningFlow'
 import { NexusExpansion } from './components/NexusExpansion'
+import { EServicePanel } from './components/EServicePanel'
 import { defaultSiteSettings, mediaItems, topics } from './defaults'
 import './App.css'
 
@@ -489,6 +490,7 @@ function App() {
               topics={topicOptions}
             />
           )}
+          {view === 'services' && <EServicePanel currentUser={currentUser} key={currentUser?.email ?? 'guest'} setView={setView} />}
           {view === 'detail' && (
             <MediaDetail
               item={selected}

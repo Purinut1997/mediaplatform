@@ -553,3 +553,13 @@
 - อัปเดต Vite จาก `8.0.14` เป็น `8.0.16` และ Babel packages เป็นรุ่นที่มี security patch ผ่าน `package-lock.json`
 - `npm audit` เหลือ 0 vulnerabilities
 - หลังอัปเดต `lint`, tests 57 รายการ และ production build ผ่านครบ
+
+# อัปเดต 20 มิถุนายน 2569 — My E‑Service
+
+- เพิ่มหน้า E‑Service ส่วนตัว แยกข้อมูลตามบัญชี รองรับค้นหา หมวดหมู่ ปักหมุด เพิ่ม แก้ไข ลบ และเปิดระบบภายนอกแบบ `https://`
+- ไอคอนรองรับ PNG/JPG/WebP ไม่เกิน 80 KB เพื่อลดภาระพื้นที่และเวลาโหลด
+- โควตาเริ่มต้น Member 6 ช่อง, VIP 18 ช่อง, Admin/Super Admin ไม่จำกัด โดยระบบที่ MIKPURINUT มอบให้ไม่นับโควตา
+- Super Admin ปรับโควตากลางภายหลังได้ และกำหนดค่าเฉพาะบัญชี 0-1,000 ช่องหรือคืนค่าเป็นตามแพ็กเกจได้
+- Super Admin มอบ E‑Service ให้ผู้ใช้จากหน้าจัดการสมาชิกได้ พร้อมจำนวนระบบเพิ่มเอง/ระบบที่มอบให้บนการ์ดสมาชิก
+- เพิ่มตาราง `user_services`, ฟิลด์ `users.eservice_limit_override`, Activity Log และรองรับ Backup/Restore
+- เพิ่ม smoke test สำหรับสิทธิ์ API `/api/member/services`; `lint`, tests 57 รายการ และ production build ผ่าน

@@ -117,6 +117,8 @@ export function AdminPanel({
     purchaseRefundDays: String(settings.purchaseRefundDays),
     orderExpiryHours: String(settings.orderExpiryHours),
     paymentReviewHours: String(settings.paymentReviewHours),
+    eserviceMemberLimit: String(settings.eserviceMemberLimit),
+    eserviceVipLimit: String(settings.eserviceVipLimit),
   })
   const [editingMediaId, setEditingMediaId] = useState<number | null>(null)
   const [saving, setSaving] = useState(false)
@@ -1084,6 +1086,8 @@ export function AdminPanel({
       purchaseRefundDays: Number(settingsForm.purchaseRefundDays || 0),
       orderExpiryHours: Number(settingsForm.orderExpiryHours || 24),
       paymentReviewHours: Number(settingsForm.paymentReviewHours || 24),
+      eserviceMemberLimit: Number(settingsForm.eserviceMemberLimit || 0),
+      eserviceVipLimit: Number(settingsForm.eserviceVipLimit || 0),
     }
 
     try {
@@ -1111,6 +1115,8 @@ export function AdminPanel({
         purchaseRefundDays: String(result.settings.purchaseRefundDays),
         orderExpiryHours: String(result.settings.orderExpiryHours),
         paymentReviewHours: String(result.settings.paymentReviewHours),
+        eserviceMemberLimit: String(result.settings.eserviceMemberLimit),
+        eserviceVipLimit: String(result.settings.eserviceVipLimit),
       })
       setSettingsNotice('บันทึกการตั้งค่าเรียบร้อยแล้ว')
     } catch (saveError) {
@@ -1775,6 +1781,8 @@ export function AdminPanel({
                               <span className="rounded-full bg-cyan-300/10 px-3 py-1 text-cyan-200">{user.role}</span>
                               <span className="rounded-full bg-amber-300/10 px-3 py-1 text-amber-200">{user.access}</span>
                               <span className="rounded-full bg-white/10 px-3 py-1 text-slate-200">{user.status}</span>
+                              <span className="rounded-full bg-emerald-300/10 px-3 py-1 text-emerald-200">E‑Service: {user.role !== 'member' ? 'ไม่จำกัด' : user.eserviceLimitOverride === null || user.eserviceLimitOverride === undefined ? 'ตามแพ็กเกจ' : `${user.eserviceLimitOverride} ช่อง`}</span>
+                              <span className="rounded-full bg-cyan-300/10 px-3 py-1 text-cyan-200">เพิ่มเอง {user.eserviceCustomCount ?? 0} · มอบให้ {user.eservicePurchasedCount ?? 0}</span>
                             </div>
                           </div>
                           <ShieldCheck className={isSuperAdmin ? 'text-cyan-300' : 'text-slate-500'} size={22} />
@@ -1818,6 +1826,34 @@ export function AdminPanel({
                             type="button"
                           >
                             {user.status === 'active' ? 'ปิดบัญชี' : 'เปิดบัญชี'}
+                          </button>
+                          <button
+                            className="min-h-10 rounded-xl bg-emerald-300/10 px-3 text-sm font-black text-emerald-100 disabled:cursor-not-allowed disabled:opacity-40"
+                            disabled={loadingMembers || isSuperAdmin}
+                            onClick={() => {
+                              const current = user.eserviceLimitOverride === null || user.eserviceLimitOverride === undefined ? '' : String(user.eserviceLimitOverride)
+                              const value = window.prompt('โควตา E‑Service เฉพาะบัญชี (0-1000)\nเว้นว่างเพื่อกลับไปใช้ค่าตามแพ็กเกจ', current)
+                              if (value === null) return
+                              void submitMemberAction({ action: 'set-eservice-limit', userId: user.id, eserviceLimitOverride: value.trim() === '' ? null : Number(value) })
+                            }}
+                            type="button"
+                          >
+                            ตั้งโควตา E‑Service
+                          </button>
+                          <button
+                            className="min-h-10 rounded-xl bg-cyan-300 px-3 text-sm font-black text-slate-950 disabled:cursor-not-allowed disabled:opacity-40"
+                            disabled={loadingMembers}
+                            onClick={() => {
+                              const title = window.prompt('ชื่อระบบที่มอบให้ผู้ใช้')?.trim()
+                              if (!title) return
+                              const url = window.prompt('URL ระบบ (ต้องขึ้นต้น https://)')?.trim()
+                              if (!url) return
+                              const category = window.prompt('หมวดหมู่', 'ระบบจาก MIKPURINUT')?.trim() || 'ระบบจาก MIKPURINUT'
+                              void submitMemberAction({ action: 'grant-eservice', userId: user.id, title, url, category })
+                            }}
+                            type="button"
+                          >
+                            มอบระบบ E‑Service
                           </button>
                         </div>
                         {editingVipUserId === user.id && !isSuperAdmin && (
@@ -2004,6 +2040,23 @@ export function AdminPanel({
             >
               {savingSettings ? <Loader2 className="animate-spin" size={20} /> : <Settings size={20} />}
               {savingSettings ? 'กำลังบันทึก...' : 'บันทึกหน้าแรก'}
+            </button>
+          </form>
+
+          <form
+            className="rounded-2xl border border-cyan-300/20 bg-white/[0.07] p-4 ring-1 ring-white/[0.03]"
+            onSubmit={submitSettings}
+          >
+            <div>
+              <h3 className="text-xl font-black">โควตา E‑Service</h3>
+              <p className="mt-1 text-sm font-semibold text-slate-400">กำหนดจำนวนลิงก์ที่ผู้ใช้เพิ่มเองได้ ระบบที่มอบให้จาก MIKPURINUT ไม่นับรวม</p>
+            </div>
+            <div className="mt-4 grid gap-4 md:grid-cols-2">
+              <AdminField label="Member (ช่อง)" name="eserviceMemberLimit" onChange={updateSettings} placeholder="6" type="number" value={settingsForm.eserviceMemberLimit} />
+              <AdminField label="VIP (ช่อง)" name="eserviceVipLimit" onChange={updateSettings} placeholder="18" type="number" value={settingsForm.eserviceVipLimit} />
+            </div>
+            <button className="mt-5 inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-cyan-300 px-5 font-black text-slate-950 disabled:opacity-60" disabled={savingSettings} type="submit">
+              {savingSettings ? <Loader2 className="animate-spin" size={20} /> : <Settings size={20} />} บันทึกโควตา
             </button>
           </form>
 
@@ -3030,7 +3083,7 @@ export function AdminPanel({
                 <Archive size={20} />
                 JSON ทั้งระบบ
               </button>
-              {['media', 'media_links', 'media_events', 'media_reviews', 'media_issue_reports', 'user_favorites', 'tags', 'media_tags', 'categories', 'users', 'vip_requests', 'purchase_requests', 'media_purchases', 'refund_requests', 'notifications', 'app_settings'].map((table) => (
+              {['media', 'media_links', 'media_events', 'media_reviews', 'media_issue_reports', 'user_favorites', 'user_services', 'tags', 'media_tags', 'categories', 'users', 'vip_requests', 'purchase_requests', 'media_purchases', 'refund_requests', 'notifications', 'app_settings'].map((table) => (
                 <button
                   className="inline-flex min-h-16 items-center justify-center gap-2 rounded-2xl border border-white/10 bg-black/20 px-5 font-black text-white disabled:opacity-60"
                   disabled={loadingOps}

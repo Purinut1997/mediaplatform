@@ -1,7 +1,7 @@
 import { requireSuperAdmin, writeAuditLog } from '../../_lib/admin'
 import { ensureSchema, getSql, type Env } from '../../_lib/db'
 
-const allowedTables = ['media', 'media_links', 'media_events', 'media_reviews', 'media_issue_reports', 'user_favorites', 'tags', 'media_tags', 'categories', 'users', 'vip_requests', 'purchase_requests', 'media_purchases', 'refund_requests', 'notifications', 'app_settings'] as const
+const allowedTables = ['media', 'media_links', 'media_events', 'media_reviews', 'media_issue_reports', 'user_favorites', 'user_services', 'tags', 'media_tags', 'categories', 'users', 'vip_requests', 'purchase_requests', 'media_purchases', 'refund_requests', 'notifications', 'app_settings'] as const
 type BackupTable = (typeof allowedTables)[number]
 
 function toCsv(rows: Record<string, unknown>[]) {
@@ -25,6 +25,8 @@ async function readTable(sql: ReturnType<typeof getSql>, table: BackupTable) {
       return sql`select * from media_issue_reports order by created_at desc`
     case 'user_favorites':
       return sql`select * from user_favorites order by created_at desc`
+    case 'user_services':
+      return sql`select * from user_services order by user_id, pinned desc, created_at desc`
     case 'tags':
       return sql`select * from tags order by name asc`
     case 'media_tags':
@@ -32,7 +34,7 @@ async function readTable(sql: ReturnType<typeof getSql>, table: BackupTable) {
     case 'categories':
       return sql`select * from categories order by sort_order asc, id asc`
     case 'users':
-      return sql`select id, name, email, role, access_level, vip_expires_at, status, created_at, updated_at from users order by id desc`
+      return sql`select id, name, email, role, access_level, vip_expires_at, eservice_limit_override, status, created_at, updated_at from users order by id desc`
     case 'vip_requests':
       return sql`select * from vip_requests order by id desc`
     case 'purchase_requests':
@@ -75,13 +77,14 @@ export const onRequestGet = async ({ env, request }: { env: Env; request: Reques
     })
   }
 
-  const [media, mediaLinks, tags, mediaTags, categories, users, vipRequests, purchaseRequests, mediaPurchases, refundRequests, mediaIssues, settings] = await Promise.all([
+  const [media, mediaLinks, tags, mediaTags, categories, users, userServices, vipRequests, purchaseRequests, mediaPurchases, refundRequests, mediaIssues, settings] = await Promise.all([
     readTable(sql, 'media'),
     readTable(sql, 'media_links'),
     readTable(sql, 'tags'),
     readTable(sql, 'media_tags'),
     readTable(sql, 'categories'),
     readTable(sql, 'users'),
+    readTable(sql, 'user_services'),
     readTable(sql, 'vip_requests'),
     readTable(sql, 'purchase_requests'),
     readTable(sql, 'media_purchases'),
@@ -113,6 +116,7 @@ export const onRequestGet = async ({ env, request }: { env: Env; request: Reques
       mediaTags,
       categories,
       users,
+      userServices,
       vipRequests,
       purchaseRequests,
       mediaPurchases,

@@ -112,4 +112,6 @@ export const defaultSiteSettings: SiteSettings = {
   vipSlipLabel: 'แนบสลิปโอนเงิน',
   vipAgreementLabel: 'ข้อมูลถูกต้องและยอมรับเงื่อนไขการใช้งาน',
   vipSubmitLabel: 'ลงทะเบียนสมาชิก',
+  eserviceMemberLimit: 6,
+  eserviceVipLimit: 18,
 }

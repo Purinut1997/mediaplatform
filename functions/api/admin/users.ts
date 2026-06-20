@@ -7,7 +7,7 @@ import { readPagination } from '../../_lib/pagination'
 import { emailHtmlText, sendEmail } from '../../_lib/email'
 
 type AdminAction = {
-  action?: 'approve-vip' | 'reject-vip' | 'approve-purchase' | 'reject-purchase' | 'set-refund-status' | 'set-access' | 'set-vip-expiry' | 'set-vip-lifetime' | 'extend-vip' | 'set-status' | 'set-role' | 'grant-purchase' | 'revoke-purchase'
+  action?: 'approve-vip' | 'reject-vip' | 'approve-purchase' | 'reject-purchase' | 'set-refund-status' | 'set-access' | 'set-vip-expiry' | 'set-vip-lifetime' | 'extend-vip' | 'set-status' | 'set-role' | 'grant-purchase' | 'revoke-purchase' | 'set-eservice-limit' | 'grant-eservice'
   requestId?: number
   userId?: number
   access?: 'สมาชิก' | 'VIP'
@@ -19,6 +19,10 @@ type AdminAction = {
   vipExpiresAt?: string
   refundStatus?: 'reviewing' | 'approved' | 'rejected' | 'completed'
   adminNote?: string
+  eserviceLimitOverride?: number | null
+  title?: string
+  url?: string
+  category?: string
 }
 
 async function requireSuperAdmin(env: Env, request: Request) {
@@ -52,7 +56,9 @@ export const onRequestGet = async ({ env, request }: { env: Env; request: Reques
     ? String(url.searchParams.get('role'))
     : 'all'
   const users = await sql`
-    select id, name, email, role, access_level, vip_expires_at, status, created_at
+    select users.id, users.name, users.email, users.role, users.access_level, users.vip_expires_at, users.eservice_limit_override, users.status, users.created_at,
+      (select count(*)::int from user_services where user_id = users.id and source = 'custom') as eservice_custom_count,
+      (select count(*)::int from user_services where user_id = users.id and source = 'purchased') as eservice_purchased_count
     from users
     where (${query} = '' or name ilike ${pattern} or email ilike ${pattern})
       and (${statusFilter} = 'all' or status = ${statusFilter})
@@ -140,6 +146,9 @@ export const onRequestGet = async ({ env, request }: { env: Env; request: Reques
       role: user.role,
       access: user.access_level,
       vipExpiresAt: user.vip_expires_at,
+      eserviceLimitOverride: user.eservice_limit_override,
+      eserviceCustomCount: Number(user.eservice_custom_count ?? 0),
+      eservicePurchasedCount: Number(user.eservice_purchased_count ?? 0),
       status: user.status,
       createdAt: user.created_at,
     })),
@@ -385,6 +394,30 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
       if (!updated) return Response.json({ ok: false, error: 'ไม่พบสมาชิกที่เปิดหรือปิดบัญชีได้' }, { status: 404 })
       if (body.status === 'disabled') await sql`delete from sessions where user_id = ${userId}`
       await writeAuditLog(env, currentUser, 'set_user_status', 'user', userId, { status: body.status })
+    } else if (body.action === 'grant-eservice' && userId) {
+      const title = String(body.title ?? '').trim().slice(0, 80)
+      const category = String(body.category ?? '').trim().slice(0, 40) || 'ระบบจาก MIKPURINUT'
+      let targetUrl = ''
+      try { const parsed = new URL(String(body.url ?? '').trim()); if (parsed.protocol === 'https:') targetUrl = parsed.toString() } catch { targetUrl = '' }
+      if (!title || !targetUrl) return Response.json({ ok: false, error: 'ชื่อระบบและ URL แบบ https:// ต้องถูกต้อง' }, { status: 400 })
+      const [created] = await sql`
+        insert into user_services (user_id, title, url, category, source)
+        select id, ${title}, ${targetUrl}, ${category}, 'purchased' from users where id = ${userId}
+        returning id
+      `
+      if (!created) return Response.json({ ok: false, error: 'ไม่พบบัญชีผู้ใช้' }, { status: 404 })
+      await writeAuditLog(env, currentUser, 'grant_eservice', 'user_service', created.id, { userId, title })
+    } else if (body.action === 'set-eservice-limit' && userId) {
+      const override = body.eserviceLimitOverride === null ? null : Number(body.eserviceLimitOverride)
+      if (override !== null && (!Number.isInteger(override) || override < 0 || override > 1000)) {
+        return Response.json({ ok: false, error: 'โควตา E-Service ต้องอยู่ระหว่าง 0-1,000 ช่อง' }, { status: 400 })
+      }
+      const [updated] = await sql`
+        update users set eservice_limit_override = ${override}, updated_at = now()
+        where id = ${userId} and role <> 'superadmin' returning id
+      `
+      if (!updated) return Response.json({ ok: false, error: 'ไม่พบบัญชีที่แก้ไขโควตาได้' }, { status: 404 })
+      await writeAuditLog(env, currentUser, 'set_eservice_limit', 'user', userId, { override })
     } else if (body.action === 'set-role' && userId && ['admin', 'member'].includes(String(body.role))) {
       const [updated] = await sql`
         update users set role = ${body.role}, updated_at = now()

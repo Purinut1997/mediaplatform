@@ -1,5 +1,5 @@
 export type Theme = 'light' | 'dark'
-export type View = 'home' | 'media' | 'detail' | 'account' | 'admin' | 'login' | 'register' | 'forgot' | 'reset'
+export type View = 'home' | 'media' | 'services' | 'detail' | 'account' | 'admin' | 'login' | 'register' | 'forgot' | 'reset'
 export type AdminSection =
   | 'dashboard'
   | 'media'
@@ -94,6 +94,9 @@ export type AdminUser = {
   access: CurrentUser['access']
   status: 'active' | 'disabled'
   vipExpiresAt?: string | null
+  eserviceLimitOverride?: number | null
+  eserviceCustomCount?: number
+  eservicePurchasedCount?: number
   createdAt: string
 }
 
@@ -273,6 +276,7 @@ export type RestorePreview = {
   mediaEvents: number
   mediaReviews: number
   userFavorites: number
+  userServices: number
   tags: number
   mediaTags: number
   users: number
@@ -353,4 +357,25 @@ export type SiteSettings = {
   vipSlipLabel: string
   vipAgreementLabel: string
   vipSubmitLabel: string
+  eserviceMemberLimit: number
+  eserviceVipLimit: number
+}
+
+export type EServiceItem = {
+  id: number
+  title: string
+  url: string
+  description: string
+  category: string
+  iconDataUrl: string
+  pinned: boolean
+  source: 'custom' | 'purchased'
+  createdAt: string
+  updatedAt: string
+}
+
+export type EServiceQuota = {
+  limit: number | null
+  used: number
+  remaining: number | null
 }

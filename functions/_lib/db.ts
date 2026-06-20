@@ -21,7 +21,7 @@ export type Env = {
 }
 
 let schemaReady = false
-const SCHEMA_VERSION = '2026.06.19.2'
+const SCHEMA_VERSION = '2026.06.20.1'
 
 export function getSql(env: Env) {
   if (!env.DATABASE_URL) {
@@ -54,6 +54,24 @@ export async function ensureSchema(env: Env) {
       return
     }
     if (state?.version) {
+      await sql`alter table users add column if not exists eservice_limit_override integer`
+      await sql`
+        create table if not exists user_services (
+          id serial primary key,
+          user_id integer not null references users(id) on delete cascade,
+          title varchar(80) not null,
+          url text not null,
+          description varchar(160) not null default '',
+          category varchar(40) not null default 'งานทั่วไป',
+          icon_data_url text not null default '',
+          source text not null default 'custom' check (source in ('custom', 'purchased')),
+          pinned boolean not null default false,
+          sort_order integer not null default 0,
+          created_at timestamptz not null default now(),
+          updated_at timestamptz not null default now()
+        )
+      `
+      await sql`create index if not exists user_services_user_idx on user_services(user_id, pinned desc, sort_order, created_at desc)`
       await sql`alter table media add column if not exists deleted_at timestamptz`
       await sql`alter table media add column if not exists deleted_by text`
       await sql`alter table media add column if not exists available_from timestamptz`
@@ -249,11 +267,30 @@ export async function ensureSchema(env: Env) {
       role text not null default 'member' check (role in ('superadmin', 'admin', 'member')),
       access_level text not null default 'สมาชิก' check (access_level in ('สมาชิก', 'VIP')),
       vip_expires_at timestamptz,
+      eservice_limit_override integer,
       status text not null default 'active' check (status in ('active', 'disabled')),
       created_at timestamptz not null default now(),
       updated_at timestamptz not null default now()
     )
   `
+
+  await sql`
+    create table if not exists user_services (
+      id serial primary key,
+      user_id integer not null references users(id) on delete cascade,
+      title varchar(80) not null,
+      url text not null,
+      description varchar(160) not null default '',
+      category varchar(40) not null default 'งานทั่วไป',
+      icon_data_url text not null default '',
+      source text not null default 'custom' check (source in ('custom', 'purchased')),
+      pinned boolean not null default false,
+      sort_order integer not null default 0,
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now()
+    )
+  `
+  await sql`create index if not exists user_services_user_idx on user_services(user_id, pinned desc, sort_order, created_at desc)`
 
   await sql`
     create table if not exists sessions (

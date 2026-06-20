@@ -62,6 +62,11 @@ const checks = [
     validate: (data) => data.ok === false,
   },
   {
+    path: '/api/member/services',
+    expectedStatus: 401,
+    validate: (data) => data.ok === false,
+  },
+  {
     path: '/api/refunds',
     expectedStatus: 401,
     validate: (data) => data.ok === false && data.error === 'Unauthorized',

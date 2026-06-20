@@ -10,8 +10,8 @@ type BackupPayload = {
   mode?: 'merge' | 'replace'
   replaceTables?: string[]
   backup?: {
-    data?: Partial<Record<'media' | 'mediaLinks' | 'mediaEvents' | 'mediaReviews' | 'mediaIssues' | 'userFavorites' | 'tags' | 'mediaTags' | 'categories' | 'users' | 'vipRequests' | 'purchaseRequests' | 'mediaPurchases' | 'refundRequests' | 'notifications' | 'settings', BackupRow[]>>
-  } & Partial<Record<'media' | 'mediaLinks' | 'mediaEvents' | 'mediaReviews' | 'mediaIssues' | 'userFavorites' | 'tags' | 'mediaTags' | 'categories' | 'users' | 'vipRequests' | 'purchaseRequests' | 'mediaPurchases' | 'refundRequests' | 'notifications' | 'settings', BackupRow[]>>
+    data?: Partial<Record<'media' | 'mediaLinks' | 'mediaEvents' | 'mediaReviews' | 'mediaIssues' | 'userFavorites' | 'userServices' | 'tags' | 'mediaTags' | 'categories' | 'users' | 'vipRequests' | 'purchaseRequests' | 'mediaPurchases' | 'refundRequests' | 'notifications' | 'settings', BackupRow[]>>
+  } & Partial<Record<'media' | 'mediaLinks' | 'mediaEvents' | 'mediaReviews' | 'mediaIssues' | 'userFavorites' | 'userServices' | 'tags' | 'mediaTags' | 'categories' | 'users' | 'vipRequests' | 'purchaseRequests' | 'mediaPurchases' | 'refundRequests' | 'notifications' | 'settings', BackupRow[]>>
 }
 
 const text = (value: unknown, fallback = '') => String(value ?? fallback).trim()
@@ -37,6 +37,7 @@ const replaceableTables = new Set([
   'mediaEvents',
   'mediaReviews',
   'userFavorites',
+  'userServices',
   'tags',
   'mediaTags',
   'categories',
@@ -67,6 +68,7 @@ function readData(payload: BackupPayload) {
     mediaEvents: Array.isArray(source.mediaEvents) ? source.mediaEvents : [],
     mediaReviews: Array.isArray(source.mediaReviews) ? source.mediaReviews : [],
     userFavorites: Array.isArray(source.userFavorites) ? source.userFavorites : [],
+    userServices: Array.isArray(source.userServices) ? source.userServices : [],
     tags: Array.isArray(source.tags) ? source.tags : [],
     mediaTags: Array.isArray(source.mediaTags) ? source.mediaTags : [],
     categories: Array.isArray(source.categories) ? source.categories : [],
@@ -94,6 +96,7 @@ function preview(data: ReturnType<typeof readData>, replaceTables: string[] = []
     mediaEvents: data.mediaEvents.length,
     mediaReviews: data.mediaReviews.length,
     userFavorites: data.userFavorites.length,
+    userServices: data.userServices.length,
     tags: data.tags.length,
     mediaTags: data.mediaTags.length,
     users: data.users.length,
@@ -304,7 +307,9 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
           await sql`
             update users
             set name = ${text(user.name, email)}, role = ${role}, access_level = ${access},
-                vip_expires_at = ${text(user.vip_expires_at) || null}, status = ${status}, updated_at = now()
+                vip_expires_at = ${text(user.vip_expires_at) || null},
+                eservice_limit_override = ${user.eservice_limit_override === null || user.eservice_limit_override === undefined ? null : Math.max(0, Math.min(1000, int(user.eservice_limit_override)))},
+                status = ${status}, updated_at = now()
             where lower(email) = ${email} and role <> 'superadmin'
           `
           if (Number.isFinite(Number(user.id))) {
@@ -317,13 +322,14 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
       }
       const passwordHash = text(user.password_hash) || await hashPassword(randomHex(16))
       const [restoredUser] = await sql`
-        insert into users (name, email, password_hash, role, access_level, vip_expires_at, status)
-        values (${text(user.name, email)}, ${email}, ${passwordHash}, ${role}, ${access}, ${text(user.vip_expires_at) || null}, ${status})
+        insert into users (name, email, password_hash, role, access_level, vip_expires_at, eservice_limit_override, status)
+        values (${text(user.name, email)}, ${email}, ${passwordHash}, ${role}, ${access}, ${text(user.vip_expires_at) || null}, ${user.eservice_limit_override === null || user.eservice_limit_override === undefined ? null : Math.max(0, Math.min(1000, int(user.eservice_limit_override)))}, ${status})
         on conflict (email) do update set
           name = excluded.name,
           role = case when users.role = 'superadmin' then users.role else excluded.role end,
           access_level = excluded.access_level,
           vip_expires_at = excluded.vip_expires_at,
+          eservice_limit_override = excluded.eservice_limit_override,
           status = excluded.status,
           updated_at = now()
         returning id
@@ -331,6 +337,20 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
       if (restoredUser?.id && Number.isFinite(Number(user.id))) {
         userIdMap.set(Number(user.id), Number(restoredUser.id))
       }
+    }
+
+    for (const service of data.userServices) {
+      const userId = userIdMap.get(Number(service.user_id))
+      const title = text(service.title).slice(0, 80)
+      const url = safeHttpUrl(text(service.url))
+      if (!userId || !title || !url) continue
+      const source = service.source === 'purchased' ? 'purchased' : 'custom'
+      const createdAt = text(service.created_at) || new Date().toISOString()
+      await sql`
+        insert into user_services (user_id, title, url, description, category, icon_data_url, source, pinned, sort_order, created_at, updated_at)
+        select ${userId}, ${title}, ${url}, ${text(service.description).slice(0, 160)}, ${text(service.category, 'งานทั่วไป').slice(0, 40)}, ${text(service.icon_data_url)}, ${source}, ${Boolean(service.pinned)}, ${int(service.sort_order)}, ${createdAt}, ${text(service.updated_at) || createdAt}
+        where not exists (select 1 from user_services where user_id = ${userId} and url = ${url} and title = ${title})
+      `
     }
 
     for (const favorite of data.userFavorites) {

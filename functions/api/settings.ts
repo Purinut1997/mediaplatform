@@ -51,6 +51,8 @@ type SiteSettings = {
   vipSlipLabel: string
   vipAgreementLabel: string
   vipSubmitLabel: string
+  eserviceMemberLimit: number
+  eserviceVipLimit: number
 }
 
 const defaultSettings: SiteSettings = {
@@ -101,6 +103,8 @@ const defaultSettings: SiteSettings = {
   vipSlipLabel: 'แนบสลิปโอนเงิน',
   vipAgreementLabel: 'ข้อมูลถูกต้องและยอมรับเงื่อนไขการใช้งาน',
   vipSubmitLabel: 'ลงทะเบียนสมาชิก',
+  eserviceMemberLimit: 6,
+  eserviceVipLimit: 18,
 }
 
 function optionalEmail(value: unknown) {
@@ -126,6 +130,8 @@ function normalizeSettings(value?: Partial<SiteSettings>) {
     purchaseRefundDays: boundedInteger(value?.purchaseRefundDays ?? defaultSettings.purchaseRefundDays, 'ระยะเวลาขอคืนเงินซื้อแยก', { max: 365 }),
     orderExpiryHours: boundedInteger(value?.orderExpiryHours ?? defaultSettings.orderExpiryHours, 'อายุคำสั่งซื้อ', { min: 1, max: 720 }),
     paymentReviewHours: boundedInteger(value?.paymentReviewHours ?? defaultSettings.paymentReviewHours, 'เวลาตรวจสอบการชำระเงิน', { min: 1, max: 720 }),
+    eserviceMemberLimit: boundedInteger(value?.eserviceMemberLimit ?? defaultSettings.eserviceMemberLimit, 'โควตา E-Service สมาชิก', { max: 1000 }),
+    eserviceVipLimit: boundedInteger(value?.eserviceVipLimit ?? defaultSettings.eserviceVipLimit, 'โควตา E-Service VIP', { max: 1000 }),
     refundRequestEnabled: value?.refundRequestEnabled === undefined
       ? defaultSettings.refundRequestEnabled
       : Boolean(value.refundRequestEnabled),
@@ -188,6 +194,8 @@ function readSettings(body: Partial<SiteSettings>): SiteSettings {
     vipSlipLabel: boundedText(body.vipSlipLabel ?? defaultSettings.vipSlipLabel, 'ข้อความแนบสลิป', { max: 100 }),
     vipAgreementLabel: boundedText(body.vipAgreementLabel ?? defaultSettings.vipAgreementLabel, 'ข้อความยอมรับเงื่อนไข', { max: 300 }),
     vipSubmitLabel: boundedText(body.vipSubmitLabel ?? defaultSettings.vipSubmitLabel, 'ข้อความปุ่มสมัคร VIP', { max: 100 }),
+    eserviceMemberLimit: boundedInteger(body.eserviceMemberLimit ?? defaultSettings.eserviceMemberLimit, 'โควตา E-Service สมาชิก', { max: 1000 }),
+    eserviceVipLimit: boundedInteger(body.eserviceVipLimit ?? defaultSettings.eserviceVipLimit, 'โควตา E-Service VIP', { max: 1000 }),
   })
 }
 

@@ -44,6 +44,7 @@ export function Header({
   const nav = [
     { label: 'หน้าหลัก', value: 'home' as View },
     { label: 'คลังสื่อ', value: 'media' as View },
+    { label: 'E-Service', value: 'services' as View },
   ]
   const memberNav = currentUser
     ? [...nav, { label: 'คลังของฉัน', value: 'account' as View }]
