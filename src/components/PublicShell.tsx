@@ -47,7 +47,7 @@ export function Header({
     { label: 'E-Service', value: 'services' as View },
   ]
   const memberNav = currentUser
-    ? [...nav, { label: 'คลังของฉัน', value: 'account' as View }, { label: 'โปรไฟล์', value: 'profile' as View }]
+    ? [...nav, { label: 'คลังของฉัน', value: 'account' as View }]
     : nav
   const visibleNav = canAccessAdmin(currentUser)
     ? [...memberNav, { label: 'หลังบ้าน', value: 'admin' as View }]
@@ -85,9 +85,9 @@ export function Header({
             {theme === 'dark' ? <Sun size={19} /> : <Moon size={19} />}
           </button>
           {currentUser ? (
-            <button className="hidden min-h-11 rounded-xl bg-slate-950 px-5 text-sm font-black text-cyan-200 shadow-lg shadow-slate-900/15 transition hover:-translate-y-0.5 dark:bg-cyan-300 dark:text-slate-950 sm:inline-flex sm:items-center" onClick={() => setView('profile')} type="button">
-              <UserCircle2 className="mr-2" size={18} />
-              {currentUser.name}
+            <button aria-label={`เปิดโปรไฟล์ ${currentUser.name}`} className={`hidden min-h-11 max-w-52 items-center rounded-xl px-4 text-sm font-black shadow-lg transition hover:-translate-y-0.5 sm:inline-flex ${view === 'profile' ? 'bg-cyan-500 text-white ring-2 ring-cyan-300/40 dark:bg-cyan-300 dark:text-slate-950' : 'bg-slate-950 text-cyan-200 shadow-slate-900/15 dark:bg-cyan-300 dark:text-slate-950'}`} onClick={() => setView('profile')} title={`โปรไฟล์: ${currentUser.name}`} type="button">
+              <UserCircle2 className="mr-2 shrink-0" size={18} />
+              <span className="truncate whitespace-nowrap">{currentUser.name}</span>
             </button>
           ) : (
             <>
@@ -103,6 +103,7 @@ export function Header({
 
       {menuOpen && (
         <div className="border-t border-slate-200 bg-white/95 px-4 py-3 lg:hidden dark:border-white/10 dark:bg-slate-950/95">
+          {currentUser && <button className={`mb-2 flex min-h-14 w-full items-center gap-3 rounded-xl px-4 text-left ${view === 'profile' ? 'bg-cyan-500 text-white' : 'bg-slate-950 text-cyan-100 dark:bg-cyan-300 dark:text-slate-950'}`} onClick={() => { setView('profile'); setMenuOpen(false) }} type="button"><UserCircle2 className="shrink-0" size={21} /><span className="min-w-0"><span className="block truncate text-sm font-black">{currentUser.name}</span><span className="block text-xs font-semibold opacity-70">เปิดโปรไฟล์และจัดการบัญชี</span></span></button>}
           <button className="mb-2 flex min-h-12 w-full items-center gap-2 rounded-xl bg-cyan-50 px-4 text-left text-sm font-black text-cyan-800 dark:bg-cyan-300/10 dark:text-cyan-200" onClick={() => { onOpenSearch(); setMenuOpen(false) }} type="button"><Search size={17} />ค้นหาสื่ออัจฉริยะ</button>
           {visibleNav.map((item) => (
             <button className="block min-h-12 w-full rounded-xl px-4 text-left text-sm font-bold text-slate-700 hover:bg-cyan-50 dark:text-slate-200 dark:hover:bg-white/10" key={item.value} onClick={() => { setView(item.value); setMenuOpen(false) }} type="button">
