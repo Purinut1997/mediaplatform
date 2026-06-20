@@ -507,3 +507,11 @@
 - เพิ่มแถบอธิบาย Server-side Security, Neon PostgreSQL และ Cloudflare Pages เพื่อสื่อสารความน่าเชื่อถือของระบบ
 - เปลี่ยนตัวเลขสื่อและยอดดาวน์โหลดใน Hero จากค่าตกแต่งเป็นข้อมูลจริง พร้อม fallback สำหรับการพัฒนาบนเครื่อง
 - ตรวจ responsive ที่ความกว้าง 390px และ desktop แล้วไม่พบ horizontal overflow
+
+# อัปเดต 20 มิถุนายน 2569 — Spotlight, Trending และ Smart Search
+
+- เพิ่ม Spotlight แบบ cinematic บนหน้าแรก โดยเลือกสื่อเด่นจากยอดเข้าชม ดาวน์โหลด และคะแนนจริง
+- เพิ่มอันดับ Trending 3 รายการ พร้อมสถิติย่อและปุ่มเปิดรายละเอียดโดยตรง
+- เพิ่ม Smart Search ค้นจากชื่อ คำอธิบาย หมวดหมู่ แหล่งสื่อ และแท็ก โดยไม่เพิ่ม request ไปฐานข้อมูล
+- เปิด Smart Search ได้จาก Header, เมนูมือถือ และคีย์ลัด `Ctrl/Command + K`; ปิดด้วย `Escape`
+- ตรวจ dialog และ responsive ที่ความกว้าง 390px แล้วไม่พบ horizontal overflow หรือ console error

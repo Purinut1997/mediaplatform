@@ -26,6 +26,7 @@ export function Header({
   view,
   menuOpen,
   onLogout,
+  onOpenSearch,
   setMenuOpen,
   setTheme,
   setView,
@@ -35,6 +36,7 @@ export function Header({
   view: View
   menuOpen: boolean
   onLogout: () => void
+  onOpenSearch: () => void
   setMenuOpen: (value: boolean) => void
   setTheme: (theme: Theme) => void
   setView: (view: View) => void
@@ -75,6 +77,9 @@ export function Header({
         </nav>
 
         <div className="flex items-center gap-2">
+          <button aria-label="ค้นหาสื่ออัจฉริยะ" className="hidden min-h-11 items-center gap-2 rounded-xl border border-white/70 bg-white/80 px-4 text-sm font-black text-slate-700 shadow-sm transition hover:-translate-y-0.5 md:inline-flex dark:border-white/10 dark:bg-white/10 dark:text-white" onClick={onOpenSearch} type="button">
+            <Search size={17} /> ค้นหา <span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-400 dark:bg-white/10">⌘K</span>
+          </button>
           <button aria-label="สลับธีม" className="grid h-11 w-11 place-items-center rounded-xl border border-white/70 bg-white/80 text-slate-700 shadow-sm transition hover:-translate-y-0.5 dark:border-white/10 dark:bg-white/10 dark:text-white" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} type="button">
             {theme === 'dark' ? <Sun size={19} /> : <Moon size={19} />}
           </button>
@@ -97,6 +102,7 @@ export function Header({
 
       {menuOpen && (
         <div className="border-t border-slate-200 bg-white/95 px-4 py-3 lg:hidden dark:border-white/10 dark:bg-slate-950/95">
+          <button className="mb-2 flex min-h-12 w-full items-center gap-2 rounded-xl bg-cyan-50 px-4 text-left text-sm font-black text-cyan-800 dark:bg-cyan-300/10 dark:text-cyan-200" onClick={() => { onOpenSearch(); setMenuOpen(false) }} type="button"><Search size={17} />ค้นหาสื่ออัจฉริยะ</button>
           {visibleNav.map((item) => (
             <button className="block min-h-12 w-full rounded-xl px-4 text-left text-sm font-bold text-slate-700 hover:bg-cyan-50 dark:text-slate-200 dark:hover:bg-white/10" key={item.value} onClick={() => { setView(item.value); setMenuOpen(false) }} type="button">
               {item.label}

@@ -40,6 +40,7 @@ import { Header, Hero, HomeJourney, MaintenanceScreen } from './components/Publi
 import { MemberLibraryPanel } from './components/MemberLibrary'
 import { MediaDetail } from './components/MediaDetail'
 import { VipTermsDialog } from './components/VipTermsDialog'
+import { DiscoverySpotlight, SmartSearchDialog } from './components/HomeExperience'
 import { defaultSiteSettings, mediaItems, topics } from './defaults'
 import './App.css'
 
@@ -100,9 +101,21 @@ function App() {
   const [showError, setShowError] = useState(false)
   const [loading, setLoading] = useState(true)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [smartSearchOpen, setSmartSearchOpen] = useState(false)
   const [memberLibrary, setMemberLibrary] = useState<MemberLibrary | null>(null)
   const [memberLibraryLoading, setMemberLibraryLoading] = useState(false)
   const [memberLibraryRefresh, setMemberLibraryRefresh] = useState(0)
+
+  useEffect(() => {
+    const handleSmartSearch = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault()
+        setSmartSearchOpen(true)
+      }
+    }
+    window.addEventListener('keydown', handleSmartSearch)
+    return () => window.removeEventListener('keydown', handleSmartSearch)
+  }, [])
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', theme === 'dark')
@@ -368,6 +381,7 @@ function App() {
           currentUser={currentUser}
           menuOpen={menuOpen}
           onLogout={logout}
+          onOpenSearch={() => setSmartSearchOpen(true)}
           setMenuOpen={setMenuOpen}
           setTheme={setTheme}
           setView={setView}
@@ -390,6 +404,7 @@ function App() {
                 totalDownloads={(mediaRecords.length ? mediaRecords : mediaItems).reduce((sum, item) => sum + item.downloads, 0)}
               />
               <PortalTiles setView={setView} />
+              <DiscoverySpotlight mediaItems={mediaRecords.length ? mediaRecords : mediaItems} openDetail={openDetail} openSearch={() => setSmartSearchOpen(true)} />
               <HomeJourney currentUser={currentUser} setView={setView} />
               <MediaSection
                 currentUser={currentUser}
@@ -541,6 +556,12 @@ function App() {
       </div>
 
       <CreditBadge />
+      <SmartSearchDialog
+        mediaItems={mediaRecords.length ? mediaRecords : mediaItems}
+        onClose={() => setSmartSearchOpen(false)}
+        open={smartSearchOpen}
+        openDetail={openDetail}
+      />
       {toast && <Toast message={toast} />}
       {showSuccess && (
         <Popup
