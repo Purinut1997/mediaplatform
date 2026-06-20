@@ -524,3 +524,15 @@
 - ประวัติ Learning Flow เก็บใน `localStorage` เฉพาะรหัสสื่อสูงสุด 6 รายการ ไม่ส่งข้อมูลส่วนนี้เพิ่มไป backend
 - การเปิดหน้ารายละเอียดจริงเท่านั้นที่อัปเดต Continue Learning และ progress
 - เพิ่มปุ่มดูตัวอย่างบนการ์ดสื่อหน้าแรกและหน้าคลัง พร้อมตรวจ desktop/mobile 390px แล้วไม่พบ horizontal overflow หรือ console error
+
+# อัปเดต 20 มิถุนายน 2569 — Nexus Experience ครบ 10 ฟีเจอร์
+
+- เพิ่ม Personal Collections สร้าง/ลบชุดและเลือกเก็บสื่อได้ โดยเก็บข้อมูลเฉพาะบนอุปกรณ์
+- เพิ่ม Share Card พร้อม QR, คัดลอกลิงก์, Native Share และ deep link `?media=id` ที่เปิดหน้าสื่อโดยตรง
+- เพิ่ม Achievement 4 ระดับจากการสำรวจสื่อและการสร้างคอลเลกชัน
+- เพิ่ม Nexus Pulse แสดงจำนวนสื่อ ยอดเข้าชม ดาวน์โหลด คะแนนเฉลี่ย และสื่อยอดนิยมจากข้อมูลจริง
+- เพิ่ม AI Media Guide แนะนำสื่อจากเป้าหมายด้วยการให้คะแนนข้อความในเบราว์เซอร์ ไม่ส่งข้อมูลไป AI ภายนอกและไม่มีค่า API
+- เพิ่ม PWA Install Experience ใช้ browser install prompt เมื่อรองรับ และแสดงวิธีติดตั้งด้วยตนเองเมื่อยังเรียก prompt ไม่ได้
+- เพิ่ม Creator Profile ของ MIKPURINUT พร้อมความเชี่ยวชาญและจำนวนผลงานในระบบ
+- รวมกับ Quick Preview, Learning Path และ Continue Learning ทำให้ชุด UX ที่วางแผนไว้ครบ 10 รายการ
+- ตรวจ interaction หลักและ responsive ที่ความกว้าง 390px แล้วไม่พบ horizontal overflow หรือ console error

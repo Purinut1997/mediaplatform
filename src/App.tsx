@@ -1,4 +1,4 @@
-import { lazy, Suspense, type FormEvent, type ReactNode, useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, type FormEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ArrowLeft,
   ChevronRight,
@@ -42,6 +42,7 @@ import { MediaDetail } from './components/MediaDetail'
 import { VipTermsDialog } from './components/VipTermsDialog'
 import { DiscoverySpotlight, SmartSearchDialog } from './components/HomeExperience'
 import { LearningFlow, QuickPreviewDialog } from './components/LearningFlow'
+import { NexusExpansion } from './components/NexusExpansion'
 import { defaultSiteSettings, mediaItems, topics } from './defaults'
 import './App.css'
 
@@ -115,6 +116,7 @@ function App() {
   const [memberLibrary, setMemberLibrary] = useState<MemberLibrary | null>(null)
   const [memberLibraryLoading, setMemberLibraryLoading] = useState(false)
   const [memberLibraryRefresh, setMemberLibraryRefresh] = useState(0)
+  const sharedMediaHandled = useRef(false)
 
   useEffect(() => {
     const handleSmartSearch = (event: KeyboardEvent) => {
@@ -215,10 +217,18 @@ function App() {
         if (!active) return
 
         const nextMedia = mediaJson.media ?? []
+        const sharedMediaId = Number(new URLSearchParams(window.location.search).get('media'))
+        const sharedMedia = !sharedMediaHandled.current && Number.isInteger(sharedMediaId)
+          ? nextMedia.find((item) => item.id === sharedMediaId)
+          : undefined
         setMediaRecords(nextMedia)
         setMediaPage(mediaJson.page ?? 1)
         setMediaTotal(mediaJson.total ?? nextMedia.length)
-        setSelected(nextMedia[0] ?? mediaItems[0])
+        setSelected(sharedMedia ?? nextMedia[0] ?? mediaItems[0])
+        if (sharedMedia) {
+          sharedMediaHandled.current = true
+          setView('detail')
+        }
         setTopicOptions([
           'ทั้งหมด',
           ...(categoriesJson.categories?.map((item) => item.name) ?? topics.slice(1)),
@@ -227,12 +237,21 @@ function App() {
         setDataStatus('ready')
       } catch {
         if (!active) return
+        const sharedMediaId = Number(new URLSearchParams(window.location.search).get('media'))
+        const sharedMedia = !sharedMediaHandled.current && Number.isInteger(sharedMediaId)
+          ? mediaItems.find((item) => item.id === sharedMediaId)
+          : undefined
         setMediaRecords([])
         setMediaPage(1)
         setMediaTotal(0)
         setTopicOptions(topics)
         setSiteSettings(defaultSiteSettings)
         setDataStatus('fallback')
+        if (sharedMedia) {
+          sharedMediaHandled.current = true
+          setSelected(sharedMedia)
+          setView('detail')
+        }
       }
     }
 
@@ -424,6 +443,11 @@ function App() {
                 mediaItems={mediaRecords.length ? mediaRecords : mediaItems}
                 openDetail={openDetail}
                 openPreview={setPreviewItem}
+                recentMediaIds={recentMediaIds}
+              />
+              <NexusExpansion
+                mediaItems={mediaRecords.length ? mediaRecords : mediaItems}
+                openDetail={openDetail}
                 recentMediaIds={recentMediaIds}
               />
               <HomeJourney currentUser={currentUser} setView={setView} />
