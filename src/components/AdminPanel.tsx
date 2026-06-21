@@ -1,4 +1,5 @@
 import { type FormEvent, useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import {
   AlertCircle,
   Archive,
@@ -136,6 +137,7 @@ export function AdminPanel({
   const [vipExpiryDate, setVipExpiryDate] = useState('')
   const [vipRequests, setVipRequests] = useState<VipRequest[]>([])
   const [vipApprovalOptions, setVipApprovalOptions] = useState<Record<number, { days: string; lifetime: boolean }>>({})
+  const [vipProofReview, setVipProofReview] = useState<{ request: VipRequest } | null>(null)
   const [purchaseRequests, setPurchaseRequests] = useState<PurchaseRequest[]>([])
   const [refundRequests, setRefundRequests] = useState<RefundRequest[]>([])
   const [mediaIssues, setMediaIssues] = useState<MediaIssueReport[]>([])
@@ -174,6 +176,13 @@ export function AdminPanel({
   const [categoryError, setCategoryError] = useState('')
   const [opsError, setOpsError] = useState('')
   const isSuperAdmin = currentUser.role === 'superadmin'
+
+  useEffect(() => {
+    if (!vipProofReview) return
+    const close = (event: KeyboardEvent) => { if (event.key === 'Escape') setVipProofReview(null) }
+    window.addEventListener('keydown', close)
+    return () => window.removeEventListener('keydown', close)
+  }, [vipProofReview])
 
   const pendingVipRequests = vipRequests.filter((request) => request.status === 'pending')
   const resolvedVipRequests = vipRequests.filter((request) => request.status !== 'pending')
@@ -735,12 +744,23 @@ export function AdminPanel({
 
       if (!response.ok) throw new Error(result.error ?? 'อัปเดตสมาชิกไม่สำเร็จ')
       await loadMembers()
+      return true
     } catch (actionError) {
       setMemberError(
         actionError instanceof Error ? actionError.message : 'อัปเดตสมาชิกไม่สำเร็จ',
       )
       setLoadingMembers(false)
+      return false
     }
+  }
+
+  const closeVipProofReview = () => {
+    setVipProofReview(null)
+  }
+
+  const openVipProofReview = (request: VipRequest) => {
+    setMemberError('')
+    setVipProofReview({ request })
   }
 
   const openVipEditor = (user: AdminUser) => {
@@ -1544,15 +1564,14 @@ export function AdminPanel({
                             <p className="mt-1 text-xs font-bold text-cyan-200">สลิป: {request.slipName}</p>
                           )}
                           {request.hasSlipData && (
-                            <a
-                              className="mt-2 inline-flex min-h-9 items-center gap-2 rounded-xl bg-cyan-300/10 px-3 text-xs font-black text-cyan-100"
-                              href={`/api/admin/vip-proof?id=${request.id}`}
-                              rel="noreferrer"
-                              target="_blank"
+                            <button
+                              className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-xl bg-gradient-to-r from-cyan-300 to-emerald-300 px-4 text-sm font-black text-slate-950 shadow-lg disabled:opacity-60"
+                              onClick={() => openVipProofReview(request)}
+                              type="button"
                             >
-                              <ExternalLink size={14} />
-                              เปิดหลักฐานการโอน
-                            </a>
+                              <Eye size={17} />
+                              ตรวจหลักฐานและมอบสิทธิ์ VIP
+                            </button>
                           )}
                           {!request.hasSlipData && (
                             <p className="mt-2 rounded-xl bg-red-400/10 px-3 py-2 text-xs font-black text-red-200">ไม่มีหลักฐานแนบมา — ไม่สามารถอนุมัติได้</p>
@@ -1560,54 +1579,7 @@ export function AdminPanel({
                         </div>
                         <Crown className="shrink-0 text-amber-300" size={22} />
                       </div>
-                      <div className="mt-4 rounded-2xl border border-cyan-300/15 bg-black/20 p-3">
-                        <p className="text-xs font-black text-cyan-100">ระยะสิทธิ์หลังอนุมัติ</p>
-                        <div className="mt-2 grid gap-2 sm:grid-cols-[1fr_auto]">
-                          <input
-                            className="min-h-10 rounded-xl border border-white/10 bg-black/20 px-3 text-sm font-bold text-white outline-none disabled:opacity-40"
-                            disabled={vipApprovalOptions[request.id]?.lifetime ?? settings.vipLifetimeEnabled}
-                            max={3650}
-                            min={1}
-                            onChange={(event) => setVipApprovalOptions((current) => ({ ...current, [request.id]: { days: event.target.value, lifetime: current[request.id]?.lifetime ?? settings.vipLifetimeEnabled } }))}
-                            type="number"
-                            value={vipApprovalOptions[request.id]?.days ?? String(settings.vipDurationDays)}
-                          />
-                          <label className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-amber-300/10 px-3 text-xs font-black text-amber-100">
-                            <input
-                              checked={vipApprovalOptions[request.id]?.lifetime ?? settings.vipLifetimeEnabled}
-                              onChange={(event) => setVipApprovalOptions((current) => ({ ...current, [request.id]: { days: current[request.id]?.days ?? String(settings.vipDurationDays), lifetime: event.target.checked } }))}
-                              type="checkbox"
-                            />
-                            ตลอดชีพ
-                          </label>
-                        </div>
-                        <p className="mt-2 text-xs font-semibold text-slate-400">กำหนดได้ 1–3,650 วัน หรือเลือกตลอดชีพสำหรับคำขอนี้</p>
-                      </div>
-                      <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                        <button
-                          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-emerald-300 px-3 font-black text-slate-950 disabled:opacity-60"
-                          disabled={loadingMembers || !request.hasSlipData}
-                          onClick={() => submitMemberAction({
-                            action: 'approve-vip',
-                            requestId: request.id,
-                            days: Number(vipApprovalOptions[request.id]?.days ?? settings.vipDurationDays),
-                            vipLifetime: vipApprovalOptions[request.id]?.lifetime ?? settings.vipLifetimeEnabled,
-                          })}
-                          type="button"
-                        >
-                          <CheckCircle2 size={18} />
-                          อนุมัติ
-                        </button>
-                        <button
-                          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-white/10 px-3 font-black text-white disabled:opacity-60"
-                          disabled={loadingMembers}
-                          onClick={() => submitMemberAction({ action: 'reject-vip', requestId: request.id })}
-                          type="button"
-                        >
-                          <X size={18} />
-                          ปฏิเสธ
-                        </button>
-                      </div>
+                      {!request.hasSlipData && <button className="mt-3 min-h-10 rounded-xl bg-red-400/10 px-4 text-sm font-black text-red-200 disabled:opacity-60" disabled={loadingMembers} onClick={() => void submitMemberAction({ action: 'reject-vip', requestId: request.id })} type="button">ปฏิเสธคำขอ</button>}
                     </article>
                   ))}
                 </div>
@@ -3843,6 +3815,43 @@ export function AdminPanel({
         </div>
       </div>
       </div>
+      {vipProofReview && createPortal(
+        <div aria-label="ตรวจหลักฐานและมอบสิทธิ์ VIP" aria-modal="true" className="fixed inset-0 z-[130] grid place-items-center bg-slate-950/88 p-3 backdrop-blur-xl sm:p-5" role="dialog">
+          <button aria-label="ปิดหน้าต่างตรวจหลักฐาน" className="absolute inset-0 cursor-default" onClick={closeVipProofReview} type="button" />
+          <div className="relative grid max-h-[94vh] w-full max-w-6xl overflow-hidden rounded-[2rem] border border-cyan-300/20 bg-slate-950 text-white shadow-2xl lg:grid-cols-[1.35fr_0.8fr]">
+            <button aria-label="ปิด" className="absolute right-4 top-4 z-10 grid h-11 w-11 place-items-center rounded-2xl bg-slate-950/80 text-white backdrop-blur hover:bg-red-500" onClick={closeVipProofReview} type="button"><X size={20} /></button>
+            <div className="grid min-h-[48vh] place-items-center overflow-auto bg-slate-900/80 p-4 sm:p-6 lg:min-h-[78vh]">
+              {vipProofReview.request.slipName.toLowerCase().endsWith('.pdf')
+                ? <div className="grid max-w-md place-items-center rounded-3xl border border-dashed border-cyan-300/30 bg-white/5 p-8 text-center"><FileText className="text-cyan-300" size={52} /><h3 className="mt-4 text-xl font-black">หลักฐานเป็นไฟล์ PDF</h3><p className="mt-2 text-sm font-semibold text-slate-400">เปิดไฟล์ในแท็บใหม่แล้วกลับมามอบสิทธิ์จากหน้าต่างนี้</p><a className="mt-5 inline-flex min-h-12 items-center gap-2 rounded-2xl bg-cyan-300 px-5 font-black text-slate-950" href={`/api/admin/vip-proof?id=${vipProofReview.request.id}`} rel="noreferrer" target="_blank"><ExternalLink size={18} />เปิดหลักฐาน PDF</a></div>
+                : <img alt={`หลักฐานการชำระเงินของ ${vipProofReview.request.name}`} className="max-h-[76vh] max-w-full rounded-2xl bg-white object-contain shadow-2xl" src={`/api/admin/vip-proof?id=${vipProofReview.request.id}`} />}
+            </div>
+            <div className="overflow-y-auto p-5 sm:p-7">
+              <p className="text-xs font-black tracking-[0.18em] text-cyan-300">VIP PROOF REVIEW</p>
+              <h2 className="mt-2 text-2xl font-black">ตรวจหลักฐานและมอบสิทธิ์</h2>
+              <div className="mt-5 rounded-2xl border border-white/10 bg-white/5 p-4">
+                <p className="text-lg font-black">{vipProofReview.request.name}</p>
+                <p className="mt-1 text-sm font-semibold text-slate-400">{vipProofReview.request.email}</p>
+                {vipProofReview.request.phone && <p className="mt-1 text-sm font-semibold text-slate-400">โทร {vipProofReview.request.phone}</p>}
+                <p className="mt-2 text-xs font-bold text-cyan-200">คำขอ #{vipProofReview.request.id} · {vipProofReview.request.slipName}</p>
+              </div>
+              <div className="mt-5 rounded-2xl border border-cyan-300/20 bg-cyan-300/[0.06] p-4">
+                <p className="font-black text-cyan-100">กำหนดระยะสิทธิ์ VIP</p>
+                <label className="mt-3 block text-sm font-bold text-slate-300">จำนวนวัน
+                  <input className="mt-2 min-h-12 w-full rounded-xl border border-white/10 bg-black/25 px-4 font-black text-white outline-none focus:border-cyan-300 disabled:opacity-50" disabled={vipApprovalOptions[vipProofReview.request.id]?.lifetime ?? settings.vipLifetimeEnabled} max={3650} min={1} onChange={(event) => setVipApprovalOptions((current) => ({ ...current, [vipProofReview.request.id]: { days: event.target.value, lifetime: current[vipProofReview.request.id]?.lifetime ?? settings.vipLifetimeEnabled } }))} type="number" value={vipApprovalOptions[vipProofReview.request.id]?.days ?? String(settings.vipDurationDays)} />
+                </label>
+                <label className="mt-3 flex min-h-12 items-center gap-3 rounded-xl bg-amber-300/10 px-4 font-black text-amber-100"><input checked={vipApprovalOptions[vipProofReview.request.id]?.lifetime ?? settings.vipLifetimeEnabled} onChange={(event) => setVipApprovalOptions((current) => ({ ...current, [vipProofReview.request.id]: { days: current[vipProofReview.request.id]?.days ?? String(settings.vipDurationDays), lifetime: event.target.checked } }))} type="checkbox" />มอบสิทธิ์ VIP ตลอดชีพ</label>
+                <p className="mt-3 text-xs font-semibold leading-5 text-slate-400">ตรวจชื่อ ยอด และหลักฐานให้ถูกต้องก่อนอนุมัติ เมื่อมอบสิทธิ์แล้วสมาชิกจะใช้ VIP ได้ทันที</p>
+              </div>
+              {memberError && <p className="mt-4 rounded-xl bg-red-400/10 p-3 text-sm font-bold text-red-200">{memberError}</p>}
+              <div className="mt-5 grid gap-3">
+                <button className="inline-flex min-h-13 items-center justify-center gap-2 rounded-2xl bg-emerald-300 px-5 font-black text-slate-950 shadow-lg disabled:opacity-60" disabled={loadingMembers} onClick={async () => { const request = vipProofReview.request; const approved = await submitMemberAction({ action: 'approve-vip', requestId: request.id, days: Number(vipApprovalOptions[request.id]?.days ?? settings.vipDurationDays), vipLifetime: vipApprovalOptions[request.id]?.lifetime ?? settings.vipLifetimeEnabled }); if (approved) closeVipProofReview() }} type="button">{loadingMembers ? <Loader2 className="animate-spin" size={19} /> : <CheckCircle2 size={19} />}ยืนยันและมอบสิทธิ์ VIP</button>
+                <button className="min-h-12 rounded-2xl bg-red-400/10 px-5 font-black text-red-200 disabled:opacity-60" disabled={loadingMembers} onClick={async () => { const rejected = await submitMemberAction({ action: 'reject-vip', requestId: vipProofReview.request.id }); if (rejected) closeVipProofReview() }} type="button">ปฏิเสธคำขอนี้</button>
+                <button className="min-h-11 rounded-2xl bg-white/10 px-5 font-black" onClick={closeVipProofReview} type="button">ปิดและตรวจภายหลัง</button>
+              </div>
+            </div>
+          </div>
+        </div>, document.body,
+      )}
     </section>
   )
 }

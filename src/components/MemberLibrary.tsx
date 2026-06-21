@@ -1,4 +1,5 @@
-import { useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import {
   AlertCircle,
   BookmarkCheck,
@@ -7,13 +8,16 @@ import {
   Clock3,
   Crown,
   FileUp,
+  ExternalLink,
   Heart,
   Loader2,
   LogOut,
   PackageCheck,
   Search,
   Send,
+  Maximize2,
   UserCircle2,
+  X,
 } from 'lucide-react'
 import { readJson } from '../lib/api'
 import { paymentProofAccept, paymentProofHelpText, readPaymentProof } from '../lib/payment-proof'
@@ -36,9 +40,36 @@ function directImageUrl(value: string) {
 
 function VipQrImage({ src }: { src: string }) {
   const [failed, setFailed] = useState(false)
+  const [expanded, setExpanded] = useState(false)
   const imageUrl = directImageUrl(src)
+  useEffect(() => {
+    if (!expanded) return
+    const close = (event: KeyboardEvent) => { if (event.key === 'Escape') setExpanded(false) }
+    window.addEventListener('keydown', close)
+    return () => window.removeEventListener('keydown', close)
+  }, [expanded])
   if (!imageUrl || failed) return <div className="grid h-28 w-28 place-items-center rounded-2xl border border-dashed border-red-300 bg-red-50 p-2 text-center text-xs font-black text-red-700">เปิดภาพ QR ไม่สำเร็จ<br />ตรวจลิงก์ไฟล์ภาพ</div>
-  return <img alt="QR Code สมัคร VIP" className="h-28 w-28 rounded-2xl border border-slate-200 bg-white object-contain p-2" onError={() => setFailed(true)} src={imageUrl} />
+  return <>
+    <button aria-label="ขยาย QR Code" className="group relative h-28 w-28 overflow-hidden rounded-2xl border border-slate-200 bg-white p-2 shadow-sm transition hover:scale-[1.03] hover:shadow-lg" onClick={() => setExpanded(true)} type="button">
+      <img alt="QR Code สมัคร VIP" className="h-full w-full object-contain" onError={() => setFailed(true)} src={imageUrl} />
+      <span className="absolute bottom-2 right-2 grid h-8 w-8 place-items-center rounded-xl bg-slate-950/80 text-white opacity-0 transition group-hover:opacity-100"><Maximize2 size={16} /></span>
+    </button>
+    {expanded && createPortal(
+      <div aria-label="QR Code สำหรับชำระเงิน VIP" aria-modal="true" className="fixed inset-0 z-[120] grid place-items-center bg-slate-950/85 p-4 backdrop-blur-xl" role="dialog">
+        <button aria-label="ปิด QR Code" className="absolute inset-0 cursor-default" onClick={() => setExpanded(false)} type="button" />
+        <div className="relative w-full max-w-xl rounded-[2rem] border border-white/15 bg-slate-900 p-5 text-white shadow-2xl sm:p-7">
+          <button aria-label="ปิด" className="absolute right-4 top-4 grid h-11 w-11 place-items-center rounded-2xl bg-white/10 hover:bg-white/20" onClick={() => setExpanded(false)} type="button"><X size={20} /></button>
+          <p className="text-xs font-black tracking-[0.18em] text-cyan-300">VIP PAYMENT QR</p>
+          <h2 className="mt-2 text-2xl font-black">สแกน QR Code เพื่อชำระเงิน</h2>
+          <div className="mx-auto mt-6 aspect-square w-full max-w-sm rounded-3xl bg-white p-4"><img alt="QR Code สมัคร VIP ขนาดใหญ่" className="h-full w-full object-contain" src={imageUrl} /></div>
+          <div className="mt-5 flex flex-wrap justify-center gap-3">
+            <a className="inline-flex min-h-11 items-center gap-2 rounded-2xl bg-cyan-300 px-5 font-black text-slate-950" href={imageUrl} rel="noreferrer" target="_blank"><ExternalLink size={17} />เปิดภาพต้นฉบับ</a>
+            <button className="min-h-11 rounded-2xl bg-white/10 px-5 font-black" onClick={() => setExpanded(false)} type="button">ปิด</button>
+          </div>
+        </div>
+      </div>, document.body,
+    )}
+  </>
 }
 
 export function MemberLibraryPanel({
