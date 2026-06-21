@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   Edit3,
+  EllipsisVertical,
   ExternalLink,
   Grid3X3,
   ImagePlus,
@@ -244,6 +245,35 @@ export function EServicePanel({ currentUser, setView }: { currentUser: CurrentUs
 
 function ServiceCard({ item, onDelete, onEdit, onOpen, onPin }: { item: ServiceItem; onDelete: () => void; onEdit: () => void; onOpen: () => void; onPin: () => void }) {
   const editable = item.source === 'custom'
+  const [menuOpen, setMenuOpen] = useState(false)
   const initials = item.title.split(/\s+/).map((part) => part[0]).join('').slice(0, 2).toUpperCase()
-  return <article className="nexus-card group relative flex min-h-72 flex-col overflow-hidden rounded-[2rem] border p-5 backdrop-blur-xl transition hover:-translate-y-1"><div className="flex items-start justify-between gap-3"><div className="grid h-20 w-20 place-items-center overflow-hidden rounded-3xl border border-white bg-gradient-to-br from-cyan-400 to-blue-600 text-2xl font-black text-white shadow-lg">{item.iconDataUrl ? <img alt={`ไอคอน ${item.title}`} className="h-full w-full object-cover" loading="lazy" src={item.iconDataUrl} /> : initials}</div><button aria-label={item.pinned ? `เลิกปักหมุด ${item.title}` : `ปักหมุด ${item.title}`} className={`grid h-10 w-10 place-items-center rounded-xl ${item.pinned ? 'bg-amber-100 text-amber-700 dark:bg-amber-300/10 dark:text-amber-300' : 'bg-slate-100 text-slate-400 dark:bg-white/10'}`} disabled={!editable} onClick={onPin} type="button"><Pin className={item.pinned ? 'fill-current' : ''} size={17} /></button></div><div className="mt-4 flex flex-wrap gap-2"><span className={`rounded-full px-3 py-1 text-[10px] font-black ${item.source === 'purchased' ? 'bg-emerald-100 text-emerald-700' : item.source === 'demo' ? 'bg-violet-100 text-violet-700' : 'bg-cyan-100 text-cyan-700'}`}>{sourceLabel(item.source)}</span><span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-black text-slate-500 dark:bg-white/10 dark:text-slate-300">{item.category}</span></div><h2 className="mt-3 line-clamp-2 text-xl font-black text-slate-950 dark:text-white">{item.title}</h2><p className="mt-2 line-clamp-2 text-sm font-semibold leading-6 text-slate-500 dark:text-slate-400">{item.description || 'ทางลัดเข้าสู่ระบบภายนอกของคุณ'}</p><div className="mt-auto flex gap-2 pt-5">{item.source !== 'demo' ? <button className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-slate-950 px-3 text-sm font-black text-cyan-200 dark:bg-cyan-300 dark:text-slate-950" onClick={onOpen} type="button">เปิดระบบ<ExternalLink size={16} /></button> : <button className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-violet-100 px-3 text-sm font-black text-violet-700" disabled type="button"><LockKeyhole size={16} />ตัวอย่าง</button>}{editable && <><button aria-label={`แก้ไข ${item.title}`} className="grid h-11 w-11 place-items-center rounded-xl bg-slate-100 text-slate-600 dark:bg-white/10 dark:text-slate-300" onClick={onEdit} type="button"><Edit3 size={16} /></button><button aria-label={`ลบ ${item.title}`} className="grid h-11 w-11 place-items-center rounded-xl bg-rose-50 text-rose-600 dark:bg-rose-300/10 dark:text-rose-300" onClick={onDelete} type="button"><Trash2 size={16} /></button></>}</div></article>
+  const deleteItem = () => {
+    setMenuOpen(false)
+    if (window.confirm(`ลบ E-Service “${item.title}” ใช่หรือไม่`)) onDelete()
+  }
+
+  return (
+    <article className="nexus-card group relative flex min-h-[21rem] flex-col overflow-visible rounded-[2rem] border p-5 backdrop-blur-xl transition hover:-translate-y-1 hover:shadow-2xl">
+      <div className="absolute right-4 top-4 z-20 flex items-center gap-2">
+        <button aria-label={item.pinned ? `เลิกปักหมุด ${item.title}` : `ปักหมุด ${item.title}`} className={`grid h-11 w-11 place-items-center rounded-2xl border transition ${item.pinned ? 'border-amber-300/50 bg-amber-100 text-amber-700 dark:bg-amber-300/15 dark:text-amber-300' : 'border-slate-200 bg-white/90 text-slate-400 dark:border-white/10 dark:bg-slate-900/90'}`} disabled={!editable} onClick={onPin} type="button"><Pin className={item.pinned ? 'fill-current' : ''} size={18} /></button>
+        {editable && <div className="relative">
+          <button aria-expanded={menuOpen} aria-label={`เมนูจัดการ ${item.title}`} className="grid h-11 w-11 place-items-center rounded-2xl border border-slate-200 bg-white/90 text-slate-600 transition hover:border-cyan-300 hover:text-cyan-700 dark:border-white/10 dark:bg-slate-900/90 dark:text-slate-300" onClick={() => setMenuOpen((value) => !value)} type="button"><EllipsisVertical size={20} /></button>
+          {menuOpen && <><button aria-label="ปิดเมนูจัดการ" className="fixed inset-0 z-20 cursor-default" onClick={() => setMenuOpen(false)} type="button" /><div className="absolute right-0 top-13 z-30 w-44 overflow-hidden rounded-2xl border border-slate-200 bg-white p-1.5 shadow-2xl dark:border-white/10 dark:bg-slate-900">
+            <button className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-left text-sm font-black text-slate-700 hover:bg-cyan-50 dark:text-slate-200 dark:hover:bg-white/10" onClick={() => { setMenuOpen(false); onEdit() }} type="button"><Edit3 size={17} />แก้ไขระบบ</button>
+            <button className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-left text-sm font-black text-rose-600 hover:bg-rose-50 dark:text-rose-300 dark:hover:bg-rose-300/10" onClick={deleteItem} type="button"><Trash2 size={17} />ลบระบบ</button>
+          </div></>}
+        </div>}
+      </div>
+
+      <button aria-label={item.source === 'demo' ? `ตัวอย่าง ${item.title}` : `เปิดระบบ ${item.title}`} className="group/icon relative grid h-32 w-32 place-items-center overflow-hidden rounded-[2rem] border-2 border-white bg-gradient-to-br from-cyan-400 to-blue-600 text-3xl font-black text-white shadow-xl shadow-cyan-900/15 transition hover:scale-[1.04] hover:shadow-cyan-500/25 disabled:cursor-default sm:h-36 sm:w-36" disabled={item.source === 'demo'} onClick={onOpen} title={item.source === 'demo' ? 'รายการตัวอย่าง' : `คลิกเพื่อเปิด ${item.title}`} type="button">
+        {item.iconDataUrl ? <img alt={`ไอคอน ${item.title}`} className="h-full w-full object-cover" loading="lazy" src={item.iconDataUrl} /> : initials}
+        <span className="absolute inset-0 grid place-items-center bg-slate-950/65 opacity-0 transition group-hover/icon:opacity-100">{item.source === 'demo' ? <LockKeyhole size={28} /> : <ExternalLink size={28} />}</span>
+      </button>
+
+      <div className="mt-5 flex flex-wrap gap-2"><span className={`rounded-full px-3 py-1 text-[10px] font-black ${item.source === 'purchased' ? 'bg-emerald-100 text-emerald-700' : item.source === 'demo' ? 'bg-violet-100 text-violet-700' : 'bg-cyan-100 text-cyan-700'}`}>{sourceLabel(item.source)}</span><span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-black text-slate-500 dark:bg-white/10 dark:text-slate-300">{item.category}</span></div>
+      <h2 className="mt-3 line-clamp-2 text-2xl font-black text-slate-950 dark:text-white">{item.title}</h2>
+      <p className="mt-2 line-clamp-2 text-sm font-semibold leading-6 text-slate-500 dark:text-slate-400">{item.description || 'คลิกที่ไอคอนเพื่อเข้าสู่ระบบภายนอกของคุณ'}</p>
+      <p className={`mt-auto pt-5 text-xs font-black ${item.source === 'demo' ? 'text-violet-500' : 'text-cyan-700 dark:text-cyan-300'}`}>{item.source === 'demo' ? 'ตัวอย่างการ์ด E‑Service' : 'คลิกไอคอนเพื่อเปิดระบบ ↗'}</p>
+    </article>
+  )
 }
