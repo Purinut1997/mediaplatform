@@ -36,7 +36,6 @@ import type {
   AdminAnalytics,
   AdminDateFilter,
   AdminMediaSort,
-  AdminNotification,
   AdminSection,
   AdminUser,
   AnalyticsPoint,
@@ -147,10 +146,6 @@ export function AdminPanel({
   const [errorLogs, setErrorLogs] = useState<ErrorLog[]>([])
   const [errorPage, setErrorPage] = useState(1)
   const [errorTotal, setErrorTotal] = useState(0)
-  const [notifications, setNotifications] = useState<AdminNotification[]>([])
-  const [notificationUnread, setNotificationUnread] = useState(0)
-  const [notificationPage, setNotificationPage] = useState(1)
-  const [notificationTotal, setNotificationTotal] = useState(0)
   const [analytics, setAnalytics] = useState<AdminAnalytics | null>(null)
   const [systemHealth, setSystemHealth] = useState<SystemHealth | null>(null)
   const [telegramStatus, setTelegramStatus] = useState<TelegramStatus | null>(null)
@@ -242,10 +237,9 @@ export function AdminPanel({
   const vipMemberRate = analytics?.engagement.activeUsers
     ? (analytics.engagement.vipUsers / analytics.engagement.activeUsers) * 100
     : 0
-  const unreadNotifications = notificationUnread
+  const unreadNotifications = systemHealth?.counts.unreadNotifications ?? 0
   const minVipExpiryDate = new Date(filterNow + 86400000).toISOString().slice(0, 10)
   const maxVipExpiryDate = new Date(filterNow + 3650 * 86400000).toISOString().slice(0, 10)
-  const notificationPageCount = Math.max(1, Math.ceil(notificationTotal / 8))
   const activityActions = Array.from(new Set(auditLogs.map((log) => log.action).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'th'))
   const activityTargets = Array.from(new Set(auditLogs.map((log) => log.targetType).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'th'))
   const filteredAuditLogs = auditLogs.filter((log) => {
@@ -422,22 +416,6 @@ export function AdminPanel({
     }
   }
 
-  const loadNotifications = async (page = notificationPage) => {
-    const response = await fetch(`/api/admin/notifications?page=${page}&pageSize=8`, { credentials: 'include' })
-    const result = await readJson<{
-      notifications?: AdminNotification[]
-      unread?: number
-      total?: number
-      page?: number
-      error?: string
-    }>(response)
-    if (!response.ok) throw new Error(result.error ?? 'โหลด Notification Center ไม่สำเร็จ')
-    setNotifications(result.notifications ?? [])
-    setNotificationUnread(result.unread ?? 0)
-    setNotificationTotal(result.total ?? 0)
-    setNotificationPage(result.page ?? page)
-  }
-
   const loadAnalytics = async () => {
     const response = await fetch('/api/admin/analytics', { credentials: 'include' })
     const result = await readJson<{ analytics?: AdminAnalytics; error?: string }>(response)
@@ -470,7 +448,6 @@ export function AdminPanel({
       const [healthResponse, issuesResponse] = await Promise.all([
         fetch('/api/admin/health', { credentials: 'include' }),
         fetch('/api/media/issues', { credentials: 'include' }),
-        loadNotifications(),
         loadAnalytics(),
       ])
       const health = await readJson<{ health?: SystemHealth; error?: string }>(healthResponse)
@@ -505,32 +482,6 @@ export function AdminPanel({
       setOpsError(opsLoadError instanceof Error ? opsLoadError.message : 'โหลดข้อมูลหลังบ้านไม่สำเร็จ')
     } finally {
       setLoadingOps(false)
-    }
-  }
-
-  const jumpFromNotification = (notice: AdminNotification) => {
-    if (notice.targetType === 'vip_request' && isSuperAdmin) setAdminSection('members')
-    else if (notice.targetType === 'media_issue') { setAdminSection('members'); setMemberView('requests') }
-    else if (notice.targetType === 'media') setAdminSection('media')
-    else if (notice.targetType === 'media_links') setAdminSection('links')
-    else if (notice.targetType === 'error_logs' && isSuperAdmin) setAdminSection('errors')
-    else if (notice.targetType === 'app_settings' && isSuperAdmin) setAdminSection('settings')
-  }
-
-  const submitNotificationAction = async (payload: { action: 'mark-read' | 'mark-unread' | 'mark-all-read'; id?: number }) => {
-    setOpsError('')
-    try {
-      const response = await fetch('/api/admin/notifications', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(payload),
-      })
-      const result = await readJson<{ error?: string }>(response)
-      if (!response.ok) throw new Error(result.error ?? 'อัปเดตแจ้งเตือนไม่สำเร็จ')
-      await loadNotifications(payload.action === 'mark-all-read' ? 1 : notificationPage)
-    } catch (notificationError) {
-      setOpsError(notificationError instanceof Error ? notificationError.message : 'อัปเดตแจ้งเตือนไม่สำเร็จ')
     }
   }
 
@@ -711,6 +662,20 @@ export function AdminPanel({
     // Initial admin data load only; later refreshes are triggered by explicit actions.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  useEffect(() => {
+    const target = window.sessionStorage.getItem('nexus-admin-target')
+    if (!target) return
+    window.sessionStorage.removeItem('nexus-admin-target')
+    queueMicrotask(() => {
+      if (target === 'vip_request' || target === 'media_issue') { setAdminSection('members'); setMemberView('requests') }
+      else if (target === 'users') setAdminSection('members')
+      else if (target === 'media') setAdminSection('media')
+      else if (target === 'media_links') setAdminSection('links')
+      else if (target === 'error_logs' && isSuperAdmin) setAdminSection('errors')
+      else if (target === 'app_settings' && isSuperAdmin) setAdminSection('settings')
+    })
+  }, [isSuperAdmin])
 
   useEffect(() => {
     const timer = window.setTimeout(() => void loadAdminMediaPage(1), 250)
@@ -1389,97 +1354,6 @@ export function AdminPanel({
                   </div>
                 </div>
 
-                <div className="rounded-2xl border border-white/10 bg-black/20 p-5">
-                  <div className="mb-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
-                    <div>
-                      <p className="font-black text-white">Notification Center</p>
-                      <p className="mt-1 text-xs font-bold text-slate-500">
-                        {unreadNotifications.toLocaleString('th-TH')} รายการยังไม่อ่าน · ทั้งหมด {notificationTotal.toLocaleString('th-TH')}
-                      </p>
-                    </div>
-                    <button
-                      className="min-h-10 rounded-xl bg-white/10 px-3 text-xs font-black text-cyan-100 disabled:opacity-40"
-                      disabled={unreadNotifications === 0}
-                      onClick={() => void submitNotificationAction({ action: 'mark-all-read' })}
-                      type="button"
-                    >
-                      อ่านทั้งหมดแล้ว
-                    </button>
-                  </div>
-                  <div className="grid gap-3">
-                    {notifications.length === 0 && (
-                      <div className="rounded-2xl border border-dashed border-white/15 p-4 text-sm font-bold text-slate-400">
-                        ตอนนี้ไม่มีแจ้งเตือนสำคัญ
-                      </div>
-                    )}
-                    {notifications.map((notice) => (
-                      <article
-                        className={`rounded-2xl border p-4 transition hover:-translate-y-0.5 ${
-                          notice.readAt ? 'opacity-55' : ''
-                        } ${
-                          notice.tone === 'red'
-                            ? 'border-red-300/15 bg-red-400/10 text-red-100'
-                            : notice.tone === 'amber'
-                              ? 'border-amber-300/15 bg-amber-300/10 text-amber-100'
-                              : notice.tone === 'emerald'
-                                ? 'border-emerald-300/15 bg-emerald-300/10 text-emerald-100'
-                                : 'border-sky-300/15 bg-sky-300/10 text-sky-100'
-                        }`}
-                        key={notice.id}
-                      >
-                        <button
-                          className="block w-full text-left"
-                          onClick={() => jumpFromNotification(notice)}
-                          type="button"
-                        >
-                          <span className="flex items-start justify-between gap-3">
-                            <span className="font-black">{notice.title}</span>
-                            {!notice.readAt && <span className="mt-1 h-2.5 w-2.5 rounded-full bg-cyan-300" />}
-                          </span>
-                          <span className="mt-1 block text-sm font-semibold opacity-75">{notice.detail}</span>
-                          <span className="mt-2 block text-xs font-bold opacity-55">{formatAdminDate(notice.createdAt)}</span>
-                        </button>
-                        <div className="mt-3 flex justify-end">
-                          <button
-                            className="rounded-lg bg-black/20 px-3 py-2 text-xs font-black"
-                            onClick={() =>
-                              void submitNotificationAction({
-                                action: notice.readAt ? 'mark-unread' : 'mark-read',
-                                id: notice.id,
-                              })
-                            }
-                            type="button"
-                          >
-                            {notice.readAt ? 'ทำเป็นยังไม่อ่าน' : 'อ่านแล้ว'}
-                          </button>
-                        </div>
-                      </article>
-                    ))}
-                  </div>
-                  {notificationTotal > 8 && (
-                    <div className="mt-4 flex items-center justify-between gap-2 border-t border-white/10 pt-4">
-                      <button
-                        className="min-h-10 rounded-xl bg-white/10 px-3 text-xs font-black text-white disabled:cursor-not-allowed disabled:opacity-35"
-                        disabled={notificationPage <= 1}
-                        onClick={() => void loadNotifications(notificationPage - 1)}
-                        type="button"
-                      >
-                        ก่อนหน้า
-                      </button>
-                      <span className="text-xs font-black text-cyan-200">
-                        หน้า {notificationPage.toLocaleString('th-TH')} / {notificationPageCount.toLocaleString('th-TH')}
-                      </span>
-                      <button
-                        className="min-h-10 rounded-xl bg-cyan-300 px-3 text-xs font-black text-slate-950 disabled:cursor-not-allowed disabled:opacity-35"
-                        disabled={notificationPage >= notificationPageCount}
-                        onClick={() => void loadNotifications(notificationPage + 1)}
-                        type="button"
-                      >
-                        ถัดไป
-                      </button>
-                    </div>
-                  )}
-                </div>
               </div>
             </section>
           )}

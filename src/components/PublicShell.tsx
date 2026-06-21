@@ -1,10 +1,14 @@
+import { useEffect, useRef, useState } from 'react'
 import {
   BadgeCheck,
+  Bell,
   BookOpen,
   BrainCircuit,
   Cloud,
   Database,
   FolderHeart,
+  CheckCheck,
+  Inbox,
   LockKeyhole,
   Menu,
   Moon,
@@ -18,7 +22,103 @@ import {
 } from 'lucide-react'
 import { BRAND_HERO_URL, LOGO_URL } from '../brand'
 import { canAccessAdmin } from '../lib/media'
-import type { CurrentUser, SiteSettings, Theme, View } from '../types'
+import type { AdminNotification, CurrentUser, SiteSettings, Theme, View } from '../types'
+
+function NotificationInbox({ setView }: { setView: (view: View) => void }) {
+  const [open, setOpen] = useState(false)
+  const [items, setItems] = useState<AdminNotification[]>([])
+  const [unread, setUnread] = useState(0)
+  const [total, setTotal] = useState(0)
+  const [toast, setToast] = useState<AdminNotification | null>(null)
+  const [loading, setLoading] = useState(true)
+  const boxRef = useRef<HTMLDivElement>(null)
+  const firstLoadRef = useRef(true)
+
+  const load = async () => {
+    try {
+      const response = await fetch('/api/admin/notifications?page=1&pageSize=8', { credentials: 'include' })
+      const result = await response.json() as { notifications?: AdminNotification[]; unread?: number; total?: number }
+      if (!response.ok) return
+      const next = result.notifications ?? []
+      setItems(next)
+      setUnread(result.unread ?? 0)
+      setTotal(result.total ?? 0)
+      const newest = next.find((item) => !item.readAt)
+      const announcedId = Number(window.sessionStorage.getItem('nexus-notification-announced') ?? 0)
+      if (newest && (firstLoadRef.current || newest.id > announcedId)) {
+        setToast(newest)
+        window.sessionStorage.setItem('nexus-notification-announced', String(newest.id))
+      }
+      firstLoadRef.current = false
+    } catch {
+      // The inbox retries automatically on the next poll or when the tab becomes visible.
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    queueMicrotask(() => void load())
+    const timer = window.setInterval(() => void load(), 45_000)
+    const onVisibility = () => { if (document.visibilityState === 'visible') void load() }
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => { window.clearInterval(timer); document.removeEventListener('visibilitychange', onVisibility) }
+  }, [])
+
+  useEffect(() => {
+    if (!toast) return
+    const timer = window.setTimeout(() => setToast(null), 6500)
+    return () => window.clearTimeout(timer)
+  }, [toast])
+
+  useEffect(() => {
+    const close = (event: MouseEvent) => { if (boxRef.current && !boxRef.current.contains(event.target as Node)) setOpen(false) }
+    document.addEventListener('mousedown', close)
+    return () => document.removeEventListener('mousedown', close)
+  }, [])
+
+  const patch = async (action: 'mark-read' | 'mark-all-read', id?: number) => {
+    const response = await fetch('/api/admin/notifications', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ action, id }) })
+    if (response.ok) await load()
+  }
+
+  const openTarget = (notice: AdminNotification) => {
+    void patch('mark-read', notice.id)
+    if (notice.targetType) window.sessionStorage.setItem('nexus-admin-target', notice.targetType)
+    setOpen(false)
+    setToast(null)
+    setView('admin')
+  }
+
+  const tone = (notice: AdminNotification) => notice.tone === 'red'
+    ? 'border-red-200 bg-red-50 text-red-800 dark:border-red-300/15 dark:bg-red-400/10 dark:text-red-100'
+    : notice.tone === 'amber'
+      ? 'border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-300/15 dark:bg-amber-300/10 dark:text-amber-100'
+      : notice.tone === 'emerald'
+        ? 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-300/15 dark:bg-emerald-300/10 dark:text-emerald-100'
+        : 'border-sky-200 bg-sky-50 text-sky-800 dark:border-sky-300/15 dark:bg-sky-300/10 dark:text-sky-100'
+
+  return <div className="relative" ref={boxRef}>
+    <button aria-expanded={open} aria-label={`กล่องข้อความ ${unread} รายการยังไม่อ่าน`} className={`relative grid h-11 w-11 place-items-center rounded-xl border shadow-sm transition hover:-translate-y-0.5 ${open ? 'border-cyan-400 bg-cyan-500 text-white' : 'border-white/70 bg-white/80 text-slate-700 dark:border-white/10 dark:bg-white/10 dark:text-white'}`} onClick={() => setOpen((value) => !value)} type="button">
+      <Bell className={unread ? 'animate-[bell-ring_1.8s_ease-in-out_infinite]' : ''} size={19} />
+      {unread > 0 && <span className="absolute -right-1.5 -top-1.5 grid min-h-5 min-w-5 place-items-center rounded-full bg-red-500 px-1 text-[10px] font-black text-white ring-2 ring-white dark:ring-slate-950">{unread > 99 ? '99+' : unread}</span>}
+    </button>
+
+    {open && <div className="fixed left-3 right-3 top-[4.7rem] z-[80] max-h-[75vh] overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white/98 shadow-2xl backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/98 sm:absolute sm:left-auto sm:right-0 sm:top-14 sm:w-[390px]">
+      <div className="flex items-center justify-between gap-3 border-b border-slate-200 p-4 dark:border-white/10">
+        <div><p className="flex items-center gap-2 font-black text-slate-950 dark:text-white"><Inbox className="text-cyan-500" size={19} />กล่องข้อความ</p><p className="mt-1 text-xs font-bold text-slate-500">ยังไม่อ่าน {unread.toLocaleString('th-TH')} · ทั้งหมด {total.toLocaleString('th-TH')}</p></div>
+        <button className="inline-flex min-h-9 items-center gap-1 rounded-xl bg-cyan-50 px-3 text-xs font-black text-cyan-800 disabled:opacity-40 dark:bg-cyan-300/10 dark:text-cyan-200" disabled={!unread} onClick={() => void patch('mark-all-read')} type="button"><CheckCheck size={15} />อ่านทั้งหมด</button>
+      </div>
+      <div className="max-h-[60vh] space-y-2 overflow-y-auto p-3">
+        {loading && <p className="p-5 text-center text-sm font-bold text-slate-500">กำลังโหลดข้อความ...</p>}
+        {!loading && items.length === 0 && <div className="grid min-h-32 place-items-center rounded-2xl border border-dashed border-slate-300 text-center text-sm font-bold text-slate-500 dark:border-white/15"><span><CheckCheck className="mx-auto mb-2 text-emerald-500" />ไม่มีข้อความใหม่</span></div>}
+        {items.map((notice) => <button className={`block w-full rounded-2xl border p-3.5 text-left transition hover:-translate-y-0.5 ${tone(notice)} ${notice.readAt ? 'opacity-60' : 'shadow-sm'}`} key={notice.id} onClick={() => openTarget(notice)} type="button"><span className="flex items-start justify-between gap-3"><span className="font-black">{notice.title}</span>{!notice.readAt && <span className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full bg-cyan-400" />}</span><span className="mt-1 block text-sm font-semibold opacity-75">{notice.detail}</span><span className="mt-2 block text-[11px] font-bold opacity-55">{new Date(notice.createdAt).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' })}</span></button>)}
+      </div>
+    </div>}
+
+    {toast && <button className={`fixed bottom-5 right-4 z-[100] w-[min(380px,calc(100vw-2rem))] rounded-2xl border p-4 text-left shadow-2xl backdrop-blur-xl transition ${tone(toast)}`} onClick={() => openTarget(toast)} type="button"><span className="flex items-start gap-3"><span className="relative mt-0.5 grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white/70 dark:bg-white/10"><Bell size={19} /><span className="absolute -right-1 -top-1 h-3 w-3 animate-ping rounded-full bg-cyan-400" /></span><span className="min-w-0"><span className="block text-xs font-black uppercase tracking-wider opacity-60">ข้อความใหม่</span><span className="mt-1 block font-black">{toast.title}</span><span className="mt-1 line-clamp-2 block text-sm font-semibold opacity-75">{toast.detail}</span></span></span></button>}
+  </div>
+}
 
 export function Header({
   currentUser,
@@ -84,6 +184,7 @@ export function Header({
           <button aria-label="สลับธีม" className="grid h-11 w-11 place-items-center rounded-xl border border-white/70 bg-white/80 text-slate-700 shadow-sm transition hover:-translate-y-0.5 dark:border-white/10 dark:bg-white/10 dark:text-white" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} type="button">
             {theme === 'dark' ? <Sun size={19} /> : <Moon size={19} />}
           </button>
+          {canAccessAdmin(currentUser) && <NotificationInbox setView={setView} />}
           {currentUser ? (
             <button aria-label={`เปิดโปรไฟล์ ${currentUser.name}`} className={`hidden min-h-11 max-w-52 items-center rounded-xl px-4 text-sm font-black shadow-lg transition hover:-translate-y-0.5 sm:inline-flex ${view === 'profile' ? 'bg-cyan-500 text-white ring-2 ring-cyan-300/40 dark:bg-cyan-300 dark:text-slate-950' : 'bg-slate-950 text-cyan-200 shadow-slate-900/15 dark:bg-cyan-300 dark:text-slate-950'}`} onClick={() => setView('profile')} title={`โปรไฟล์: ${currentUser.name}`} type="button">
               <UserCircle2 className="mr-2 shrink-0" size={18} />
