@@ -70,6 +70,58 @@ export function canAccessAdmin(user: CurrentUser | null) {
   return user?.role === 'superadmin' || user?.role === 'admin'
 }
 
+function safeUrl(value: string) {
+  try {
+    return new URL(value.trim())
+  } catch {
+    return null
+  }
+}
+
+export function normalizeAssetUrl(value = '') {
+  const url = safeUrl(value)
+  if (!url) return value
+
+  if (url.hostname === 'github.com') {
+    const parts = url.pathname.split('/').filter(Boolean)
+    const blobIndex = parts.indexOf('blob')
+    if (parts.length >= 5 && blobIndex === 2) {
+      const [owner, repo, , branch, ...pathParts] = parts
+      return `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${pathParts.join('/')}`
+    }
+  }
+
+  if (url.hostname === 'raw.githubusercontent.com') return url.toString()
+
+  return value
+}
+
+export function getEmbeddableUrl(link = '', source = '') {
+  const cleanLink = normalizeAssetUrl(link.trim())
+  if (!cleanLink) return ''
+
+  if (source === 'YouTube' || /youtu\.be|youtube\.com/.test(cleanLink)) {
+    const id =
+      cleanLink.match(/[?&]v=([^&]+)/)?.[1] ||
+      cleanLink.match(/youtu\.be\/([^?&]+)/)?.[1] ||
+      cleanLink.match(/youtube\.com\/embed\/([^?&]+)/)?.[1] ||
+      cleanLink.match(/youtube\.com\/shorts\/([^?&]+)/)?.[1]
+    return id ? `https://www.youtube.com/embed/${id}` : cleanLink
+  }
+
+  if (source === 'Google Drive' || /drive\.google\.com/.test(cleanLink)) {
+    const id = cleanLink.match(/\/d\/([^/]+)/)?.[1] || cleanLink.match(/[?&]id=([^&]+)/)?.[1]
+    return id ? `https://drive.google.com/file/d/${id}/preview` : cleanLink
+  }
+
+  if (source === 'Google Sheet' || /docs\.google\.com\/spreadsheets/.test(cleanLink)) {
+    const id = cleanLink.match(/\/spreadsheets\/d\/([^/]+)/)?.[1]
+    return id ? `https://docs.google.com/spreadsheets/d/${id}/preview` : cleanLink.replace(/\/(edit|copy|view|pubhtml).*$/, '/preview')
+  }
+
+  return cleanLink
+}
+
 export function getPreviewUrl(item: MediaItem) {
   const primaryLink =
     item.links?.find((link) => link.previewUrl) ??
@@ -79,21 +131,5 @@ export function getPreviewUrl(item: MediaItem) {
   if (!link) return ''
 
   const source = primaryLink?.type || item.source
-
-  if (source === 'YouTube') {
-    const id =
-      link.match(/[?&]v=([^&]+)/)?.[1] ||
-      link.match(/youtu\.be\/([^?&]+)/)?.[1] ||
-      link.match(/youtube\.com\/embed\/([^?&]+)/)?.[1]
-    return id ? `https://www.youtube.com/embed/${id}` : link
-  }
-
-  if (source === 'Google Drive') {
-    const id = link.match(/\/d\/([^/]+)/)?.[1] || link.match(/[?&]id=([^&]+)/)?.[1]
-    return id ? `https://drive.google.com/file/d/${id}/preview` : link
-  }
-
-  if (source === 'Google Sheet') return link.replace(/\/edit.*$/, '/preview')
-
-  return link
+  return getEmbeddableUrl(link, source)
 }

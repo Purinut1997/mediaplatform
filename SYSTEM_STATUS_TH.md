@@ -40,6 +40,8 @@
 - รองรับลิงก์สื่อหลายรายการต่อการ์ด เช่น Google Drive, Google Sheet, YouTube และ External Link
   - หน้ารายละเอียดแสดงรายการไฟล์/บทเรียนทุกลิงก์ให้ผู้ใช้เลือกเปิดได้
   - แต่ละปุ่มตรวจสิทธิ์ของลิงก์นั้นผ่าน backend ก่อนเปิดจริง
+  - หน้าปกและ Preview แปลงลิงก์ GitHub blob, Google Sheet `/copy|edit|view`, Google Drive และ YouTube เป็น URL ที่เหมาะกับการแสดงผลอัตโนมัติ
+  - หลังบ้านมีตัวอย่างหน้าปกและ URL Preview ที่ระบบคำนวณให้ดูทันทีตอนเพิ่ม/แก้ไขสื่อ
 - รองรับแท็กจริงต่อสื่อผ่านตาราง `tags` และ `media_tags`
 - มีหน้า Login และ Register พร้อม bot check แบบพื้นฐาน
 - รองรับ Google Login แบบ OAuth จริง

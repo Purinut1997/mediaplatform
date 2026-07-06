@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
-import { AlertTriangle, Download, ExternalLink, Eye, FileText, Heart, LockKeyhole, PlayCircle, Send, Star } from 'lucide-react'
+import { AlertTriangle, Download, ExternalLink, Eye, FileText, Heart, ImageIcon, LockKeyhole, PlayCircle, Send, Star } from 'lucide-react'
 import { readJson } from '../lib/api'
-import { canViewAccess, getPreviewUrl } from '../lib/media'
+import { canViewAccess, getPreviewUrl, normalizeAssetUrl } from '../lib/media'
 import { paymentProofAccept, paymentProofHelpText, readPaymentProof } from '../lib/payment-proof'
 import type { CurrentUser, MediaIssueReport, MediaItem, SiteSettings } from '../types'
 
@@ -27,7 +27,13 @@ export function MediaDetail({
   onFavorite: () => void
 }) {
   const previewUrl = getPreviewUrl(item)
+  const coverUrl = normalizeAssetUrl(item.cover)
   const primaryLink = item.links?.find((link) => canViewAccess(currentUser, link.access) && link.url) ?? item.links?.[0]
+  const previewOpenUrl = primaryLink?.url || item.resourceUrl || previewUrl || ''
+  const [failedCoverUrl, setFailedCoverUrl] = useState('')
+  const [failedPreviewUrl, setFailedPreviewUrl] = useState('')
+  const coverFailed = Boolean(coverUrl && failedCoverUrl === coverUrl)
+  const previewFailed = Boolean(previewUrl && failedPreviewUrl === previewUrl)
   const [purchaseSlipName, setPurchaseSlipName] = useState('')
   const [purchaseSlipDataUrl, setPurchaseSlipDataUrl] = useState('')
   const [purchaseNotice, setPurchaseNotice] = useState('')
@@ -87,8 +93,23 @@ export function MediaDetail({
       </button>
 
       <div className="nexus-glass grid gap-6 overflow-hidden rounded-[2rem] border p-4 backdrop-blur-xl lg:grid-cols-[.95fr_1.05fr]">
-        <div className="overflow-hidden rounded-3xl bg-slate-100 dark:bg-slate-800">
-          <img alt={item.title} className="h-full min-h-80 w-full object-cover" src={item.cover} />
+        <div className="relative grid min-h-[22rem] place-items-center overflow-hidden rounded-3xl border border-cyan-300/15 bg-slate-950/40 p-4 shadow-inner">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_10%,rgba(34,211,238,.24),transparent_32%),radial-gradient(circle_at_80%_80%,rgba(168,85,247,.18),transparent_30%)]" />
+          {!coverFailed && coverUrl ? (
+            <img
+              alt={item.title}
+              className="relative max-h-[32rem] w-full rounded-[1.5rem] object-contain shadow-2xl shadow-cyan-950/40"
+              onError={() => setFailedCoverUrl(coverUrl)}
+              src={coverUrl}
+            />
+          ) : (
+            <div className="relative grid w-full max-w-sm place-items-center rounded-[1.5rem] border border-dashed border-cyan-300/30 bg-white/8 p-8 text-center text-cyan-100">
+              <ImageIcon className="mb-3 text-cyan-300" size={44} />
+              <p className="text-lg font-black">ยังแสดงหน้าปกไม่ได้</p>
+              <p className="mt-2 text-sm font-semibold text-slate-300">ระบบรองรับลิงก์ภาพตรง หรือ GitHub blob ที่แปลงเป็น raw ได้อัตโนมัติ</p>
+              {item.cover && <a className="mt-4 inline-flex min-h-10 items-center gap-2 rounded-xl bg-cyan-300 px-4 text-sm font-black text-slate-950" href={normalizeAssetUrl(item.cover)} rel="noreferrer" target="_blank"><ExternalLink size={16} />เปิดรูปต้นฉบับ</a>}
+            </div>
+          )}
         </div>
         <div className="p-2 sm:p-4">
           <div className="mb-4 flex flex-wrap gap-2">
@@ -187,19 +208,35 @@ export function MediaDetail({
           </ul>
         </section>
         <aside className="nexus-glass rounded-3xl border p-6 backdrop-blur">
-          <h3 className="mb-4 inline-flex items-center gap-2 text-xl font-black"><PlayCircle className="text-violet-600" />Preview</h3>
-          {previewUrl ? (
-            <iframe className="h-72 w-full rounded-2xl border border-slate-200 bg-slate-100 dark:border-white/10 dark:bg-slate-900" loading="lazy" referrerPolicy="no-referrer-when-downgrade" src={previewUrl} title={`preview-${item.title}`} />
-          ) : (
-            <div className="grid place-items-center rounded-2xl border border-dashed border-slate-300 p-8 text-center text-slate-500 dark:border-white/10">
-              <ExternalLink className="mb-3" />เพิ่มลิงก์ preview จากหลังบ้านเพื่อแสดง Drive / Sheet / YouTube ตรงนี้
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <h3 className="inline-flex items-center gap-2 text-xl font-black"><PlayCircle className="text-violet-600" />Preview</h3>
+            {previewOpenUrl && <a className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-white/10 px-3 text-xs font-black text-cyan-100" href={previewOpenUrl} rel="noreferrer" target="_blank"><ExternalLink size={15} />เปิดเต็มหน้า</a>}
+          </div>
+          {previewUrl && !previewFailed ? (
+            <div className="overflow-hidden rounded-2xl border border-cyan-300/20 bg-slate-950/60 shadow-inner">
+              <iframe className="h-80 w-full bg-white" loading="lazy" onError={() => setFailedPreviewUrl(previewUrl)} referrerPolicy="no-referrer-when-downgrade" src={previewUrl} title={`preview-${item.title}`} />
             </div>
+          ) : (
+            <PreviewFallback openUrl={previewOpenUrl} />
           )}
         </aside>
       </div>
       <MediaIssuePanel currentUser={currentUser} item={item} />
       <ReviewPanel currentUser={currentUser} mediaId={item.id} />
     </section>
+  )
+}
+
+function PreviewFallback({ openUrl }: { openUrl: string }) {
+  return (
+    <div className="grid min-h-72 place-items-center rounded-2xl border border-dashed border-cyan-300/25 bg-slate-950/35 p-8 text-center text-slate-300">
+      <div>
+        <PlayCircle className="mx-auto mb-3 text-cyan-300" size={44} />
+        <p className="text-lg font-black text-white">Preview ยังฝังในหน้านี้ไม่ได้</p>
+        <p className="mx-auto mt-2 max-w-xs text-sm font-semibold leading-6 text-slate-400">บางลิงก์ต้องเปิดในแท็บใหม่ เช่น Google Sheet แบบ /copy หรือไฟล์ที่เจ้าของปิดการฝัง iframe</p>
+        {openUrl && <a className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-xl bg-cyan-300 px-4 font-black text-slate-950" href={openUrl} rel="noreferrer" target="_blank"><ExternalLink size={17} />เปิด Preview / ลิงก์ไฟล์</a>}
+      </div>
+    </div>
   )
 }
 

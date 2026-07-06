@@ -16,6 +16,7 @@ import {
   Eye,
   FileText,
   Gauge,
+  ImageIcon,
   Layers3,
   Link2,
   Loader2,
@@ -60,7 +61,7 @@ import type {
   VipMemberSummary,
 } from '../types'
 import { readJson } from '../lib/api'
-import { createEmptyMediaForm, createEmptyMediaLink, moveMediaLink, normalizeMediaStatus } from '../lib/media'
+import { createEmptyMediaForm, createEmptyMediaLink, getEmbeddableUrl, moveMediaLink, normalizeAssetUrl, normalizeMediaStatus } from '../lib/media'
 import { accessOptions, sourceOptions, statusOptions } from '../defaults'
 
 type MemberView = 'directory' | 'vip' | 'requests' | 'admins'
@@ -3183,6 +3184,36 @@ export function AdminPanel({
                 placeholder="https://..."
                 value={form.cover}
               />
+              <div className="md:col-span-2 rounded-2xl border border-cyan-300/15 bg-cyan-300/[0.04] p-4">
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <p className="text-sm font-black text-cyan-100">ตัวอย่างหน้าปก</p>
+                    <p className="mt-1 text-xs font-semibold text-slate-400">รองรับ GitHub blob และแปลงเป็น raw image อัตโนมัติ</p>
+                  </div>
+                  {form.cover && (
+                    <a className="inline-flex min-h-9 items-center gap-2 rounded-xl bg-white/10 px-3 text-xs font-black text-cyan-100" href={normalizeAssetUrl(form.cover)} rel="noreferrer" target="_blank">
+                      <ExternalLink size={14} />
+                      เปิดรูป
+                    </a>
+                  )}
+                </div>
+                <div className="grid gap-4 sm:grid-cols-[180px_1fr]">
+                  <div className="grid min-h-32 place-items-center overflow-hidden rounded-2xl border border-white/10 bg-slate-950/60 p-2">
+                    {form.cover ? (
+                      <img alt="cover preview" className="max-h-40 w-full rounded-xl object-contain" src={normalizeAssetUrl(form.cover)} />
+                    ) : (
+                      <div className="text-center text-sm font-bold text-slate-500">
+                        <ImageIcon className="mx-auto mb-2" size={30} />
+                        วาง URL เพื่อดูตัวอย่าง
+                      </div>
+                    )}
+                  </div>
+                  <div className="rounded-2xl bg-black/20 p-3 text-xs font-semibold leading-6 text-slate-300">
+                    <p className="font-black text-slate-100">URL ที่ระบบจะใช้แสดงผล</p>
+                    <p className="mt-1 break-all text-cyan-100">{form.cover ? normalizeAssetUrl(form.cover) : 'ยังไม่มี URL หน้าปก'}</p>
+                  </div>
+                </div>
+              </div>
               <AdminField
                 label="แท็ก"
                 name="tags"
@@ -3329,6 +3360,9 @@ export function AdminPanel({
                             placeholder="ปล่อยว่างได้"
                             value={link.previewUrl}
                           />
+                          <span className="mt-2 block rounded-xl bg-cyan-300/[0.06] px-3 py-2 text-[11px] font-bold leading-5 text-cyan-100">
+                            Preview ที่ระบบสร้างให้: <span className="break-all text-slate-300">{getEmbeddableUrl(link.previewUrl || link.url, link.type) || 'ยังไม่มีลิงก์สำหรับ preview'}</span>
+                          </span>
                         </label>
                       </div>
                     </div>

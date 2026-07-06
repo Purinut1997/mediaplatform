@@ -29,7 +29,7 @@ import type {
   View,
 } from './types'
 import { readJson } from './lib/api'
-import { canAccessAdmin, canViewMedia } from './lib/media'
+import { canAccessAdmin, canViewMedia, normalizeAssetUrl } from './lib/media'
 import { paymentProofAccept, paymentProofHelpText, readPaymentProof } from './lib/payment-proof'
 import { LOGO_URL } from './brand'
 import { TechBackground } from './components/TechBackground'
@@ -60,6 +60,10 @@ function trackMediaEvent(mediaId: number, eventType: 'view') {
   }).catch(() => undefined)
 }
 
+function normalizeClientMedia(item: MediaItem): MediaItem {
+  return { ...item, cover: normalizeAssetUrl(item.cover) }
+}
+
 function App() {
   const oauthResult =
     typeof window === 'undefined' ? '' : new URLSearchParams(window.location.search).get('oauth') ?? ''
@@ -69,7 +73,7 @@ function App() {
   })
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null)
   const [sessionReady, setSessionReady] = useState(false)
-  const [mediaRecords, setMediaRecords] = useState<MediaItem[]>(mediaItems)
+  const [mediaRecords, setMediaRecords] = useState<MediaItem[]>(() => mediaItems.map(normalizeClientMedia))
   const [mediaPage, setMediaPage] = useState(1)
   const [mediaTotal, setMediaTotal] = useState(0)
   const [loadingMoreMedia, setLoadingMoreMedia] = useState(false)
@@ -218,7 +222,7 @@ function App() {
 
         if (!active) return
 
-        const nextMedia = mediaJson.media ?? []
+        const nextMedia = (mediaJson.media ?? []).map(normalizeClientMedia)
         const sharedMediaId = Number(new URLSearchParams(window.location.search).get('media'))
         const sharedMedia = !sharedMediaHandled.current && Number.isInteger(sharedMediaId)
           ? nextMedia.find((item) => item.id === sharedMediaId)
@@ -284,7 +288,7 @@ function App() {
       if (!response.ok) throw new Error(result.error || 'โหลดสื่อเพิ่มเติมไม่สำเร็จ')
       setMediaRecords((items) => {
         const known = new Set(items.map((item) => item.id))
-        return [...items, ...(result.media ?? []).filter((item) => !known.has(item.id))]
+        return [...items, ...(result.media ?? []).map(normalizeClientMedia).filter((item) => !known.has(item.id))]
       })
       setMediaPage(result.page ?? nextPage)
       setMediaTotal(result.total ?? mediaTotal)

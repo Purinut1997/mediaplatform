@@ -3,6 +3,7 @@ import {
   canViewAccess,
   createEmptyMediaForm,
   getPreviewUrl,
+  normalizeAssetUrl,
   moveMediaLink,
   normalizeMediaStatus,
 } from './media'
@@ -54,6 +55,8 @@ describe('frontend media helpers', () => {
       .toBe('https://drive.google.com/file/d/file-id/preview')
     expect(getPreviewUrl({ ...base, source: 'Google Sheet', resourceUrl: 'https://docs.google.com/spreadsheets/d/sheet-id/edit#gid=0' }))
       .toBe('https://docs.google.com/spreadsheets/d/sheet-id/preview')
+    expect(getPreviewUrl({ ...base, source: 'Google Sheet', resourceUrl: 'https://docs.google.com/spreadsheets/d/sheet-id/copy' }))
+      .toBe('https://docs.google.com/spreadsheets/d/sheet-id/preview')
     expect(getPreviewUrl({
       ...base,
       source: 'Google Drive',
@@ -62,6 +65,11 @@ describe('frontend media helpers', () => {
         { label: 'วิดีโอ', type: 'YouTube', url: 'https://youtu.be/video-id', previewUrl: '', access: 'สาธารณะ' },
       ],
     })).toBe('https://www.youtube.com/embed/video-id')
+  })
+
+  it('normalizes GitHub blob URLs for image display', () => {
+    expect(normalizeAssetUrl('https://github.com/Purinut1997/web-images/blob/main/folder/cover.png'))
+      .toBe('https://raw.githubusercontent.com/Purinut1997/web-images/main/folder/cover.png')
   })
 
   it('reorders media links without mutating the original list', () => {
