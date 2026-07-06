@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react'
-import { AlertTriangle, Download, ExternalLink, Eye, FileText, Heart, ImageIcon, LockKeyhole, PlayCircle, Send, Star } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { AlertTriangle, ChevronLeft, ChevronRight, Download, ExternalLink, Eye, FileText, Heart, ImageIcon, LockKeyhole, Maximize2, PlayCircle, Send, Star, X } from 'lucide-react'
 import { readJson } from '../lib/api'
-import { canViewAccess, getPreviewUrl, normalizeAssetUrl } from '../lib/media'
+import { canViewAccess, getImageDisplayUrl, getPreviewUrl, isPreviewImageUrl, normalizeAssetUrl } from '../lib/media'
 import { paymentProofAccept, paymentProofHelpText, readPaymentProof } from '../lib/payment-proof'
 import type { CurrentUser, MediaIssueReport, MediaItem, SiteSettings } from '../types'
 
@@ -28,8 +28,29 @@ export function MediaDetail({
 }) {
   const previewUrl = getPreviewUrl(item)
   const coverUrl = normalizeAssetUrl(item.cover)
-  const primaryLink = item.links?.find((link) => canViewAccess(currentUser, link.access) && link.url) ?? item.links?.[0]
+  const primaryLink = item.links?.find((link) => link.type !== 'Preview Image' && canViewAccess(currentUser, link.access) && link.url) ?? item.links?.find((link) => link.type !== 'Preview Image')
   const previewOpenUrl = primaryLink?.url || item.resourceUrl || previewUrl || ''
+  const resourceLinks = useMemo(() => item.links?.filter((link) => link.type !== 'Preview Image') ?? [], [item.links])
+  const previewImages = useMemo(() => {
+    const fromLinks = (item.links ?? [])
+      .map((link) => {
+        const rawUrl = link.previewUrl || link.url
+        const isPreviewImage = link.type === 'Preview Image' || isPreviewImageUrl(rawUrl)
+        return isPreviewImage && rawUrl
+          ? {
+              access: link.access,
+              label: link.label || 'ภาพตัวอย่างระบบ',
+              openUrl: normalizeAssetUrl(rawUrl),
+              url: getImageDisplayUrl(rawUrl),
+            }
+          : null
+      })
+      .filter(Boolean) as Array<{ access: string; label: string; openUrl: string; url: string }>
+    if (!fromLinks.length && item.previewUrl && isPreviewImageUrl(item.previewUrl)) {
+      fromLinks.push({ access: item.access, label: 'ภาพตัวอย่างระบบ', openUrl: normalizeAssetUrl(item.previewUrl), url: getImageDisplayUrl(item.previewUrl) })
+    }
+    return fromLinks
+  }, [item.access, item.links, item.previewUrl])
   const [failedCoverUrl, setFailedCoverUrl] = useState('')
   const [failedPreviewUrl, setFailedPreviewUrl] = useState('')
   const coverFailed = Boolean(coverUrl && failedCoverUrl === coverUrl)
@@ -172,17 +193,17 @@ export function MediaDetail({
         </div>
       </div>
 
-      {Boolean(item.links?.length) && (
+      {Boolean(resourceLinks.length) && (
         <section className="nexus-glass mt-6 rounded-3xl border p-6 backdrop-blur">
           <div className="mb-4 flex flex-wrap items-end justify-between gap-2">
             <div>
               <h3 className="text-xl font-black text-slate-950 dark:text-white">ไฟล์และบทเรียนในชุดนี้</h3>
               <p className="mt-1 text-sm font-semibold text-slate-500 dark:text-slate-400">เลือกเปิดเอกสาร วิดีโอ หรือลิงก์ที่ต้องการได้โดยตรง</p>
             </div>
-            <span className="rounded-full bg-cyan-100 px-3 py-1 text-xs font-black text-cyan-800 dark:bg-cyan-300/10 dark:text-cyan-200">{item.links?.length ?? 0} รายการ</span>
+            <span className="rounded-full bg-cyan-100 px-3 py-1 text-xs font-black text-cyan-800 dark:bg-cyan-300/10 dark:text-cyan-200">{resourceLinks.length} รายการ</span>
           </div>
           <div className="grid gap-3 md:grid-cols-2">
-            {item.links?.map((link, index) => {
+            {resourceLinks.map((link, index) => {
               const allowed = (canDownload && canViewAccess(currentUser, link.access)) || canCheckPurchasedAccess
               return (
                 <button className={`flex min-h-16 items-center gap-3 rounded-2xl border px-4 py-3 text-left transition ${allowed ? 'border-cyan-200 bg-cyan-50 hover:border-cyan-400 hover:bg-cyan-100 dark:border-cyan-300/20 dark:bg-cyan-300/10 dark:hover:bg-cyan-300/15' : 'border-slate-200 bg-slate-100 text-slate-500 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-400'}`} key={link.id ?? `${link.label}-${index}`} onClick={() => void openResource(link.id, allowed)} type="button">
@@ -209,10 +230,15 @@ export function MediaDetail({
         </section>
         <aside className="nexus-glass rounded-3xl border p-6 backdrop-blur">
           <div className="mb-4 flex items-center justify-between gap-3">
-            <h3 className="inline-flex items-center gap-2 text-xl font-black"><PlayCircle className="text-violet-600" />Preview</h3>
-            {previewOpenUrl && <a className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-white/10 px-3 text-xs font-black text-cyan-100" href={previewOpenUrl} rel="noreferrer" target="_blank"><ExternalLink size={15} />เปิดเต็มหน้า</a>}
+            <div>
+              <h3 className="inline-flex items-center gap-2 text-xl font-black"><PlayCircle className="text-violet-600" />Preview ระบบ</h3>
+              <p className="mt-1 text-xs font-bold text-slate-500 dark:text-slate-400">ภาพตัวอย่าง หน้าจอ หรือเดโมที่เปิดดูในเว็บได้เลย</p>
+            </div>
+            {previewOpenUrl && !previewImages.length && <a className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-white/10 px-3 text-xs font-black text-cyan-100" href={previewOpenUrl} rel="noreferrer" target="_blank"><ExternalLink size={15} />เปิดเต็มหน้า</a>}
           </div>
-          {previewUrl && !previewFailed ? (
+          {previewImages.length ? (
+            <SystemPreviewGallery images={previewImages} />
+          ) : previewUrl && !previewFailed && !isPreviewImageUrl(previewUrl) ? (
             <div className="overflow-hidden rounded-2xl border border-cyan-300/20 bg-slate-950/60 shadow-inner">
               <iframe className="h-80 w-full bg-white" loading="lazy" onError={() => setFailedPreviewUrl(previewUrl)} referrerPolicy="no-referrer-when-downgrade" src={previewUrl} title={`preview-${item.title}`} />
             </div>
@@ -224,6 +250,62 @@ export function MediaDetail({
       <MediaIssuePanel currentUser={currentUser} item={item} />
       <ReviewPanel currentUser={currentUser} mediaId={item.id} />
     </section>
+  )
+}
+
+function SystemPreviewGallery({
+  images,
+}: {
+  images: Array<{ access: string; label: string; openUrl: string; url: string }>
+}) {
+  const [activeIndex, setActiveIndex] = useState(0)
+  const [expanded, setExpanded] = useState(false)
+  const active = images[Math.min(activeIndex, images.length - 1)] ?? images[0]
+  const go = (direction: -1 | 1) => {
+    setActiveIndex((index) => (index + direction + images.length) % images.length)
+  }
+
+  return (
+    <>
+      <div className="overflow-hidden rounded-[1.75rem] border border-cyan-300/20 bg-slate-950/55 p-3 shadow-2xl shadow-cyan-950/20">
+        <button className="group relative block h-80 w-full overflow-hidden rounded-2xl bg-slate-950 text-left" onClick={() => setExpanded(true)} type="button">
+          <img alt={active.label} className="h-full w-full object-contain transition duration-500 group-hover:scale-[1.02]" src={active.url} />
+          <span className="absolute left-3 top-3 rounded-full bg-slate-950/75 px-3 py-1 text-xs font-black text-cyan-100 backdrop-blur">{active.label}</span>
+          <span className="absolute bottom-3 right-3 inline-flex items-center gap-2 rounded-full bg-cyan-300 px-3 py-1 text-xs font-black text-slate-950 shadow-lg shadow-cyan-500/20"><Maximize2 size={14} />ดูภาพใหญ่</span>
+        </button>
+        <div className="mt-3 flex items-center justify-between gap-3">
+          <button className="grid h-10 w-10 place-items-center rounded-xl bg-white/10 text-white disabled:opacity-30" disabled={images.length < 2} onClick={() => go(-1)} type="button"><ChevronLeft size={18} /></button>
+          <p className="min-w-0 flex-1 truncate text-center text-xs font-bold text-slate-400">{activeIndex + 1} / {images.length} · {active.openUrl}</p>
+          <button className="grid h-10 w-10 place-items-center rounded-xl bg-white/10 text-white disabled:opacity-30" disabled={images.length < 2} onClick={() => go(1)} type="button"><ChevronRight size={18} /></button>
+        </div>
+        {images.length > 1 && (
+          <div className="mt-3 grid grid-cols-4 gap-2">
+            {images.slice(0, 8).map((image, index) => (
+              <button className={`h-16 overflow-hidden rounded-xl border bg-slate-950 p-1 transition ${index === activeIndex ? 'border-cyan-300 shadow-lg shadow-cyan-500/20' : 'border-white/10 opacity-70 hover:opacity-100'}`} key={`${image.url}-${index}`} onClick={() => setActiveIndex(index)} type="button">
+                <img alt={image.label} className="h-full w-full rounded-lg object-cover" src={image.url} />
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+      {expanded && (
+        <div aria-label={`ดูภาพตัวอย่าง ${active.label}`} aria-modal="true" className="fixed inset-0 z-[95] grid place-items-center bg-slate-950/88 p-4 backdrop-blur-xl" role="dialog">
+          <button aria-label="ปิดภาพตัวอย่าง" className="absolute inset-0 cursor-default" onClick={() => setExpanded(false)} type="button" />
+          <div className="relative w-full max-w-6xl">
+            <button aria-label="ปิด" className="absolute right-3 top-3 z-10 grid h-11 w-11 place-items-center rounded-2xl bg-slate-950/80 text-white shadow-xl" onClick={() => setExpanded(false)} type="button"><X size={20} /></button>
+            {images.length > 1 && <button aria-label="ภาพก่อนหน้า" className="absolute left-3 top-1/2 z-10 grid h-12 w-12 -translate-y-1/2 place-items-center rounded-2xl bg-slate-950/80 text-white shadow-xl" onClick={() => go(-1)} type="button"><ChevronLeft size={24} /></button>}
+            {images.length > 1 && <button aria-label="ภาพถัดไป" className="absolute right-3 top-1/2 z-10 grid h-12 w-12 -translate-y-1/2 place-items-center rounded-2xl bg-slate-950/80 text-white shadow-xl" onClick={() => go(1)} type="button"><ChevronRight size={24} /></button>}
+            <div className="overflow-hidden rounded-[2rem] border border-cyan-300/20 bg-slate-950 p-3 shadow-2xl">
+              <img alt={active.label} className="max-h-[82vh] w-full rounded-[1.5rem] object-contain" src={active.url} />
+              <div className="flex flex-wrap items-center justify-between gap-3 px-2 py-3 text-sm font-bold text-slate-300">
+                <span>{active.label}</span>
+                <a className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-cyan-300 px-3 text-slate-950" href={active.openUrl} rel="noreferrer" target="_blank"><ExternalLink size={16} />เปิดรูปต้นฉบับ</a>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   )
 }
 

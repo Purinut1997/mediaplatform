@@ -63,7 +63,7 @@ export const mediaItems: MediaItem[] = [
 export const topics = ['ทั้งหมด', 'AI', 'AppScript', 'โรงเรียน', 'งานเอกสาร', 'อบรม']
 export const accessOptions: AccessLevel[] = ['สาธารณะ', 'สมาชิก', 'VIP', 'ซื้อแยก']
 export const statusOptions: MediaStatus[] = ['ฉบับร่าง', 'รอตรวจสอบ', 'เผยแพร่แล้ว', 'ซ่อนชั่วคราว', 'ถูกปฏิเสธ']
-export const sourceOptions: MediaSource[] = ['Google Drive', 'Google Sheet', 'YouTube', 'External Link']
+export const sourceOptions: MediaSource[] = ['Google Drive', 'Google Sheet', 'YouTube', 'External Link', 'Preview Image']
 
 export const defaultSiteSettings: SiteSettings = {
   heroEyebrow: 'AI / Cyber / School Operations',

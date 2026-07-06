@@ -14,7 +14,7 @@ export type AdminSection =
 
 export type AccessLevel = 'สาธารณะ' | 'สมาชิก' | 'VIP' | 'ซื้อแยก'
 export type MediaStatus = 'ฉบับร่าง' | 'รอตรวจสอบ' | 'เผยแพร่แล้ว' | 'ซ่อนชั่วคราว' | 'ถูกปฏิเสธ'
-export type MediaSource = 'Google Drive' | 'Google Sheet' | 'YouTube' | 'External Link'
+export type MediaSource = 'Google Drive' | 'Google Sheet' | 'YouTube' | 'External Link' | 'Preview Image'
 export type AdminDateFilter = 'ทั้งหมด' | 'วันนี้' | '7 วัน' | '30 วัน'
 export type AdminMediaSort = 'ล่าสุด' | 'ดาวน์โหลดมากสุด' | 'เข้าชมมากสุด' | 'ชื่อ A-Z'
 

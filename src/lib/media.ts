@@ -96,9 +96,40 @@ export function normalizeAssetUrl(value = '') {
   return value
 }
 
+function googleDriveFileId(value: string) {
+  return value.match(/\/d\/([^/]+)/)?.[1] || value.match(/[?&]id=([^&]+)/)?.[1] || ''
+}
+
+export function getImageDisplayUrl(value = '') {
+  const cleanLink = normalizeAssetUrl(value.trim())
+  const url = safeUrl(cleanLink)
+  if (!url) return cleanLink
+
+  if (/drive\.google\.com/.test(url.hostname)) {
+    const id = googleDriveFileId(cleanLink)
+    return id ? `https://drive.google.com/thumbnail?id=${encodeURIComponent(id)}&sz=w1600` : cleanLink
+  }
+
+  return cleanLink
+}
+
+export function isPreviewImageUrl(value = '') {
+  const cleanLink = normalizeAssetUrl(value.trim())
+  if (!cleanLink) return false
+  if (cleanLink.startsWith('data:image/')) return true
+
+  const url = safeUrl(cleanLink)
+  if (!url) return false
+  if (/googleusercontent\.com$/.test(url.hostname) || url.hostname === 'lh3.googleusercontent.com') return true
+
+  const pathname = decodeURIComponent(url.pathname).toLowerCase()
+  return /\.(avif|gif|jpe?g|png|svg|webp)$/.test(pathname)
+}
+
 export function getEmbeddableUrl(link = '', source = '') {
   const cleanLink = normalizeAssetUrl(link.trim())
   if (!cleanLink) return ''
+  if (source === 'Preview Image' || isPreviewImageUrl(cleanLink)) return getImageDisplayUrl(cleanLink)
 
   if (source === 'YouTube' || /youtu\.be|youtube\.com/.test(cleanLink)) {
     const id =
@@ -110,7 +141,7 @@ export function getEmbeddableUrl(link = '', source = '') {
   }
 
   if (source === 'Google Drive' || /drive\.google\.com/.test(cleanLink)) {
-    const id = cleanLink.match(/\/d\/([^/]+)/)?.[1] || cleanLink.match(/[?&]id=([^&]+)/)?.[1]
+    const id = googleDriveFileId(cleanLink)
     return id ? `https://drive.google.com/file/d/${id}/preview` : cleanLink
   }
 
@@ -124,9 +155,9 @@ export function getEmbeddableUrl(link = '', source = '') {
 
 export function getPreviewUrl(item: MediaItem) {
   const primaryLink =
-    item.links?.find((link) => link.previewUrl) ??
+    item.links?.find((link) => link.type !== 'Preview Image' && link.previewUrl && !isPreviewImageUrl(link.previewUrl)) ??
     item.links?.find((link) => link.type === 'YouTube' && link.url) ??
-    item.links?.[0]
+    item.links?.find((link) => link.type !== 'Preview Image')
   const link = primaryLink?.previewUrl || primaryLink?.url || item.previewUrl || item.resourceUrl || ''
   if (!link) return ''
 

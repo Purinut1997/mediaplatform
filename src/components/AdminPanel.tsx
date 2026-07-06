@@ -61,7 +61,7 @@ import type {
   VipMemberSummary,
 } from '../types'
 import { readJson } from '../lib/api'
-import { createEmptyMediaForm, createEmptyMediaLink, getEmbeddableUrl, moveMediaLink, normalizeAssetUrl, normalizeMediaStatus } from '../lib/media'
+import { createEmptyMediaForm, createEmptyMediaLink, getEmbeddableUrl, getImageDisplayUrl, moveMediaLink, normalizeAssetUrl, normalizeMediaStatus } from '../lib/media'
 import { accessOptions, sourceOptions, statusOptions } from '../defaults'
 
 type MemberView = 'directory' | 'vip' | 'requests' | 'admins'
@@ -831,6 +831,7 @@ export function AdminPanel({
       'Google Sheet': 'เปิด Google Sheet',
       YouTube: 'ดูวิดีโอสอน',
       'External Link': 'เปิดลิงก์เพิ่มเติม',
+      'Preview Image': 'ภาพตัวอย่างระบบ',
     }
     setForm((current) => ({
       ...current,
@@ -3242,6 +3243,7 @@ export function AdminPanel({
                     ['Google Sheet', 'เพิ่ม Google Sheet', Database],
                     ['YouTube', 'เพิ่มวิดีโอ YouTube', PlayCircle],
                     ['External Link', 'เพิ่มลิงก์เว็บ', ExternalLink],
+                    ['Preview Image', 'เพิ่มภาพ Preview', ImageIcon],
                   ] as const).map(([type, label, Icon]) => (
                     <button
                       className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.05] px-3 text-sm font-black text-slate-200 transition hover:border-cyan-300/40 hover:bg-cyan-300/10 hover:text-cyan-100 disabled:cursor-not-allowed disabled:opacity-40"
@@ -3361,7 +3363,7 @@ export function AdminPanel({
                             value={link.previewUrl}
                           />
                           <span className="mt-2 block rounded-xl bg-cyan-300/[0.06] px-3 py-2 text-[11px] font-bold leading-5 text-cyan-100">
-                            Preview ที่ระบบสร้างให้: <span className="break-all text-slate-300">{getEmbeddableUrl(link.previewUrl || link.url, link.type) || 'ยังไม่มีลิงก์สำหรับ preview'}</span>
+                            Preview ที่ระบบสร้างให้: <span className="break-all text-slate-300">{(link.type === 'Preview Image' ? getImageDisplayUrl(link.previewUrl || link.url) : getEmbeddableUrl(link.previewUrl || link.url, link.type)) || 'ยังไม่มีลิงก์สำหรับ preview'}</span>
                           </span>
                         </label>
                       </div>

@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest'
 import {
   canViewAccess,
   createEmptyMediaForm,
+  getImageDisplayUrl,
   getPreviewUrl,
+  isPreviewImageUrl,
   normalizeAssetUrl,
   moveMediaLink,
   normalizeMediaStatus,
@@ -70,6 +72,31 @@ describe('frontend media helpers', () => {
   it('normalizes GitHub blob URLs for image display', () => {
     expect(normalizeAssetUrl('https://github.com/Purinut1997/web-images/blob/main/folder/cover.png'))
       .toBe('https://raw.githubusercontent.com/Purinut1997/web-images/main/folder/cover.png')
+  })
+
+  it('detects preview images and keeps them out of iframe previews', () => {
+    const imageUrl = 'https://github.com/Purinut1997/web-images/blob/main/folder/screen.webp'
+    expect(isPreviewImageUrl(imageUrl)).toBe(true)
+    expect(getImageDisplayUrl('https://drive.google.com/file/d/drive-image-id/view'))
+      .toBe('https://drive.google.com/thumbnail?id=drive-image-id&sz=w1600')
+    expect(getPreviewUrl({
+      id: 2,
+      title: 'System',
+      topic: 'AppScript',
+      access: 'สมาชิก' as const,
+      status: 'เผยแพร่แล้ว' as const,
+      price: 0,
+      downloads: 0,
+      views: 0,
+      rating: 0,
+      cover: '',
+      description: '',
+      source: 'Google Sheet',
+      links: [
+        { label: 'ภาพตัวอย่าง', type: 'Preview Image', url: imageUrl, previewUrl: '', access: 'สมาชิก' as const },
+        { label: 'ไฟล์หลัก', type: 'Google Sheet', url: 'https://docs.google.com/spreadsheets/d/sheet-id/copy', previewUrl: '', access: 'สมาชิก' as const },
+      ],
+    })).toBe('https://docs.google.com/spreadsheets/d/sheet-id/preview')
   })
 
   it('reorders media links without mutating the original list', () => {
