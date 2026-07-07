@@ -42,6 +42,7 @@
   - แต่ละปุ่มตรวจสิทธิ์ของลิงก์นั้นผ่าน backend ก่อนเปิดจริง
   - หน้าปกและ Preview แปลงลิงก์ GitHub blob, Google Sheet `/copy|edit|view`, Google Drive และ YouTube เป็น URL ที่เหมาะกับการแสดงผลอัตโนมัติ
   - มีชนิดลิงก์ `Preview Image` สำหรับทำแกลเลอรีภาพตัวอย่างระบบเต็มแถว พร้อมตัวนับภาพ, ปุ่มเลื่อน, thumbnail แนวนอน และ modal ดูภาพใหญ่ โดยไม่ฝัง Sheet/ไฟล์จริงในส่วน Preview
+  - Preview Image รองรับลิงก์รูปตรง, Google Drive image, Google Photos/Googleusercontent และ GitHub blob โดยมี API ช่วยดึงรูปจากลิงก์แชร์ Google Photos สาธารณะ
   - หลังบ้านมีตัวอย่างหน้าปกและ URL Preview ที่ระบบคำนวณให้ดูทันทีตอนเพิ่ม/แก้ไขสื่อ
 - รองรับแท็กจริงต่อสื่อผ่านตาราง `tags` และ `media_tags`
 - มีหน้า Login และ Register พร้อม bot check แบบพื้นฐาน

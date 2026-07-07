@@ -3350,7 +3350,7 @@ export function AdminPanel({
                           <input
                             className="mt-2 min-h-11 w-full rounded-xl border border-white/10 bg-black/24 px-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-300 focus:ring-4 focus:ring-cyan-300/10"
                             onChange={(event) => updateMediaLink(index, 'url', event.target.value)}
-                            placeholder="Google Drive / Google Sheet / YouTube / External URL"
+                            placeholder={link.type === 'Preview Image' ? 'Google Photos / Google Drive image / URL รูปภาพ' : 'Google Drive / Google Sheet / YouTube / External URL'}
                             value={link.url}
                           />
                         </label>

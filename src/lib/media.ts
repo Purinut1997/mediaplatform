@@ -100,10 +100,18 @@ function googleDriveFileId(value: string) {
   return value.match(/\/d\/([^/]+)/)?.[1] || value.match(/[?&]id=([^&]+)/)?.[1] || ''
 }
 
+function isGooglePhotosUrl(url: URL) {
+  return url.hostname === 'photos.app.goo.gl' || url.hostname === 'photos.google.com'
+}
+
 export function getImageDisplayUrl(value = '') {
   const cleanLink = normalizeAssetUrl(value.trim())
   const url = safeUrl(cleanLink)
   if (!url) return cleanLink
+
+  if (isGooglePhotosUrl(url)) {
+    return `/api/media/preview-image?url=${encodeURIComponent(cleanLink)}`
+  }
 
   if (/drive\.google\.com/.test(url.hostname)) {
     const id = googleDriveFileId(cleanLink)
@@ -120,6 +128,7 @@ export function isPreviewImageUrl(value = '') {
 
   const url = safeUrl(cleanLink)
   if (!url) return false
+  if (isGooglePhotosUrl(url)) return true
   if (/googleusercontent\.com$/.test(url.hostname) || url.hostname === 'lh3.googleusercontent.com') return true
 
   const pathname = decodeURIComponent(url.pathname).toLowerCase()

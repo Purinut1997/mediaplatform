@@ -219,7 +219,7 @@ export function MediaDetail({
         <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
           <div>
             <h3 className="inline-flex items-center gap-2 text-2xl font-black text-slate-950 dark:text-white"><PlayCircle className="text-violet-600" />Preview ระบบ</h3>
-            <p className="mt-1 text-sm font-bold text-slate-500 dark:text-slate-400">แกลเลอรีภาพตัวอย่าง หน้าจอ หรือเดโมระบบ ไม่แสดง Sheet/ไฟล์จริงในส่วนนี้</p>
+            <p className="mt-1 text-sm font-bold text-slate-500 dark:text-slate-400">แกลเลอรีภาพตัวอย่าง หน้าจอ หรือเดโมระบบ</p>
           </div>
           <span className="rounded-full bg-cyan-100 px-3 py-1 text-xs font-black text-cyan-800 dark:bg-cyan-300/10 dark:text-cyan-200">{previewImages.length} ภาพ</span>
         </div>
@@ -230,8 +230,6 @@ export function MediaDetail({
         <h3 className="mb-4 inline-flex items-center gap-2 text-xl font-black"><FileText className="text-cyan-600" />รายละเอียดสื่อ</h3>
         <ul className="space-y-3 text-slate-600 dark:text-slate-300">
           <li>รองรับการแปะลิงก์ Google Drive, Google Sheet, YouTube และลิงก์ภายนอก</li>
-          <li>ส่วน Preview ใช้ภาพชนิด `Preview Image` เพื่อโชว์หน้าจอระบบหรือภาพขายโดยเฉพาะ</li>
-          <li>ระบบจะเช็กสิทธิ์ก่อนแสดงปุ่มดาวน์โหลดจริงในขั้นตอน backend</li>
         </ul>
       </section>
       <MediaIssuePanel currentUser={currentUser} item={item} />
@@ -305,7 +303,7 @@ function PreviewFallback() {
       <div>
         <ImageIcon className="mx-auto mb-3 text-cyan-300" size={48} />
         <p className="text-xl font-black text-white">ยังไม่มีภาพ Preview ระบบ</p>
-        <p className="mx-auto mt-2 max-w-md text-sm font-semibold leading-6 text-slate-400">เพิ่มลิงก์ชนิด <span className="font-black text-cyan-200">Preview Image</span> จากหลังบ้าน เพื่อโชว์ภาพหน้าจอระบบแบบแกลเลอรี ไม่ใช้ Sheet หรือไฟล์จริงเป็นตัวอย่าง</p>
+        <p className="mx-auto mt-2 max-w-md text-sm font-semibold leading-6 text-slate-400">ยังไม่มีภาพตัวอย่างสำหรับสื่อนี้</p>
       </div>
     </div>
   )

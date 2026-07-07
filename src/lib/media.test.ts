@@ -77,6 +77,9 @@ describe('frontend media helpers', () => {
   it('detects preview images and keeps them out of iframe previews', () => {
     const imageUrl = 'https://github.com/Purinut1997/web-images/blob/main/folder/screen.webp'
     expect(isPreviewImageUrl(imageUrl)).toBe(true)
+    expect(isPreviewImageUrl('https://photos.app.goo.gl/exampleShare')).toBe(true)
+    expect(getImageDisplayUrl('https://photos.app.goo.gl/exampleShare'))
+      .toBe('/api/media/preview-image?url=https%3A%2F%2Fphotos.app.goo.gl%2FexampleShare')
     expect(getImageDisplayUrl('https://drive.google.com/file/d/drive-image-id/view'))
       .toBe('https://drive.google.com/thumbnail?id=drive-image-id&sz=w1600')
     expect(getPreviewUrl({
