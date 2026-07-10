@@ -852,6 +852,118 @@ export function AdminPanel({
     setForm((current) => ({ ...current, links: moveMediaLink(current.links, index, direction) }))
   }
 
+  const renderMediaLinkCard = (link: MediaLink, index: number) => (
+    <div
+      className={`rounded-2xl border p-4 ring-1 ring-white/[0.03] ${link.type === 'Preview Image' ? 'border-violet-300/20 bg-violet-300/[0.06]' : 'border-white/10 bg-black/20'}`}
+      key={`${index}-${link.type}`}
+    >
+      <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className={`rounded-xl px-3 py-1 text-xs font-black ${link.type === 'Preview Image' ? 'bg-violet-300/15 text-violet-100' : 'bg-white/10 text-slate-300'}`}>
+            รายการที่ {index + 1} · {link.type}
+          </span>
+          {index === 0 && (
+            <span className="rounded-xl bg-cyan-300/15 px-3 py-1 text-xs font-black text-cyan-100">
+              รายการหลัก
+            </span>
+          )}
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            aria-label={`เลื่อน ${link.label || `รายการที่ ${index + 1}`} ขึ้น`}
+            className="grid h-9 w-9 place-items-center rounded-xl bg-white/10 text-slate-200 disabled:cursor-not-allowed disabled:opacity-30"
+            disabled={index === 0}
+            onClick={() => reorderMediaLink(index, 'up')}
+            title="เลื่อนขึ้น"
+            type="button"
+          >
+            <ArrowUp size={15} />
+          </button>
+          <button
+            aria-label={`เลื่อน ${link.label || `รายการที่ ${index + 1}`} ลง`}
+            className="grid h-9 w-9 place-items-center rounded-xl bg-white/10 text-slate-200 disabled:cursor-not-allowed disabled:opacity-30"
+            disabled={index === form.links.length - 1}
+            onClick={() => reorderMediaLink(index, 'down')}
+            title="เลื่อนลง"
+            type="button"
+          >
+            <ArrowDown size={15} />
+          </button>
+          {form.links.length > 1 && (
+            <button
+              className="inline-flex min-h-9 items-center gap-2 rounded-xl bg-red-400/10 px-3 text-xs font-black text-red-200"
+              onClick={() => removeMediaLink(index)}
+              type="button"
+            >
+              <Trash2 size={14} />
+              ลบ
+            </button>
+          )}
+        </div>
+      </div>
+      <div className="grid gap-3 lg:grid-cols-[1fr_160px_160px]">
+        <label>
+          <span className="text-xs font-black text-slate-300">ชื่อปุ่ม/ไฟล์</span>
+          <input
+            className="mt-2 min-h-11 w-full rounded-xl border border-white/10 bg-black/24 px-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-300 focus:ring-4 focus:ring-cyan-300/10"
+            onChange={(event) => updateMediaLink(index, 'label', event.target.value)}
+            placeholder={link.type === 'Preview Image' ? 'เช่น หน้าแรกระบบ, หน้ารายงาน, หน้าตั้งค่า' : 'เช่น ดาวน์โหลดไฟล์, เปิดระบบ, วิดีโอสอนใช้'}
+            value={link.label}
+          />
+        </label>
+        <label>
+          <span className="text-xs font-black text-slate-300">ชนิดลิงก์</span>
+          <select
+            className="mt-2 min-h-11 w-full rounded-xl border border-white/10 bg-black/24 px-3 text-sm text-white outline-none focus:border-cyan-300 focus:ring-4 focus:ring-cyan-300/10"
+            onChange={(event) => updateMediaLink(index, 'type', event.target.value)}
+            value={link.type}
+          >
+            {sourceOptions.map((option) => (
+              <option className="bg-slate-950" key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          <span className="text-xs font-black text-slate-300">สิทธิ์ลิงก์</span>
+          <select
+            className="mt-2 min-h-11 w-full rounded-xl border border-white/10 bg-black/24 px-3 text-sm text-white outline-none focus:border-cyan-300 focus:ring-4 focus:ring-cyan-300/10"
+            onChange={(event) => updateMediaLink(index, 'access', event.target.value)}
+            value={link.access}
+          >
+            {accessOptions.map((option) => (
+              <option className="bg-slate-950" key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="lg:col-span-2">
+          <span className="text-xs font-black text-slate-300">{link.type === 'Preview Image' ? 'URL รูปภาพ Preview' : 'URL ไฟล์/วิดีโอ'}</span>
+          <input
+            className="mt-2 min-h-11 w-full rounded-xl border border-white/10 bg-black/24 px-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-300 focus:ring-4 focus:ring-cyan-300/10"
+            onChange={(event) => updateMediaLink(index, 'url', event.target.value)}
+            placeholder={link.type === 'Preview Image' ? 'Google Photos / Google Drive image / URL รูปภาพ' : 'Google Drive / Google Sheet / YouTube / External URL'}
+            value={link.url}
+          />
+        </label>
+        <label>
+          <span className="text-xs font-black text-slate-300">Preview URL</span>
+          <input
+            className="mt-2 min-h-11 w-full rounded-xl border border-white/10 bg-black/24 px-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-300 focus:ring-4 focus:ring-cyan-300/10"
+            onChange={(event) => updateMediaLink(index, 'previewUrl', event.target.value)}
+            placeholder="ปล่อยว่างได้"
+            value={link.previewUrl}
+          />
+          <span className="mt-2 block rounded-xl bg-cyan-300/[0.06] px-3 py-2 text-[11px] font-bold leading-5 text-cyan-100">
+            Preview ที่ระบบสร้างให้: <span className="break-all text-slate-300">{(link.type === 'Preview Image' ? getImageDisplayUrl(link.previewUrl || link.url) : getEmbeddableUrl(link.previewUrl || link.url, link.type)) || 'ยังไม่มีลิงก์สำหรับ preview'}</span>
+          </span>
+        </label>
+      </div>
+    </div>
+  )
+
   const startEditMedia = (item: MediaItem) => {
     setAdminSection('media')
     setEditingMediaId(item.id)
@@ -917,7 +1029,7 @@ export function AdminPanel({
           previewUrl: link.previewUrl.trim(),
         }))
         .filter((link) => link.url || link.previewUrl)
-      const primaryLink = cleanLinks[0]
+      const primaryLink = cleanLinks.find((link) => link.type !== 'Preview Image') ?? cleanLinks[0]
       const response = await fetch(editingMediaId ? `/api/media/${editingMediaId}` : '/api/media', {
         method: editingMediaId ? 'PUT' : 'POST',
         headers: {
@@ -3129,257 +3241,130 @@ export function AdminPanel({
               </div>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2">
-              <label className="md:col-span-2">
-                <span className="text-sm font-black text-slate-200">
-                  รหัสบันทึกหลังบ้าน
-                </span>
-                <input
-                  className="mt-2 min-h-12 w-full rounded-2xl border border-cyan-300/20 bg-cyan-300/10 px-4 text-base text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-300 focus:ring-4 focus:ring-cyan-300/10"
-                  onChange={(event) => setAdminToken(event.target.value)}
-                  placeholder="เว้นว่างได้ถ้าเข้าสู่ระบบ superadmin แล้ว"
-                  type="password"
-                  value={adminToken}
-                />
-              </label>
-              <AdminField
-                label="ชื่อสื่อ"
-                name="title"
-                onChange={updateForm}
-                placeholder="เช่น คู่มืออบรม AI สำหรับครู"
-                value={form.title}
-              />
-              <AdminSelect
-                label="หมวดหมู่"
-                name="topic"
-                onChange={updateForm}
-                options={topics.length ? topics : ['โรงเรียน']}
-                value={form.topic}
-              />
-              <AdminSelect
-                label="สิทธิ์การเข้าถึง"
-                name="access"
-                onChange={updateForm}
-                options={accessOptions}
-                value={form.access}
-              />
-              <AdminSelect
-                label="สถานะ"
-                name="status"
-                onChange={updateForm}
-                options={statusOptions}
-                value={form.status}
-              />
-              <AdminField
-                label="ราคา"
-                name="price"
-                onChange={updateForm}
-                placeholder="0"
-                type="number"
-                value={form.price}
-              />
-              <AdminField
-                label="URL หน้าปก"
-                name="cover"
-                onChange={updateForm}
-                placeholder="https://..."
-                value={form.cover}
-              />
-              <div className="md:col-span-2 rounded-2xl border border-cyan-300/15 bg-cyan-300/[0.04] p-4">
-                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <div className="grid gap-5">
+              <section className="rounded-[1.5rem] border border-white/10 bg-black/15 p-4">
+                <div className="mb-4 flex items-start gap-3">
+                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-cyan-300/12 text-cyan-200"><FileText size={19} /></span>
                   <div>
-                    <p className="text-sm font-black text-cyan-100">ตัวอย่างหน้าปก</p>
-                    <p className="mt-1 text-xs font-semibold text-slate-400">รองรับ GitHub blob และแปลงเป็น raw image อัตโนมัติ</p>
-                  </div>
-                  {form.cover && (
-                    <a className="inline-flex min-h-9 items-center gap-2 rounded-xl bg-white/10 px-3 text-xs font-black text-cyan-100" href={normalizeAssetUrl(form.cover)} rel="noreferrer" target="_blank">
-                      <ExternalLink size={14} />
-                      เปิดรูป
-                    </a>
-                  )}
-                </div>
-                <div className="grid gap-4 sm:grid-cols-[180px_1fr]">
-                  <div className="grid min-h-32 place-items-center overflow-hidden rounded-2xl border border-white/10 bg-slate-950/60 p-2">
-                    {form.cover ? (
-                      <img alt="cover preview" className="max-h-40 w-full rounded-xl object-contain" src={normalizeAssetUrl(form.cover)} />
-                    ) : (
-                      <div className="text-center text-sm font-bold text-slate-500">
-                        <ImageIcon className="mx-auto mb-2" size={30} />
-                        วาง URL เพื่อดูตัวอย่าง
-                      </div>
-                    )}
-                  </div>
-                  <div className="rounded-2xl bg-black/20 p-3 text-xs font-semibold leading-6 text-slate-300">
-                    <p className="font-black text-slate-100">URL ที่ระบบจะใช้แสดงผล</p>
-                    <p className="mt-1 break-all text-cyan-100">{form.cover ? normalizeAssetUrl(form.cover) : 'ยังไม่มี URL หน้าปก'}</p>
+                    <h3 className="text-lg font-black text-white">1. ข้อมูลหลัก</h3>
+                    <p className="mt-1 text-sm font-semibold text-slate-400">ตั้งชื่อ จัดหมวด และอธิบายให้คนเข้าใจว่าสื่อนี้คืออะไร</p>
                   </div>
                 </div>
-              </div>
-              <AdminField
-                label="แท็ก"
-                name="tags"
-                onChange={updateForm}
-                placeholder="AI, อบรม, โรงเรียน"
-                value={form.tags}
-              />
-              <AdminField label="เปิดให้ดาวน์โหลดตั้งแต่" name="availableFrom" onChange={updateForm} placeholder="ไม่กำหนด" type="datetime-local" value={form.availableFrom} />
-              <AdminField label="ปิดดาวน์โหลดเมื่อ" name="availableUntil" onChange={updateForm} placeholder="ไม่กำหนด" type="datetime-local" value={form.availableUntil} />
-              <AdminField label="จำกัดดาวน์โหลดต่อบัญชี (0 = ไม่จำกัด)" name="downloadLimit" onChange={updateForm} placeholder="0" type="number" value={form.downloadLimit} />
-              <div className="md:col-span-2">
-                <div className="mb-3 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <label className="md:col-span-2">
+                    <span className="text-sm font-black text-slate-200">รหัสบันทึกหลังบ้าน</span>
+                    <input
+                      className="mt-2 min-h-12 w-full rounded-2xl border border-cyan-300/20 bg-cyan-300/10 px-4 text-base text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-300 focus:ring-4 focus:ring-cyan-300/10"
+                      onChange={(event) => setAdminToken(event.target.value)}
+                      placeholder="เว้นว่างได้ถ้าเข้าสู่ระบบ superadmin แล้ว"
+                      type="password"
+                      value={adminToken}
+                    />
+                  </label>
+                  <AdminField label="ชื่อสื่อ" name="title" onChange={updateForm} placeholder="เช่น ระบบเช็กชื่อออนไลน์" value={form.title} />
+                  <AdminSelect label="หมวดหมู่" name="topic" onChange={updateForm} options={topics.length ? topics : ['โรงเรียน']} value={form.topic} />
+                  <AdminField label="แท็ก" name="tags" onChange={updateForm} placeholder="AI, อบรม, โรงเรียน" value={form.tags} />
+                  <label>
+                    <span className="text-sm font-black text-slate-200">รายละเอียด</span>
+                    <textarea
+                      className="mt-2 min-h-28 w-full rounded-2xl border border-white/10 bg-black/24 px-4 py-3 text-base text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-300 focus:ring-4 focus:ring-cyan-300/10"
+                      onChange={(event) => updateForm('description', event.target.value)}
+                      placeholder="สรุปว่าสื่อนี้ใช้ทำอะไร เหมาะกับใคร และเด่นตรงไหน"
+                      value={form.description}
+                    />
+                  </label>
+                </div>
+              </section>
+
+              <section className="rounded-[1.5rem] border border-white/10 bg-black/15 p-4">
+                <div className="mb-4 flex items-start gap-3">
+                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-emerald-300/12 text-emerald-200"><ShieldCheck size={19} /></span>
                   <div>
-                    <p className="text-sm font-black text-slate-200">ชุดลิงก์ไฟล์และวิดีโอ</p>
-                    <p className="mt-1 text-xs font-semibold text-slate-500">
-                      เพิ่ม Drive, Sheet, YouTube หรือ preview ได้หลายรายการ และจัดลำดับรายการหลักได้
-                    </p>
+                    <h3 className="text-lg font-black text-white">2. การเผยแพร่และสิทธิ์</h3>
+                    <p className="mt-1 text-sm font-semibold text-slate-400">กำหนดว่าใครเห็นได้ ราคาเท่าไร และช่วงเวลาที่ให้ดาวน์โหลด</p>
                   </div>
-                  <span className="rounded-full bg-cyan-300/10 px-3 py-1 text-xs font-black text-cyan-200">
-                    {form.links.length} / 20 รายการ
-                  </span>
                 </div>
-                <div className="mb-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-                  {([
-                    ['Google Drive', 'เพิ่มไฟล์ Drive', FileText],
-                    ['Google Sheet', 'เพิ่ม Google Sheet', Database],
-                    ['YouTube', 'เพิ่มวิดีโอ YouTube', PlayCircle],
-                    ['External Link', 'เพิ่มลิงก์เว็บ', ExternalLink],
-                    ['Preview Image', 'เพิ่มภาพ Preview', ImageIcon],
-                  ] as const).map(([type, label, Icon]) => (
-                    <button
-                      className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.05] px-3 text-sm font-black text-slate-200 transition hover:border-cyan-300/40 hover:bg-cyan-300/10 hover:text-cyan-100 disabled:cursor-not-allowed disabled:opacity-40"
-                      disabled={form.links.length >= 20}
-                      key={type}
-                      onClick={() => addMediaLink(type)}
-                      type="button"
-                    >
-                      <Icon size={17} />
-                      {label}
-                    </button>
-                  ))}
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                  <AdminSelect label="สิทธิ์การเข้าถึง" name="access" onChange={updateForm} options={accessOptions} value={form.access} />
+                  <AdminSelect label="สถานะ" name="status" onChange={updateForm} options={statusOptions} value={form.status} />
+                  <AdminField label="ราคา" name="price" onChange={updateForm} placeholder="0" type="number" value={form.price} />
+                  <AdminField label="เปิดให้ดาวน์โหลดตั้งแต่" name="availableFrom" onChange={updateForm} placeholder="ไม่กำหนด" type="datetime-local" value={form.availableFrom} />
+                  <AdminField label="ปิดดาวน์โหลดเมื่อ" name="availableUntil" onChange={updateForm} placeholder="ไม่กำหนด" type="datetime-local" value={form.availableUntil} />
+                  <AdminField label="จำกัดดาวน์โหลดต่อบัญชี (0 = ไม่จำกัด)" name="downloadLimit" onChange={updateForm} placeholder="0" type="number" value={form.downloadLimit} />
+                </div>
+              </section>
+
+              <section className="rounded-[1.5rem] border border-white/10 bg-black/15 p-4">
+                <div className="mb-4 flex items-start gap-3">
+                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-sky-300/12 text-sky-200"><ImageIcon size={19} /></span>
+                  <div>
+                    <h3 className="text-lg font-black text-white">3. หน้าปก</h3>
+                    <p className="mt-1 text-sm font-semibold text-slate-400">ใช้เป็นภาพหลักบนการ์ดและหน้ารายละเอียดสื่อ</p>
+                  </div>
+                </div>
+                <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
+                  <AdminField label="URL หน้าปก" name="cover" onChange={updateForm} placeholder="https://..." value={form.cover} />
+                  <div className="rounded-2xl border border-cyan-300/15 bg-cyan-300/[0.04] p-4">
+                    <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                      <p className="text-sm font-black text-cyan-100">ตัวอย่างหน้าปก</p>
+                      {form.cover && <a className="inline-flex min-h-9 items-center gap-2 rounded-xl bg-white/10 px-3 text-xs font-black text-cyan-100" href={normalizeAssetUrl(form.cover)} rel="noreferrer" target="_blank"><ExternalLink size={14} />เปิดรูป</a>}
+                    </div>
+                    <div className="grid min-h-40 place-items-center overflow-hidden rounded-2xl border border-white/10 bg-slate-950/60 p-2">
+                      {form.cover ? <img alt="cover preview" className="max-h-44 w-full rounded-xl object-contain" src={normalizeAssetUrl(form.cover)} /> : <div className="text-center text-sm font-bold text-slate-500"><ImageIcon className="mx-auto mb-2" size={30} />วาง URL เพื่อดูตัวอย่าง</div>}
+                    </div>
+                    <p className="mt-3 break-all rounded-xl bg-black/20 p-3 text-xs font-semibold leading-5 text-cyan-100">{form.cover ? normalizeAssetUrl(form.cover) : 'ยังไม่มี URL หน้าปก'}</p>
+                  </div>
+                </div>
+              </section>
+
+              <section className="rounded-[1.5rem] border border-violet-300/20 bg-violet-300/[0.04] p-4">
+                <div className="mb-4 flex flex-col justify-between gap-3 lg:flex-row lg:items-end">
+                  <div className="flex items-start gap-3">
+                    <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-violet-300/15 text-violet-100"><ImageIcon size={19} /></span>
+                    <div>
+                      <h3 className="text-lg font-black text-white">4. Preview ระบบ</h3>
+                      <p className="mt-1 text-sm font-semibold text-slate-400">ภาพตัวอย่างสำหรับโชว์หน้าจอระบบ เช่น Google Photos, Google Drive image หรือ URL รูปภาพ</p>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="rounded-full bg-violet-300/15 px-3 py-1 text-xs font-black text-violet-100">{form.links.filter((link) => link.type === 'Preview Image').length} ภาพ</span>
+                    <button className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-violet-300 px-3 text-sm font-black text-slate-950 disabled:opacity-40" disabled={form.links.length >= 20} onClick={() => addMediaLink('Preview Image')} type="button"><ImageIcon size={16} />เพิ่มภาพ Preview</button>
+                  </div>
                 </div>
                 <div className="grid gap-3">
-                  {form.links.map((link, index) => (
-                    <div
-                      className="rounded-2xl border border-white/10 bg-black/20 p-3 ring-1 ring-white/[0.03]"
-                      key={`${index}-${link.type}`}
-                    >
-                      <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="rounded-xl bg-white/10 px-3 py-1 text-xs font-black text-slate-300">
-                            รายการที่ {index + 1} · {link.type}
-                          </span>
-                          {index === 0 && (
-                            <span className="rounded-xl bg-cyan-300/15 px-3 py-1 text-xs font-black text-cyan-100">
-                              รายการหลัก
-                            </span>
-                          )}
-                        </div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <button
-                            aria-label={`เลื่อน ${link.label || `รายการที่ ${index + 1}`} ขึ้น`}
-                            className="grid h-9 w-9 place-items-center rounded-xl bg-white/10 text-slate-200 disabled:cursor-not-allowed disabled:opacity-30"
-                            disabled={index === 0}
-                            onClick={() => reorderMediaLink(index, 'up')}
-                            title="เลื่อนขึ้น"
-                            type="button"
-                          >
-                            <ArrowUp size={15} />
-                          </button>
-                          <button
-                            aria-label={`เลื่อน ${link.label || `รายการที่ ${index + 1}`} ลง`}
-                            className="grid h-9 w-9 place-items-center rounded-xl bg-white/10 text-slate-200 disabled:cursor-not-allowed disabled:opacity-30"
-                            disabled={index === form.links.length - 1}
-                            onClick={() => reorderMediaLink(index, 'down')}
-                            title="เลื่อนลง"
-                            type="button"
-                          >
-                            <ArrowDown size={15} />
-                          </button>
-                          {form.links.length > 1 && (
-                          <button
-                            className="inline-flex min-h-9 items-center gap-2 rounded-xl bg-red-400/10 px-3 text-xs font-black text-red-200"
-                            onClick={() => removeMediaLink(index)}
-                            type="button"
-                          >
-                            <Trash2 size={14} />
-                            ลบ
-                          </button>
-                          )}
-                        </div>
-                      </div>
-                      <div className="grid gap-3 lg:grid-cols-[1fr_160px_160px]">
-                        <label>
-                          <span className="text-xs font-black text-slate-300">ชื่อปุ่ม/ไฟล์</span>
-                          <input
-                            className="mt-2 min-h-11 w-full rounded-xl border border-white/10 bg-black/24 px-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-300 focus:ring-4 focus:ring-cyan-300/10"
-                            onChange={(event) => updateMediaLink(index, 'label', event.target.value)}
-                            placeholder="เช่น ดาวน์โหลดไฟล์, ดูวิดีโอสอนใช้"
-                            value={link.label}
-                          />
-                        </label>
-                        <label>
-                          <span className="text-xs font-black text-slate-300">ชนิดลิงก์</span>
-                          <select
-                            className="mt-2 min-h-11 w-full rounded-xl border border-white/10 bg-black/24 px-3 text-sm text-white outline-none focus:border-cyan-300 focus:ring-4 focus:ring-cyan-300/10"
-                            onChange={(event) => updateMediaLink(index, 'type', event.target.value)}
-                            value={link.type}
-                          >
-                            {sourceOptions.map((option) => (
-                              <option className="bg-slate-950" key={option} value={option}>
-                                {option}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
-                        <label>
-                          <span className="text-xs font-black text-slate-300">สิทธิ์ลิงก์</span>
-                          <select
-                            className="mt-2 min-h-11 w-full rounded-xl border border-white/10 bg-black/24 px-3 text-sm text-white outline-none focus:border-cyan-300 focus:ring-4 focus:ring-cyan-300/10"
-                            onChange={(event) => updateMediaLink(index, 'access', event.target.value)}
-                            value={link.access}
-                          >
-                            {accessOptions.map((option) => (
-                              <option className="bg-slate-950" key={option} value={option}>
-                                {option}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
-                        <label className="lg:col-span-2">
-                          <span className="text-xs font-black text-slate-300">URL ไฟล์/วิดีโอ</span>
-                          <input
-                            className="mt-2 min-h-11 w-full rounded-xl border border-white/10 bg-black/24 px-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-300 focus:ring-4 focus:ring-cyan-300/10"
-                            onChange={(event) => updateMediaLink(index, 'url', event.target.value)}
-                            placeholder={link.type === 'Preview Image' ? 'Google Photos / Google Drive image / URL รูปภาพ' : 'Google Drive / Google Sheet / YouTube / External URL'}
-                            value={link.url}
-                          />
-                        </label>
-                        <label>
-                          <span className="text-xs font-black text-slate-300">Preview URL</span>
-                          <input
-                            className="mt-2 min-h-11 w-full rounded-xl border border-white/10 bg-black/24 px-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-300 focus:ring-4 focus:ring-cyan-300/10"
-                            onChange={(event) => updateMediaLink(index, 'previewUrl', event.target.value)}
-                            placeholder="ปล่อยว่างได้"
-                            value={link.previewUrl}
-                          />
-                          <span className="mt-2 block rounded-xl bg-cyan-300/[0.06] px-3 py-2 text-[11px] font-bold leading-5 text-cyan-100">
-                            Preview ที่ระบบสร้างให้: <span className="break-all text-slate-300">{(link.type === 'Preview Image' ? getImageDisplayUrl(link.previewUrl || link.url) : getEmbeddableUrl(link.previewUrl || link.url, link.type)) || 'ยังไม่มีลิงก์สำหรับ preview'}</span>
-                          </span>
-                        </label>
-                      </div>
-                    </div>
-                  ))}
+                  {form.links.some((link) => link.type === 'Preview Image') ? form.links.map((link, index) => link.type === 'Preview Image' ? renderMediaLinkCard(link, index) : null) : (
+                    <div className="rounded-2xl border border-dashed border-violet-300/20 bg-black/18 p-6 text-center text-sm font-bold text-slate-400">ยังไม่มีภาพ Preview</div>
+                  )}
                 </div>
-              </div>
-              <label className="md:col-span-2">
-                <span className="text-sm font-black text-slate-200">รายละเอียด</span>
-                <textarea
-                  className="mt-2 min-h-32 w-full rounded-2xl border border-white/10 bg-black/24 px-4 py-3 text-base text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-300 focus:ring-4 focus:ring-cyan-300/10"
-                  onChange={(event) => updateForm('description', event.target.value)}
-                  placeholder="สรุปว่าไฟล์นี้ใช้ทำอะไร เหมาะกับใคร และต้องมีสิทธิ์ระดับไหน"
-                  value={form.description}
-                />
-              </label>
+              </section>
+
+              <section className="rounded-[1.5rem] border border-white/10 bg-black/15 p-4">
+                <div className="mb-4 flex flex-col justify-between gap-3 lg:flex-row lg:items-end">
+                  <div className="flex items-start gap-3">
+                    <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-cyan-300/12 text-cyan-200"><Link2 size={19} /></span>
+                    <div>
+                      <h3 className="text-lg font-black text-white">5. ไฟล์ใช้งานจริง</h3>
+                      <p className="mt-1 text-sm font-semibold text-slate-400">ลิงก์สำหรับเปิดระบบ ดาวน์โหลดไฟล์ ดู Sheet หรือวิดีโอ</p>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="rounded-full bg-cyan-300/10 px-3 py-1 text-xs font-black text-cyan-200">{form.links.length} / 20 รายการ</span>
+                    {([
+                      ['Google Drive', 'ไฟล์ Drive', FileText],
+                      ['Google Sheet', 'Google Sheet', Database],
+                      ['YouTube', 'YouTube', PlayCircle],
+                      ['External Link', 'ลิงก์เว็บ', ExternalLink],
+                    ] as const).map(([type, label, Icon]) => (
+                      <button className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-white/10 bg-white/[0.05] px-3 text-sm font-black text-slate-200 transition hover:border-cyan-300/40 hover:bg-cyan-300/10 disabled:opacity-40" disabled={form.links.length >= 20} key={type} onClick={() => addMediaLink(type)} type="button"><Icon size={16} />{label}</button>
+                    ))}
+                  </div>
+                </div>
+                <div className="grid gap-3">
+                  {form.links.some((link) => link.type !== 'Preview Image') ? form.links.map((link, index) => link.type !== 'Preview Image' ? renderMediaLinkCard(link, index) : null) : (
+                    <div className="rounded-2xl border border-dashed border-cyan-300/20 bg-black/18 p-6 text-center text-sm font-bold text-slate-400">ยังไม่มีไฟล์หรือระบบปลายทาง</div>
+                  )}
+                </div>
+              </section>
             </div>
 
             {error && (
