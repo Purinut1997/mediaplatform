@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
+  ChevronLeft,
+  ChevronRight,
   Edit3,
   EllipsisVertical,
   ExternalLink,
   FolderKanban,
-  GripVertical,
   Grid3X3,
   ImagePlus,
   Layers3,
@@ -120,12 +121,6 @@ export function EServicePanel({ currentUser, setView }: { currentUser: CurrentUs
   const [form, setForm] = useState<ServiceForm>(emptyForm)
   const [error, setError] = useState('')
   const [iconStatus, setIconStatus] = useState('')
-  const [draggingId, setDraggingId] = useState('')
-  const [dragOverId, setDragOverId] = useState('')
-  const pressTimerRef = useRef<number | null>(null)
-  const pressIdRef = useRef('')
-  const longPressActiveRef = useRef(false)
-  const suppressOpenRef = useRef(false)
 
   const allServices = currentUser ? services : demoServices
   const customLimit = quota.limit ?? Number.POSITIVE_INFINITY
@@ -279,79 +274,24 @@ export function EServicePanel({ currentUser, setView }: { currentUser: CurrentUs
   }
 
   const openService = (item: ServiceItem) => {
-    if (suppressOpenRef.current) {
-      suppressOpenRef.current = false
-      return
-    }
     const url = safeServiceUrl(item.url)
     if (url) window.open(url, '_blank', 'noopener,noreferrer')
   }
 
-  const clearLongPress = () => {
-    if (pressTimerRef.current !== null) window.clearTimeout(pressTimerRef.current)
-    pressTimerRef.current = null
+  const movableGroup = (item: ServiceItem) => services.filter((service) => service.category === item.category && service.pinned === item.pinned).sort(serviceSort)
+
+  const canMoveService = (item: ServiceItem, direction: -1 | 1) => {
+    if (!currentUser || item.source === 'demo') return false
+    const group = movableGroup(item)
+    const index = group.findIndex((service) => String(service.id) === String(item.id))
+    return Boolean(group[index + direction])
   }
 
-  const dragTargetFromPoint = (clientX: number, clientY: number, categoryName: string, pinned: boolean) => {
-    const element = document.elementFromPoint(clientX, clientY)?.closest<HTMLElement>('[data-service-id]')
-    if (!element || element.dataset.serviceCategory !== categoryName) return ''
-    if (element.dataset.servicePinned !== String(pinned)) return ''
-    return element.dataset.serviceId ?? ''
-  }
-
-  const onCardPointerDown = (event: ReactPointerEvent, item: ServiceItem) => {
-    if (!currentUser || item.source === 'demo') return
-    const target = event.target as HTMLElement
-    if (!target.closest('[data-eservice-drag-handle="true"]')) return
-    event.preventDefault()
-    clearLongPress()
-    pressIdRef.current = String(item.id)
-    longPressActiveRef.current = false
-    const targetCard = event.currentTarget
-    const pointerId = event.pointerId
-    try {
-      targetCard.setPointerCapture(pointerId)
-    } catch {
-      // Some browsers may reject capture if the pointer is already unavailable.
-    }
-    pressTimerRef.current = window.setTimeout(() => {
-      longPressActiveRef.current = true
-      suppressOpenRef.current = true
-      setDraggingId(String(item.id))
-      setDragOverId(String(item.id))
-    }, 180)
-  }
-
-  const onCardPointerMove = (event: ReactPointerEvent, item: ServiceItem) => {
-    if (!longPressActiveRef.current) return
-    event.preventDefault()
-    const targetId = dragTargetFromPoint(event.clientX, event.clientY, item.category, item.pinned)
-    if (targetId) setDragOverId(targetId)
-  }
-
-  const onCardPointerUp = (event: ReactPointerEvent, item: ServiceItem) => {
-    clearLongPress()
-    if (!longPressActiveRef.current) {
-      if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
-      return
-    }
-    event.preventDefault()
-    const fromId = pressIdRef.current
-    const toId = dragTargetFromPoint(event.clientX, event.clientY, item.category, item.pinned) || dragOverId || fromId
-    longPressActiveRef.current = false
-    pressIdRef.current = ''
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
-    setDraggingId('')
-    setDragOverId('')
-    void reorderServices(fromId, toId)
-  }
-
-  const onCardPointerCancel = () => {
-    clearLongPress()
-    longPressActiveRef.current = false
-    pressIdRef.current = ''
-    setDraggingId('')
-    setDragOverId('')
+  const moveService = (item: ServiceItem, direction: -1 | 1) => {
+    const group = movableGroup(item)
+    const index = group.findIndex((service) => String(service.id) === String(item.id))
+    const target = group[index + direction]
+    if (target) void reorderServices(String(item.id), String(target.id))
   }
 
   return (
@@ -371,7 +311,7 @@ export function EServicePanel({ currentUser, setView }: { currentUser: CurrentUs
       </div>
 
       {!currentUser && <div className="mt-5 flex flex-col justify-between gap-4 rounded-3xl border border-amber-300/60 bg-amber-50 p-5 sm:flex-row sm:items-center dark:border-amber-300/20 dark:bg-amber-300/10"><div><p className="font-black text-amber-900 dark:text-amber-100">กำลังดูตัวอย่าง E‑Service</p><p className="mt-1 text-sm font-semibold text-amber-700 dark:text-amber-200">เข้าสู่ระบบเพื่อสร้างรายการส่วนตัวของคุณ ตัวอย่างด้านล่างไม่เปิดระบบจริง</p></div><button className="min-h-11 rounded-2xl bg-slate-950 px-5 font-black text-cyan-200" onClick={() => setView('login')} type="button">เข้าสู่ระบบเพื่อใช้งาน</button></div>}
-      {currentUser && <div className="mt-5 flex items-center gap-3 rounded-2xl border border-cyan-200 bg-cyan-50 p-4 text-sm font-bold text-cyan-900 dark:border-cyan-300/10 dark:bg-cyan-300/10 dark:text-cyan-100"><ShieldCheck className="shrink-0" size={19} /><p>{quota.limit === null ? 'ผู้ดูแลเพิ่มลิงก์ได้ไม่จำกัด' : `บัญชีนี้เพิ่มลิงก์เองได้ ${quota.limit.toLocaleString('th-TH')} ช่อง`} ส่วนระบบที่ซื้อจาก MIKPURINUT ไม่หักโควตา · กดค้างที่การ์ดประมาณครึ่งวินาที แล้วลากไปวางตำแหน่งใหม่ภายในหมวดเดียวกัน</p></div>}
+      {currentUser && <div className="mt-5 flex items-center gap-3 rounded-2xl border border-cyan-200 bg-cyan-50 p-4 text-sm font-bold text-cyan-900 dark:border-cyan-300/10 dark:bg-cyan-300/10 dark:text-cyan-100"><ShieldCheck className="shrink-0" size={19} /><p>{quota.limit === null ? 'ผู้ดูแลเพิ่มลิงก์ได้ไม่จำกัด' : `บัญชีนี้เพิ่มลิงก์เองได้ ${quota.limit.toLocaleString('th-TH')} ช่อง`} ส่วนระบบที่ซื้อจาก MIKPURINUT ไม่หักโควตา · ใช้ปุ่มลูกศรซ้าย/ขวาบนการ์ดเพื่อเลื่อนตำแหน่งในกลุ่มเดียวกัน</p></div>}
 
       <div className="mt-7 grid gap-3 lg:grid-cols-[1fr_auto] lg:items-center">
         <label className="flex min-h-12 items-center gap-3 rounded-2xl border border-slate-200 bg-white/80 px-4 shadow-sm dark:border-white/10 dark:bg-white/5"><Search className="text-cyan-600" size={18} /><input className="w-full bg-transparent font-bold outline-none placeholder:text-slate-400" onChange={(event) => setQuery(event.target.value)} placeholder="ค้นหาชื่อระบบหรือหมวดหมู่..." value={query} /></label>
@@ -387,11 +327,11 @@ export function EServicePanel({ currentUser, setView }: { currentUser: CurrentUs
           <div className="mb-4 flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
             <div>
               <h2 className="flex items-center gap-2 text-xl font-black text-slate-950 dark:text-white"><Layers3 className="text-cyan-500" size={20} />{section.name}</h2>
-              <p className="mt-1 text-xs font-bold text-slate-500 dark:text-slate-400">{section.items.length.toLocaleString('th-TH')} ระบบในหมวดนี้ · ปักหมุดอยู่หน้าสุดเสมอ และลากเปลี่ยนตำแหน่งได้เฉพาะในกลุ่มเดียวกัน</p>
+              <p className="mt-1 text-xs font-bold text-slate-500 dark:text-slate-400">{section.items.length.toLocaleString('th-TH')} ระบบในหมวดนี้ · ปักหมุดอยู่หน้าสุดเสมอ และเลื่อนตำแหน่งได้เฉพาะในกลุ่มเดียวกัน</p>
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-            {section.items.map((item) => <ServiceCard reorderable={Boolean(currentUser && item.source !== 'demo')} dragging={draggingId === String(item.id)} dragOver={dragOverId === String(item.id)} item={item} key={item.id} onDelete={() => void deleteService(item)} onEdit={() => editService(item)} onOpen={() => openService(item)} onPin={() => void updatePin(item)} onPointerCancel={onCardPointerCancel} onPointerDown={(event) => onCardPointerDown(event, item)} onPointerMove={(event) => onCardPointerMove(event, item)} onPointerUp={(event) => onCardPointerUp(event, item)} />)}
+            {section.items.map((item) => <ServiceCard canMoveLeft={canMoveService(item, -1)} canMoveRight={canMoveService(item, 1)} item={item} key={item.id} onDelete={() => void deleteService(item)} onEdit={() => editService(item)} onMoveLeft={() => moveService(item, -1)} onMoveRight={() => moveService(item, 1)} onOpen={() => openService(item)} onPin={() => void updatePin(item)} reorderable={Boolean(currentUser && item.source !== 'demo')} />)}
           </div>
         </section>
       ))}</div> : <div className="mt-6 rounded-[2rem] border border-dashed border-slate-300 p-12 text-center dark:border-white/15"><ServerCog className="mx-auto text-slate-300" size={42} /><h2 className="mt-4 text-xl font-black">ยังไม่มี E‑Service ในหมวดนี้</h2><p className="mt-2 text-sm text-slate-500">เพิ่มลิงก์ระบบแรก หรือรอระบบที่ซื้อจาก MIKPURINUT ถูกมอบให้บัญชีของคุณ</p></div>}
@@ -403,7 +343,7 @@ export function EServicePanel({ currentUser, setView }: { currentUser: CurrentUs
   )
 }
 
-function ServiceCard({ reorderable, dragging, dragOver, item, onDelete, onEdit, onOpen, onPin, onPointerCancel, onPointerDown, onPointerMove, onPointerUp }: { reorderable: boolean; dragging: boolean; dragOver: boolean; item: ServiceItem; onDelete: () => void; onEdit: () => void; onOpen: () => void; onPin: () => void; onPointerCancel: () => void; onPointerDown: (event: ReactPointerEvent) => void; onPointerMove: (event: ReactPointerEvent) => void; onPointerUp: (event: ReactPointerEvent) => void }) {
+function ServiceCard({ canMoveLeft, canMoveRight, reorderable, item, onDelete, onEdit, onMoveLeft, onMoveRight, onOpen, onPin }: { canMoveLeft: boolean; canMoveRight: boolean; reorderable: boolean; item: ServiceItem; onDelete: () => void; onEdit: () => void; onMoveLeft: () => void; onMoveRight: () => void; onOpen: () => void; onPin: () => void }) {
   const editable = item.source === 'custom'
   const [menuOpen, setMenuOpen] = useState(false)
   const initials = item.title.split(/\s+/).map((part) => part[0]).join('').slice(0, 2).toUpperCase()
@@ -413,8 +353,12 @@ function ServiceCard({ reorderable, dragging, dragOver, item, onDelete, onEdit, 
   }
 
   return (
-    <article className={`nexus-card group relative flex flex-col overflow-visible rounded-3xl border p-2.5 backdrop-blur-xl transition sm:p-3 ${dragging ? 'scale-95 opacity-60 ring-2 ring-cyan-300' : 'hover:-translate-y-1 hover:shadow-2xl'} ${dragOver ? 'ring-2 ring-amber-300' : ''}`} data-service-category={item.category} data-service-id={String(item.id)} data-service-pinned={String(item.pinned)} onPointerCancel={onPointerCancel} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp}>
-      {reorderable && <div className="absolute left-4 top-4 z-20 inline-flex h-10 w-10 cursor-grab touch-none items-center justify-center rounded-xl border border-cyan-200 bg-slate-950/90 text-cyan-100 shadow-lg shadow-slate-950/20 backdrop-blur active:cursor-grabbing dark:border-white/10 dark:bg-slate-900/95 dark:text-cyan-200" data-eservice-drag-handle="true" title="กดค้างตรงนี้แล้วลากเพื่อย้ายลำดับ"><GripVertical size={18} /></div>}
+    <article className="nexus-card group relative flex flex-col overflow-visible rounded-3xl border p-2.5 backdrop-blur-xl transition hover:-translate-y-1 hover:shadow-2xl sm:p-3" data-service-category={item.category} data-service-id={String(item.id)} data-service-pinned={String(item.pinned)}>
+      {reorderable && <div className="absolute left-4 top-4 z-20 inline-flex overflow-hidden rounded-xl border border-cyan-200 bg-slate-950/90 text-cyan-100 shadow-lg shadow-slate-950/20 backdrop-blur dark:border-white/10 dark:bg-slate-900/95 dark:text-cyan-200">
+        <button aria-label={`เลื่อน ${item.title} ไปทางซ้าย`} className="grid h-10 w-9 place-items-center disabled:cursor-not-allowed disabled:opacity-35" disabled={!canMoveLeft} onClick={onMoveLeft} title="เลื่อนไปซ้าย" type="button"><ChevronLeft size={18} /></button>
+        <span className="h-10 w-px bg-white/15" />
+        <button aria-label={`เลื่อน ${item.title} ไปทางขวา`} className="grid h-10 w-9 place-items-center disabled:cursor-not-allowed disabled:opacity-35" disabled={!canMoveRight} onClick={onMoveRight} title="เลื่อนไปขวา" type="button"><ChevronRight size={18} /></button>
+      </div>}
       <div className="absolute right-4 top-4 z-20 flex items-center gap-1.5">
         <button aria-label={item.pinned ? `เลิกปักหมุด ${item.title}` : `ปักหมุด ${item.title}`} className={`grid h-9 w-9 place-items-center rounded-xl border shadow-sm backdrop-blur transition ${item.pinned ? 'border-amber-300/60 bg-amber-100/95 text-amber-700 dark:bg-amber-300/20 dark:text-amber-300' : 'border-slate-200 bg-white/90 text-slate-500 dark:border-white/10 dark:bg-slate-900/90 dark:text-slate-300'}`} data-eservice-control="true" disabled={!editable} onClick={onPin} type="button"><Pin className={item.pinned ? 'fill-current' : ''} size={16} /></button>
         {editable && <div className="relative">
