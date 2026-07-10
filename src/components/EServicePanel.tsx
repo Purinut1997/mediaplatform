@@ -124,7 +124,6 @@ export function EServicePanel({ currentUser, setView }: { currentUser: CurrentUs
   const [dragOverId, setDragOverId] = useState('')
   const pressTimerRef = useRef<number | null>(null)
   const pressIdRef = useRef('')
-  const pressPointRef = useRef({ x: 0, y: 0 })
   const longPressActiveRef = useRef(false)
   const suppressOpenRef = useRef(false)
 
@@ -303,34 +302,27 @@ export function EServicePanel({ currentUser, setView }: { currentUser: CurrentUs
   const onCardPointerDown = (event: ReactPointerEvent, item: ServiceItem) => {
     if (!currentUser || item.source === 'demo') return
     const target = event.target as HTMLElement
-    if (target.closest('[data-eservice-control="true"]')) return
-    if (target.closest('[data-eservice-open="true"]')) return
+    if (!target.closest('[data-eservice-drag-handle="true"]')) return
+    event.preventDefault()
     clearLongPress()
     pressIdRef.current = String(item.id)
-    pressPointRef.current = { x: event.clientX, y: event.clientY }
     longPressActiveRef.current = false
     const targetCard = event.currentTarget
     const pointerId = event.pointerId
+    try {
+      targetCard.setPointerCapture(pointerId)
+    } catch {
+      // Some browsers may reject capture if the pointer is already unavailable.
+    }
     pressTimerRef.current = window.setTimeout(() => {
       longPressActiveRef.current = true
       suppressOpenRef.current = true
-      try {
-        if (targetCard.isConnected) targetCard.setPointerCapture(pointerId)
-      } catch {
-        // Some browsers may reject capture if the pointer already ended.
-      }
       setDraggingId(String(item.id))
       setDragOverId(String(item.id))
-    }, 420)
+    }, 180)
   }
 
   const onCardPointerMove = (event: ReactPointerEvent, item: ServiceItem) => {
-    const dx = Math.abs(event.clientX - pressPointRef.current.x)
-    const dy = Math.abs(event.clientY - pressPointRef.current.y)
-    if (!longPressActiveRef.current && (dx > 10 || dy > 10)) {
-      clearLongPress()
-      return
-    }
     if (!longPressActiveRef.current) return
     event.preventDefault()
     const targetId = dragTargetFromPoint(event.clientX, event.clientY, item.category, item.pinned)
@@ -339,12 +331,16 @@ export function EServicePanel({ currentUser, setView }: { currentUser: CurrentUs
 
   const onCardPointerUp = (event: ReactPointerEvent, item: ServiceItem) => {
     clearLongPress()
-    if (!longPressActiveRef.current) return
+    if (!longPressActiveRef.current) {
+      if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
+      return
+    }
     event.preventDefault()
     const fromId = pressIdRef.current
     const toId = dragTargetFromPoint(event.clientX, event.clientY, item.category, item.pinned) || dragOverId || fromId
     longPressActiveRef.current = false
     pressIdRef.current = ''
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
     setDraggingId('')
     setDragOverId('')
     void reorderServices(fromId, toId)
@@ -418,7 +414,7 @@ function ServiceCard({ reorderable, dragging, dragOver, item, onDelete, onEdit, 
 
   return (
     <article className={`nexus-card group relative flex flex-col overflow-visible rounded-3xl border p-2.5 backdrop-blur-xl transition sm:p-3 ${dragging ? 'scale-95 opacity-60 ring-2 ring-cyan-300' : 'hover:-translate-y-1 hover:shadow-2xl'} ${dragOver ? 'ring-2 ring-amber-300' : ''}`} data-service-category={item.category} data-service-id={String(item.id)} data-service-pinned={String(item.pinned)} onPointerCancel={onPointerCancel} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp}>
-      {reorderable && <div className="absolute left-4 top-4 z-20 inline-flex h-10 w-10 cursor-grab touch-none items-center justify-center rounded-xl border border-cyan-200 bg-slate-950/90 text-cyan-100 shadow-lg shadow-slate-950/20 backdrop-blur active:cursor-grabbing dark:border-white/10 dark:bg-slate-900/95 dark:text-cyan-200" title="กดค้างตรงนี้แล้วลากเพื่อย้ายลำดับ"><GripVertical size={18} /></div>}
+      {reorderable && <div className="absolute left-4 top-4 z-20 inline-flex h-10 w-10 cursor-grab touch-none items-center justify-center rounded-xl border border-cyan-200 bg-slate-950/90 text-cyan-100 shadow-lg shadow-slate-950/20 backdrop-blur active:cursor-grabbing dark:border-white/10 dark:bg-slate-900/95 dark:text-cyan-200" data-eservice-drag-handle="true" title="กดค้างตรงนี้แล้วลากเพื่อย้ายลำดับ"><GripVertical size={18} /></div>}
       <div className="absolute right-4 top-4 z-20 flex items-center gap-1.5">
         <button aria-label={item.pinned ? `เลิกปักหมุด ${item.title}` : `ปักหมุด ${item.title}`} className={`grid h-9 w-9 place-items-center rounded-xl border shadow-sm backdrop-blur transition ${item.pinned ? 'border-amber-300/60 bg-amber-100/95 text-amber-700 dark:bg-amber-300/20 dark:text-amber-300' : 'border-slate-200 bg-white/90 text-slate-500 dark:border-white/10 dark:bg-slate-900/90 dark:text-slate-300'}`} data-eservice-control="true" disabled={!editable} onClick={onPin} type="button"><Pin className={item.pinned ? 'fill-current' : ''} size={16} /></button>
         {editable && <div className="relative">
