@@ -80,7 +80,7 @@ export const onRequestGet = async ({ env, request }: { env: Env; request: Reques
   const rows = await ctx.sql`
     select id, title, url, description, category, icon_data_url, source, pinned, sort_order, created_at, updated_at
     from user_services where user_id = ${ctx.user.id}
-    order by category, sort_order, pinned desc, created_at desc
+    order by category, pinned desc, sort_order, created_at desc
   `
   return Response.json({ ok: true, services: rows.map(serviceRow), quota: await quota(ctx.sql, ctx.user) })
 }
@@ -127,15 +127,16 @@ export const onRequestPatch = async ({ env, request }: { env: Env; request: Requ
     const body = (await request.json().catch(() => ({}))) as ServiceBody
     if (body.action === 'reorder') {
       const category = String(body.category ?? '').trim().slice(0, 40) || 'งานทั่วไป'
+      const pinned = Boolean(body.pinned)
       const ids = Array.isArray(body.ids) ? body.ids.map(Number).filter((id) => Number.isInteger(id) && id > 0).slice(0, 200) : []
       if (!ids.length) return Response.json({ ok: false, error: 'ไม่มีรายการสำหรับจัดลำดับ' }, { status: 400 })
       const rows = await ctx.sql`
         select id
         from user_services
-        where user_id = ${ctx.user.id} and category = ${category} and id = any(${ids})
+        where user_id = ${ctx.user.id} and category = ${category} and pinned = ${pinned} and id = any(${ids})
       `
       const allowed = new Set(rows.map((row) => Number(row.id)))
-      if (allowed.size !== ids.length) return Response.json({ ok: false, error: 'พบรายการที่ไม่ได้อยู่ในหมวดนี้' }, { status: 400 })
+      if (allowed.size !== ids.length) return Response.json({ ok: false, error: 'พบรายการที่ไม่ได้อยู่ในหมวด/กลุ่มหมุดนี้' }, { status: 400 })
       for (const [index, itemId] of ids.entries()) {
         await ctx.sql`
           update user_services
@@ -146,9 +147,9 @@ export const onRequestPatch = async ({ env, request }: { env: Env; request: Requ
       const updatedRows = await ctx.sql`
         select id, title, url, description, category, icon_data_url, source, pinned, sort_order, created_at, updated_at
         from user_services where user_id = ${ctx.user.id}
-        order by category, sort_order, pinned desc, created_at desc
+        order by category, pinned desc, sort_order, created_at desc
       `
-      await writeAuditLog(env, ctx.viewer, 'reorder_eservice', 'user_service', ctx.user.id, { category, count: ids.length })
+      await writeAuditLog(env, ctx.viewer, 'reorder_eservice', 'user_service', ctx.user.id, { category, pinned, count: ids.length })
       return Response.json({ ok: true, services: updatedRows.map(serviceRow) })
     }
     const id = Number(body.id)

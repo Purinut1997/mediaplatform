@@ -65,7 +65,7 @@ function sourceLabel(source: ServiceSource) {
 function serviceSort(a: ServiceItem, b: ServiceItem) {
   const orderA = Number.isFinite(a.sortOrder) ? Number(a.sortOrder) : 0
   const orderB = Number.isFinite(b.sortOrder) ? Number(b.sortOrder) : 0
-  return orderA - orderB || Number(b.pinned) - Number(a.pinned) || a.title.localeCompare(b.title, 'th')
+  return Number(b.pinned) - Number(a.pinned) || orderA - orderB || a.title.localeCompare(b.title, 'th')
 }
 
 function canvasBlob(canvas: HTMLCanvasElement, quality: number) {
@@ -224,7 +224,11 @@ export function EServicePanel({ currentUser, setView }: { currentUser: CurrentUs
     const from = services.find((item) => String(item.id) === fromId)
     const to = services.find((item) => String(item.id) === toId)
     if (!from || !to || from.category !== to.category) return
-    const sameCategory = services.filter((item) => item.category === to.category).sort(serviceSort)
+    if (from.pinned !== to.pinned) {
+      setError('รายการที่ปักหมุดย้ายได้เฉพาะในกลุ่มปักหมุด ส่วนรายการทั่วไปย้ายได้เฉพาะในกลุ่มทั่วไป')
+      return
+    }
+    const sameCategory = services.filter((item) => item.category === to.category && item.pinned === to.pinned).sort(serviceSort)
     const fromIndex = sameCategory.findIndex((item) => String(item.id) === fromId)
     const toIndex = sameCategory.findIndex((item) => String(item.id) === toId)
     if (fromIndex < 0 || toIndex < 0) return
@@ -241,7 +245,7 @@ export function EServicePanel({ currentUser, setView }: { currentUser: CurrentUs
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ action: 'reorder', category: to.category, ids: idOrder }),
+        body: JSON.stringify({ action: 'reorder', category: to.category, pinned: to.pinned, ids: idOrder }),
       })
       const result = await response.json()
       if (!response.ok) throw new Error(result.error || 'บันทึกลำดับไม่สำเร็จ')
@@ -289,9 +293,10 @@ export function EServicePanel({ currentUser, setView }: { currentUser: CurrentUs
     pressTimerRef.current = null
   }
 
-  const dragTargetFromPoint = (clientX: number, clientY: number, categoryName: string) => {
+  const dragTargetFromPoint = (clientX: number, clientY: number, categoryName: string, pinned: boolean) => {
     const element = document.elementFromPoint(clientX, clientY)?.closest<HTMLElement>('[data-service-id]')
     if (!element || element.dataset.serviceCategory !== categoryName) return ''
+    if (element.dataset.servicePinned !== String(pinned)) return ''
     return element.dataset.serviceId ?? ''
   }
 
@@ -321,7 +326,7 @@ export function EServicePanel({ currentUser, setView }: { currentUser: CurrentUs
     }
     if (!longPressActiveRef.current) return
     event.preventDefault()
-    const targetId = dragTargetFromPoint(event.clientX, event.clientY, item.category)
+    const targetId = dragTargetFromPoint(event.clientX, event.clientY, item.category, item.pinned)
     if (targetId) setDragOverId(targetId)
   }
 
@@ -330,7 +335,7 @@ export function EServicePanel({ currentUser, setView }: { currentUser: CurrentUs
     if (!longPressActiveRef.current) return
     event.preventDefault()
     const fromId = pressIdRef.current
-    const toId = dragTargetFromPoint(event.clientX, event.clientY, item.category) || dragOverId || fromId
+    const toId = dragTargetFromPoint(event.clientX, event.clientY, item.category, item.pinned) || dragOverId || fromId
     longPressActiveRef.current = false
     pressIdRef.current = ''
     setDraggingId('')
@@ -401,7 +406,7 @@ export function EServicePanel({ currentUser, setView }: { currentUser: CurrentUs
           <div className="mb-4 flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
             <div>
               <h2 className="flex items-center gap-2 text-xl font-black text-slate-950 dark:text-white"><Layers3 className="text-cyan-500" size={20} />{section.name}</h2>
-              <p className="mt-1 text-xs font-bold text-slate-500 dark:text-slate-400">{section.items.length.toLocaleString('th-TH')} ระบบในหมวดนี้ · กดค้างแล้วลากเพื่อเปลี่ยนตำแหน่งในหมวดนี้</p>
+              <p className="mt-1 text-xs font-bold text-slate-500 dark:text-slate-400">{section.items.length.toLocaleString('th-TH')} ระบบในหมวดนี้ · ปักหมุดอยู่หน้าสุดเสมอ และลากเปลี่ยนตำแหน่งได้เฉพาะในกลุ่มเดียวกัน</p>
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
@@ -427,7 +432,7 @@ function ServiceCard({ draggable, dragging, dragOver, item, onDelete, onDragEnd,
   }
 
   return (
-    <article className={`nexus-card group relative flex flex-col overflow-visible rounded-3xl border p-2.5 backdrop-blur-xl transition sm:p-3 ${dragging ? 'scale-95 opacity-60 ring-2 ring-cyan-300' : 'hover:-translate-y-1 hover:shadow-2xl'} ${dragOver ? 'ring-2 ring-amber-300' : ''}`} data-service-category={item.category} data-service-id={String(item.id)} draggable={draggable} onDragEnd={onDragEnd} onDragOver={onDragOver} onDragStart={onDragStart} onDrop={onDrop} onPointerCancel={onPointerCancel} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp}>
+    <article className={`nexus-card group relative flex flex-col overflow-visible rounded-3xl border p-2.5 backdrop-blur-xl transition sm:p-3 ${dragging ? 'scale-95 opacity-60 ring-2 ring-cyan-300' : 'hover:-translate-y-1 hover:shadow-2xl'} ${dragOver ? 'ring-2 ring-amber-300' : ''}`} data-service-category={item.category} data-service-id={String(item.id)} data-service-pinned={String(item.pinned)} draggable={draggable} onDragEnd={onDragEnd} onDragOver={onDragOver} onDragStart={onDragStart} onDrop={onDrop} onPointerCancel={onPointerCancel} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp}>
       {draggable && <div className="absolute left-4 top-4 z-20 inline-flex h-9 w-9 cursor-grab items-center justify-center rounded-xl border border-slate-200 bg-white/90 text-slate-500 shadow-sm backdrop-blur active:cursor-grabbing dark:border-white/10 dark:bg-slate-900/90 dark:text-slate-300" title="กดค้างแล้วลากเพื่อย้ายลำดับ"><GripVertical size={17} /></div>}
       <div className="absolute right-4 top-4 z-20 flex items-center gap-1.5">
         <button aria-label={item.pinned ? `เลิกปักหมุด ${item.title}` : `ปักหมุด ${item.title}`} className={`grid h-9 w-9 place-items-center rounded-xl border shadow-sm backdrop-blur transition ${item.pinned ? 'border-amber-300/60 bg-amber-100/95 text-amber-700 dark:bg-amber-300/20 dark:text-amber-300' : 'border-slate-200 bg-white/90 text-slate-500 dark:border-white/10 dark:bg-slate-900/90 dark:text-slate-300'}`} data-eservice-control="true" disabled={!editable} onClick={onPin} type="button"><Pin className={item.pinned ? 'fill-current' : ''} size={16} /></button>
@@ -440,8 +445,8 @@ function ServiceCard({ draggable, dragging, dragOver, item, onDelete, onDragEnd,
         </div>}
       </div>
 
-      <button aria-label={item.source === 'demo' ? `ตัวอย่าง ${item.title}` : `เปิดระบบ ${item.title}`} className="group/icon relative grid aspect-[4/3] w-full place-items-center overflow-hidden rounded-2xl border border-white/90 bg-white text-3xl font-black text-cyan-700 shadow-lg shadow-slate-900/10 transition hover:scale-[1.015] hover:shadow-cyan-500/20 disabled:cursor-default" disabled={item.source === 'demo'} onClick={onOpen} title={item.source === 'demo' ? 'รายการตัวอย่าง' : `คลิกเพื่อเปิด ${item.title}`} type="button">
-        {item.iconDataUrl ? <img alt={`ไอคอน ${item.title}`} className="h-full w-full object-contain p-1.5" loading="lazy" src={item.iconDataUrl} /> : initials}
+      <button aria-label={item.source === 'demo' ? `ตัวอย่าง ${item.title}` : `เปิดระบบ ${item.title}`} className="group/icon relative grid aspect-square w-full place-items-center overflow-hidden rounded-2xl border border-white/90 bg-white text-3xl font-black text-cyan-700 shadow-lg shadow-slate-900/10 transition hover:scale-[1.015] hover:shadow-cyan-500/20 disabled:cursor-default" disabled={item.source === 'demo'} onClick={onOpen} title={item.source === 'demo' ? 'รายการตัวอย่าง' : `คลิกเพื่อเปิด ${item.title}`} type="button">
+        {item.iconDataUrl ? <img alt={`ไอคอน ${item.title}`} className="h-full w-full object-contain p-2" loading="lazy" src={item.iconDataUrl} /> : initials}
         <span className="absolute inset-0 grid place-items-center bg-slate-950/65 opacity-0 transition group-hover/icon:opacity-100">{item.source === 'demo' ? <LockKeyhole size={28} /> : <ExternalLink size={28} />}</span>
         <span className={`absolute bottom-2 left-2 rounded-full px-2.5 py-1 text-[9px] font-black shadow-sm ${item.source === 'purchased' ? 'bg-emerald-100 text-emerald-700' : item.source === 'demo' ? 'bg-violet-100 text-violet-700' : 'bg-cyan-100 text-cyan-700'}`}>{sourceLabel(item.source)}</span>
       </button>
