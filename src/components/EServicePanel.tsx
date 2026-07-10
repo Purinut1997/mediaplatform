@@ -1,10 +1,13 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type DragEvent } from 'react'
 import {
   Edit3,
   EllipsisVertical,
   ExternalLink,
+  FolderKanban,
+  GripVertical,
   Grid3X3,
   ImagePlus,
+  Layers3,
   LockKeyhole,
   Pin,
   Plus,
@@ -19,21 +22,29 @@ import type { CurrentUser, EServiceItem, EServiceQuota, View } from '../types'
 
 type ServiceSource = 'purchased' | 'custom' | 'demo'
 
-type ServiceItem = Omit<EServiceItem, 'id' | 'source' | 'createdAt' | 'updatedAt'> & { id: number | string; source: ServiceSource; createdAt?: string; updatedAt?: string }
+type ServiceItem = Omit<EServiceItem, 'id' | 'source' | 'createdAt' | 'updatedAt'> & {
+  id: number | string
+  source: ServiceSource
+  sortOrder?: number
+  createdAt?: string
+  updatedAt?: string
+}
 
 type ServiceForm = Pick<ServiceItem, 'category' | 'description' | 'iconDataUrl' | 'title' | 'url'>
 
-const emptyForm: ServiceForm = { category: 'งานทั่วไป', description: '', iconDataUrl: '', title: '', url: '' }
+const allCategory = 'ทั้งหมด'
+const defaultCategory = 'งานทั่วไป'
+const emptyForm: ServiceForm = { category: defaultCategory, description: '', iconDataUrl: '', title: '', url: '' }
 const maxIconSourceBytes = 12 * 1024 * 1024
 const maxIconOutputBytes = 80 * 1024
 
 const demoServices: ServiceItem[] = [
-  { id: 'demo-student', title: 'ระบบดูแลนักเรียน', description: 'ข้อมูลนักเรียนและงานดูแลช่วยเหลือ', category: 'นักเรียน', url: 'https://example.com', iconDataUrl: LOGO_URL, pinned: true, source: 'demo' },
-  { id: 'demo-bigdata', title: 'School Big Data', description: 'แดชบอร์ดข้อมูลเพื่อการบริหาร', category: 'บริหาร', url: 'https://example.com', iconDataUrl: '', pinned: true, source: 'demo' },
-  { id: 'demo-attendance', title: 'ระบบเช็กชื่อออนไลน์', description: 'บันทึกเวลาเรียนและสรุปการมาเรียน', category: 'นักเรียน', url: 'https://example.com', iconDataUrl: '', pinned: false, source: 'demo' },
-  { id: 'demo-safety', title: 'แจ้งเตือนภัยในโรงเรียน', description: 'ช่องทางแจ้งเหตุและติดตามสถานะ', category: 'ความปลอดภัย', url: 'https://example.com', iconDataUrl: '', pinned: false, source: 'demo' },
-  { id: 'demo-mis', title: 'School MIS', description: 'ศูนย์รวมงานสารสนเทศโรงเรียน', category: 'บริหาร', url: 'https://example.com', iconDataUrl: '', pinned: false, source: 'demo' },
-  { id: 'demo-dmc', title: 'DMC Portal', description: 'ทางลัดเข้าสู่ระบบข้อมูลนักเรียน', category: 'ภายนอก', url: 'https://example.com', iconDataUrl: '', pinned: false, source: 'demo' },
+  { id: 'demo-student', title: 'ระบบดูแลนักเรียน', description: 'ข้อมูลนักเรียนและงานดูแลช่วยเหลือ', category: 'นักเรียน', url: 'https://example.com', iconDataUrl: LOGO_URL, pinned: true, source: 'demo', sortOrder: 10 },
+  { id: 'demo-bigdata', title: 'School Big Data', description: 'แดชบอร์ดข้อมูลเพื่อการบริหาร', category: 'บริหาร', url: 'https://example.com', iconDataUrl: '', pinned: true, source: 'demo', sortOrder: 20 },
+  { id: 'demo-attendance', title: 'ระบบเช็กชื่อออนไลน์', description: 'บันทึกเวลาเรียนและสรุปการมาเรียน', category: 'นักเรียน', url: 'https://example.com', iconDataUrl: '', pinned: false, source: 'demo', sortOrder: 30 },
+  { id: 'demo-safety', title: 'แจ้งเตือนภัยในโรงเรียน', description: 'ช่องทางแจ้งเหตุและติดตามสถานะ', category: 'ความปลอดภัย', url: 'https://example.com', iconDataUrl: '', pinned: false, source: 'demo', sortOrder: 40 },
+  { id: 'demo-mis', title: 'School MIS', description: 'ศูนย์รวมงานสารสนเทศโรงเรียน', category: 'บริหาร', url: 'https://example.com', iconDataUrl: '', pinned: false, source: 'demo', sortOrder: 50 },
+  { id: 'demo-dmc', title: 'DMC Portal', description: 'ทางลัดเข้าสู่ระบบข้อมูลนักเรียน', category: 'ภายนอก', url: 'https://example.com', iconDataUrl: '', pinned: false, source: 'demo', sortOrder: 60 },
 ]
 
 function safeServiceUrl(value: string) {
@@ -49,6 +60,12 @@ function sourceLabel(source: ServiceSource) {
   if (source === 'purchased') return 'ระบบจาก MIKPURINUT'
   if (source === 'custom') return 'เพิ่มเอง'
   return 'ตัวอย่างหน้าตา'
+}
+
+function serviceSort(a: ServiceItem, b: ServiceItem) {
+  const orderA = Number.isFinite(a.sortOrder) ? Number(a.sortOrder) : 0
+  const orderB = Number.isFinite(b.sortOrder) ? Number(b.sortOrder) : 0
+  return orderA - orderB || Number(b.pinned) - Number(a.pinned) || a.title.localeCompare(b.title, 'th')
 }
 
 function canvasBlob(canvas: HTMLCanvasElement, quality: number) {
@@ -97,26 +114,41 @@ export function EServicePanel({ currentUser, setView }: { currentUser: CurrentUs
   const [quota, setQuota] = useState<EServiceQuota>({ limit: currentUser?.role === 'member' ? (currentUser.access === 'VIP' ? 18 : 6) : null, used: 0, remaining: currentUser?.role === 'member' ? (currentUser.access === 'VIP' ? 18 : 6) : null })
   const [loading, setLoading] = useState(Boolean(currentUser))
   const [query, setQuery] = useState('')
-  const [category, setCategory] = useState('ทั้งหมด')
+  const [category, setCategory] = useState(allCategory)
   const [formOpen, setFormOpen] = useState(false)
   const [editingId, setEditingId] = useState('')
   const [form, setForm] = useState<ServiceForm>(emptyForm)
   const [error, setError] = useState('')
   const [iconStatus, setIconStatus] = useState('')
+  const [draggingId, setDraggingId] = useState('')
+  const [dragOverId, setDragOverId] = useState('')
 
   const allServices = currentUser ? services : demoServices
   const customLimit = quota.limit ?? Number.POSITIVE_INFINITY
   const customCount = quota.used
   const quotaReached = Number.isFinite(customLimit) && customCount >= customLimit
   const quotaLabel = Number.isFinite(customLimit) ? `${customCount}/${customLimit}` : `${customCount}/∞`
-  const categories = ['ทั้งหมด', ...new Set(allServices.map((item) => item.category))]
+  const categories = useMemo(() => [allCategory, ...Array.from(new Set(allServices.map((item) => item.category || defaultCategory)))], [allServices])
+  const categoryCounts = useMemo(() => allServices.reduce<Record<string, number>>((map, item) => {
+    const key = item.category || defaultCategory
+    map[key] = (map[key] ?? 0) + 1
+    return map
+  }, {}), [allServices])
   const filtered = useMemo(() => {
     const needle = query.trim().toLocaleLowerCase('th-TH')
     return [...allServices]
-      .filter((item) => category === 'ทั้งหมด' || item.category === category)
+      .filter((item) => category === allCategory || item.category === category)
       .filter((item) => !needle || `${item.title} ${item.description} ${item.category}`.toLocaleLowerCase('th-TH').includes(needle))
-      .sort((a, b) => Number(b.pinned) - Number(a.pinned) || a.title.localeCompare(b.title, 'th'))
+      .sort(serviceSort)
   }, [allServices, category, query])
+  const groupedSections = useMemo(() => {
+    const map = new Map<string, ServiceItem[]>()
+    for (const item of filtered) {
+      const key = item.category || defaultCategory
+      map.set(key, [...(map.get(key) ?? []), item])
+    }
+    return Array.from(map.entries()).map(([name, items]) => ({ name, items }))
+  }, [filtered])
 
   useEffect(() => {
     if (!currentUser) return
@@ -154,7 +186,7 @@ export function EServicePanel({ currentUser, setView }: { currentUser: CurrentUs
       title,
       url,
       description: form.description.trim(),
-      category: form.category.trim() || 'งานทั่วไป',
+      category: form.category.trim() || defaultCategory,
       iconDataUrl: form.iconDataUrl,
     }
     setLoading(true)
@@ -180,6 +212,38 @@ export function EServicePanel({ currentUser, setView }: { currentUser: CurrentUs
     const result = await response.json()
     if (response.ok) { setServices((current) => current.filter((service) => service.id !== item.id)); if (result.quota) setQuota(result.quota) }
     else setError(result.error || 'ลบ E-Service ไม่สำเร็จ')
+  }
+
+  const reorderServices = async (fromId: string, toId: string) => {
+    if (!currentUser || fromId === toId) return
+    const from = services.find((item) => String(item.id) === fromId)
+    const to = services.find((item) => String(item.id) === toId)
+    if (!from || !to || from.category !== to.category) return
+    const sameCategory = services.filter((item) => item.category === to.category).sort(serviceSort)
+    const fromIndex = sameCategory.findIndex((item) => String(item.id) === fromId)
+    const toIndex = sameCategory.findIndex((item) => String(item.id) === toId)
+    if (fromIndex < 0 || toIndex < 0) return
+    const ordered = [...sameCategory]
+    const [moved] = ordered.splice(fromIndex, 1)
+    ordered.splice(toIndex, 0, moved)
+    const idOrder = ordered.map((item) => Number(item.id)).filter(Number.isInteger)
+    setServices((current) => current.map((service) => {
+      const index = idOrder.indexOf(Number(service.id))
+      return index >= 0 ? { ...service, sortOrder: (index + 1) * 10 } : service
+    }))
+    try {
+      const response = await fetch('/api/member/services', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ action: 'reorder', category: to.category, ids: idOrder }),
+      })
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.error || 'บันทึกลำดับไม่สำเร็จ')
+      if (Array.isArray(result.services)) setServices(result.services)
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'บันทึกลำดับไม่สำเร็จ')
+    }
   }
 
   const editService = (item: ServiceItem) => {
@@ -211,6 +275,28 @@ export function EServicePanel({ currentUser, setView }: { currentUser: CurrentUs
     if (url) window.open(url, '_blank', 'noopener,noreferrer')
   }
 
+  const onDragStart = (event: DragEvent, item: ServiceItem) => {
+    if (!currentUser || item.source === 'demo') return
+    event.dataTransfer.effectAllowed = 'move'
+    event.dataTransfer.setData('text/plain', String(item.id))
+    setDraggingId(String(item.id))
+  }
+
+  const onDragOver = (event: DragEvent, item: ServiceItem) => {
+    if (!currentUser || item.source === 'demo') return
+    event.preventDefault()
+    event.dataTransfer.dropEffect = 'move'
+    setDragOverId(String(item.id))
+  }
+
+  const onDrop = (event: DragEvent, item: ServiceItem) => {
+    event.preventDefault()
+    const fromId = event.dataTransfer.getData('text/plain') || draggingId
+    setDraggingId('')
+    setDragOverId('')
+    void reorderServices(fromId, String(item.id))
+  }
+
   return (
     <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:py-12">
       <div className="relative overflow-hidden rounded-[2rem] border border-cyan-300/20 bg-slate-950 px-6 py-8 text-white shadow-2xl sm:px-10 sm:py-10">
@@ -219,31 +305,48 @@ export function EServicePanel({ currentUser, setView }: { currentUser: CurrentUs
           <div>
             <p className="inline-flex items-center gap-2 text-xs font-black tracking-[0.2em] text-cyan-300"><Grid3X3 size={16} /> MY E-SERVICE</p>
             <h1 className="mt-3 text-4xl font-black sm:text-5xl">ระบบของฉัน อยู่ที่เดียว</h1>
-            <p className="mt-4 max-w-2xl text-sm font-semibold leading-7 text-slate-300 sm:text-base">รวมระบบที่ได้รับจาก MIKPURINUT และทางลัดที่คุณเพิ่มเอง เปิดใช้งานได้เร็วจากทุกการ์ด</p>
+            <p className="mt-4 max-w-2xl text-sm font-semibold leading-7 text-slate-300 sm:text-base">รวมระบบที่ได้รับจาก MIKPURINUT และทางลัดที่คุณเพิ่มเอง แยกเป็นหมวดชัดเจน และลากเรียงลำดับได้ตามงานจริง</p>
           </div>
           <div className="grid grid-cols-3 gap-2 sm:min-w-[360px]">
-            {[['ทั้งหมด', allServices.length], ['จากผู้พัฒนา', allServices.filter((item) => item.source === 'purchased').length], ['ช่องเพิ่มเอง', currentUser ? quotaLabel : 'DEMO']].map(([label, value]) => <div className="rounded-2xl border border-white/10 bg-white/5 p-3 text-center" key={String(label)}><p className="text-2xl font-black text-cyan-300">{value}</p><p className="mt-1 text-[10px] font-bold text-slate-400">{label}</p></div>)}
+            {[[allCategory, allServices.length], ['หมวดหมู่', Math.max(0, categories.length - 1)], ['ช่องเพิ่มเอง', currentUser ? quotaLabel : 'DEMO']].map(([label, value]) => <div className="rounded-2xl border border-white/10 bg-white/5 p-3 text-center" key={String(label)}><p className="text-2xl font-black text-cyan-300">{value}</p><p className="mt-1 text-[10px] font-bold text-slate-400">{label}</p></div>)}
           </div>
         </div>
       </div>
 
       {!currentUser && <div className="mt-5 flex flex-col justify-between gap-4 rounded-3xl border border-amber-300/60 bg-amber-50 p-5 sm:flex-row sm:items-center dark:border-amber-300/20 dark:bg-amber-300/10"><div><p className="font-black text-amber-900 dark:text-amber-100">กำลังดูตัวอย่าง E‑Service</p><p className="mt-1 text-sm font-semibold text-amber-700 dark:text-amber-200">เข้าสู่ระบบเพื่อสร้างรายการส่วนตัวของคุณ ตัวอย่างด้านล่างไม่เปิดระบบจริง</p></div><button className="min-h-11 rounded-2xl bg-slate-950 px-5 font-black text-cyan-200" onClick={() => setView('login')} type="button">เข้าสู่ระบบเพื่อใช้งาน</button></div>}
-      {currentUser && <div className="mt-5 flex items-center gap-3 rounded-2xl border border-cyan-200 bg-cyan-50 p-4 text-sm font-bold text-cyan-900 dark:border-cyan-300/10 dark:bg-cyan-300/10 dark:text-cyan-100"><ShieldCheck className="shrink-0" size={19} /><p>{quota.limit === null ? 'ผู้ดูแลเพิ่มลิงก์ได้ไม่จำกัด' : `บัญชีนี้เพิ่มลิงก์เองได้ ${quota.limit.toLocaleString('th-TH')} ช่อง`} ส่วนระบบที่ซื้อจาก MIKPURINUT ไม่หักโควตา</p></div>}
+      {currentUser && <div className="mt-5 flex items-center gap-3 rounded-2xl border border-cyan-200 bg-cyan-50 p-4 text-sm font-bold text-cyan-900 dark:border-cyan-300/10 dark:bg-cyan-300/10 dark:text-cyan-100"><ShieldCheck className="shrink-0" size={19} /><p>{quota.limit === null ? 'ผู้ดูแลเพิ่มลิงก์ได้ไม่จำกัด' : `บัญชีนี้เพิ่มลิงก์เองได้ ${quota.limit.toLocaleString('th-TH')} ช่อง`} ส่วนระบบที่ซื้อจาก MIKPURINUT ไม่หักโควตา · กดค้างบนการ์ดแล้วลากเพื่อจัดลำดับภายในหมวด</p></div>}
 
-      <div className="mt-7 flex flex-col gap-3 lg:flex-row lg:items-center">
-        <label className="flex min-h-12 flex-1 items-center gap-3 rounded-2xl border border-slate-200 bg-white/80 px-4 shadow-sm dark:border-white/10 dark:bg-white/5"><Search className="text-cyan-600" size={18} /><input className="w-full bg-transparent font-bold outline-none placeholder:text-slate-400" onChange={(event) => setQuery(event.target.value)} placeholder="ค้นหาชื่อระบบหรือหมวดหมู่..." value={query} /></label>
-        <div className="flex gap-2 overflow-x-auto pb-1 lg:pb-0">{categories.map((item) => <button className={`min-h-11 shrink-0 rounded-2xl px-4 text-sm font-black ${category === item ? 'bg-slate-950 text-cyan-200 dark:bg-cyan-300 dark:text-slate-950' : 'border border-slate-200 bg-white/70 text-slate-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-300'}`} key={item} onClick={() => setCategory(item)} type="button">{item}</button>)}</div>
+      <div className="mt-7 grid gap-3 lg:grid-cols-[1fr_auto] lg:items-center">
+        <label className="flex min-h-12 items-center gap-3 rounded-2xl border border-slate-200 bg-white/80 px-4 shadow-sm dark:border-white/10 dark:bg-white/5"><Search className="text-cyan-600" size={18} /><input className="w-full bg-transparent font-bold outline-none placeholder:text-slate-400" onChange={(event) => setQuery(event.target.value)} placeholder="ค้นหาชื่อระบบหรือหมวดหมู่..." value={query} /></label>
         <button className="inline-flex min-h-12 shrink-0 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-600 px-5 font-black text-white shadow-lg shadow-cyan-500/15 disabled:cursor-not-allowed disabled:opacity-50" disabled={Boolean(currentUser && quotaReached)} onClick={() => currentUser ? setFormOpen(true) : setView('login')} title={quotaReached ? 'ใช้ช่องเพิ่มเองครบแล้ว' : undefined} type="button"><Plus size={19} />{quotaReached ? 'ใช้ช่องครบแล้ว' : 'เพิ่ม E‑Service'}</button>
       </div>
 
-      {loading && !services.length ? <div className="mt-6 rounded-[2rem] border border-dashed border-cyan-300/30 p-12 text-center font-black text-cyan-700">กำลังโหลด E‑Service...</div> : filtered.length ? <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">{filtered.map((item) => <ServiceCard item={item} key={item.id} onDelete={() => void deleteService(item)} onEdit={() => editService(item)} onOpen={() => openService(item)} onPin={() => void updatePin(item)} />)}</div> : <div className="mt-6 rounded-[2rem] border border-dashed border-slate-300 p-12 text-center dark:border-white/15"><ServerCog className="mx-auto text-slate-300" size={42} /><h2 className="mt-4 text-xl font-black">ยังไม่มี E‑Service ในหมวดนี้</h2><p className="mt-2 text-sm text-slate-500">เพิ่มลิงก์ระบบแรก หรือรอระบบที่ซื้อจาก MIKPURINUT ถูกมอบให้บัญชีของคุณ</p></div>}
+      <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
+        {categories.map((item) => <button className={`inline-flex min-h-11 shrink-0 items-center gap-2 rounded-2xl px-4 text-sm font-black transition ${category === item ? 'bg-slate-950 text-cyan-200 shadow-lg shadow-cyan-500/10 dark:bg-cyan-300 dark:text-slate-950' : 'border border-slate-200 bg-white/70 text-slate-600 hover:border-cyan-300 dark:border-white/10 dark:bg-white/5 dark:text-slate-300'}`} key={item} onClick={() => setCategory(item)} type="button"><FolderKanban size={16} />{item}<span className={`rounded-full px-2 py-0.5 text-[10px] ${category === item ? 'bg-white/20' : 'bg-cyan-100 text-cyan-700 dark:bg-cyan-300/10 dark:text-cyan-200'}`}>{item === allCategory ? allServices.length : (categoryCounts[item] ?? 0)}</span></button>)}
+      </div>
+
+      {loading && !services.length ? <div className="mt-6 rounded-[2rem] border border-dashed border-cyan-300/30 p-12 text-center font-black text-cyan-700">กำลังโหลด E‑Service...</div> : groupedSections.length ? <div className="mt-6 space-y-7">{groupedSections.map((section) => (
+        <section className="rounded-[2rem] border border-cyan-300/15 bg-white/55 p-4 shadow-xl shadow-cyan-950/5 backdrop-blur dark:bg-slate-950/35" key={section.name}>
+          <div className="mb-4 flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
+            <div>
+              <h2 className="flex items-center gap-2 text-xl font-black text-slate-950 dark:text-white"><Layers3 className="text-cyan-500" size={20} />{section.name}</h2>
+              <p className="mt-1 text-xs font-bold text-slate-500 dark:text-slate-400">{section.items.length.toLocaleString('th-TH')} ระบบในหมวดนี้ · ลากการ์ดเพื่อย้ายลำดับภายในหมวดเดียวกัน</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+            {section.items.map((item) => <ServiceCard draggable={Boolean(currentUser && item.source !== 'demo')} dragging={draggingId === String(item.id)} dragOver={dragOverId === String(item.id)} item={item} key={item.id} onDelete={() => void deleteService(item)} onDragEnd={() => { setDraggingId(''); setDragOverId('') }} onDragOver={(event) => onDragOver(event, item)} onDragStart={(event) => onDragStart(event, item)} onDrop={(event) => onDrop(event, item)} onEdit={() => editService(item)} onOpen={() => openService(item)} onPin={() => void updatePin(item)} />)}
+          </div>
+        </section>
+      ))}</div> : <div className="mt-6 rounded-[2rem] border border-dashed border-slate-300 p-12 text-center dark:border-white/15"><ServerCog className="mx-auto text-slate-300" size={42} /><h2 className="mt-4 text-xl font-black">ยังไม่มี E‑Service ในหมวดนี้</h2><p className="mt-2 text-sm text-slate-500">เพิ่มลิงก์ระบบแรก หรือรอระบบที่ซื้อจาก MIKPURINUT ถูกมอบให้บัญชีของคุณ</p></div>}
+
+      {error && !formOpen && <p className="mt-5 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm font-bold text-rose-700 dark:border-rose-300/20 dark:bg-rose-300/10 dark:text-rose-100">{error}</p>}
 
       {formOpen && <div aria-label={editingId ? 'แก้ไข E-Service' : 'เพิ่ม E-Service'} aria-modal="true" className="fixed inset-0 z-[90] grid place-items-center bg-slate-950/75 p-4 backdrop-blur-xl" role="dialog"><button aria-label="ปิดฟอร์ม" className="absolute inset-0 cursor-default" onClick={resetForm} type="button" /><div className="relative max-h-[92vh] w-full max-w-xl overflow-y-auto rounded-[2rem] bg-white p-6 shadow-2xl dark:bg-slate-950 sm:p-8"><button aria-label="ปิด" className="absolute right-4 top-4 grid h-10 w-10 place-items-center rounded-xl bg-slate-100 dark:bg-white/10" onClick={resetForm} type="button"><X size={18} /></button><p className="text-xs font-black tracking-[0.18em] text-cyan-700 dark:text-cyan-300">E-SERVICE SHORTCUT</p><h2 className="mt-2 text-2xl font-black">{editingId ? 'แก้ไขทางลัด' : 'เพิ่มระบบของคุณ'}</h2><div className="mt-6 grid gap-4"><label className="grid gap-2 text-sm font-black">ชื่อระบบ<input className="min-h-12 rounded-2xl border border-slate-200 bg-white px-4 font-semibold dark:border-white/10 dark:bg-white/5" maxLength={80} onChange={(event) => setForm({ ...form, title: event.target.value })} placeholder="เช่น ระบบเช็กชื่อออนไลน์" value={form.title} /></label><label className="grid gap-2 text-sm font-black">URL ระบบ<input className="min-h-12 rounded-2xl border border-slate-200 bg-white px-4 font-semibold dark:border-white/10 dark:bg-white/5" onChange={(event) => setForm({ ...form, url: event.target.value })} placeholder="https://..." value={form.url} /></label><label className="grid gap-2 text-sm font-black">หมวดหมู่<input className="min-h-12 rounded-2xl border border-slate-200 bg-white px-4 font-semibold dark:border-white/10 dark:bg-white/5" maxLength={40} onChange={(event) => setForm({ ...form, category: event.target.value })} value={form.category} /></label><label className="grid gap-2 text-sm font-black">คำอธิบาย<textarea className="min-h-24 rounded-2xl border border-slate-200 bg-white p-4 font-semibold dark:border-white/10 dark:bg-white/5" maxLength={160} onChange={(event) => setForm({ ...form, description: event.target.value })} placeholder="ระบบนี้ใช้สำหรับ..." value={form.description} /></label><label className="flex min-h-20 cursor-pointer items-center gap-4 rounded-2xl border border-dashed border-cyan-300 bg-cyan-50 p-4 dark:border-cyan-300/20 dark:bg-cyan-300/5">{form.iconDataUrl ? <img alt="ตัวอย่างไอคอน" className="h-14 w-14 rounded-2xl object-cover" src={form.iconDataUrl} /> : <span className="grid h-14 w-14 place-items-center rounded-2xl bg-cyan-100 text-cyan-700"><ImagePlus size={24} /></span>}<span><span className="block text-sm font-black">อัปโหลดไอคอน</span><span className="mt-1 block text-xs font-semibold text-slate-500">รับภาพต้นฉบับไม่เกิน 12 MB · ย่อเป็น WebP ไม่เกิน 80 KB อัตโนมัติ</span></span><input accept="image/png,image/jpeg,image/webp" className="hidden" onChange={(event) => void readIcon(event.target.files?.[0])} type="file" /></label>{iconStatus && <p className="rounded-xl bg-emerald-50 p-3 text-sm font-bold text-emerald-700 dark:bg-emerald-300/10 dark:text-emerald-200">{iconStatus}</p>}{error && <p className="rounded-xl bg-rose-50 p-3 text-sm font-bold text-rose-700 dark:bg-rose-300/10 dark:text-rose-200">{error}</p>}<button className="min-h-12 rounded-2xl bg-slate-950 font-black text-cyan-200 dark:bg-cyan-300 dark:text-slate-950" onClick={saveService} type="button">{editingId ? 'บันทึกการแก้ไข' : 'เพิ่มใน E-Service ของฉัน'}</button></div></div></div>}
     </section>
   )
 }
 
-function ServiceCard({ item, onDelete, onEdit, onOpen, onPin }: { item: ServiceItem; onDelete: () => void; onEdit: () => void; onOpen: () => void; onPin: () => void }) {
+function ServiceCard({ draggable, dragging, dragOver, item, onDelete, onDragEnd, onDragOver, onDragStart, onDrop, onEdit, onOpen, onPin }: { draggable: boolean; dragging: boolean; dragOver: boolean; item: ServiceItem; onDelete: () => void; onDragEnd: () => void; onDragOver: (event: DragEvent) => void; onDragStart: (event: DragEvent) => void; onDrop: (event: DragEvent) => void; onEdit: () => void; onOpen: () => void; onPin: () => void }) {
   const editable = item.source === 'custom'
   const [menuOpen, setMenuOpen] = useState(false)
   const initials = item.title.split(/\s+/).map((part) => part[0]).join('').slice(0, 2).toUpperCase()
@@ -253,7 +356,8 @@ function ServiceCard({ item, onDelete, onEdit, onOpen, onPin }: { item: ServiceI
   }
 
   return (
-    <article className="nexus-card group relative flex flex-col overflow-visible rounded-3xl border p-2.5 backdrop-blur-xl transition hover:-translate-y-1 hover:shadow-2xl sm:p-3">
+    <article className={`nexus-card group relative flex flex-col overflow-visible rounded-3xl border p-2.5 backdrop-blur-xl transition sm:p-3 ${dragging ? 'scale-95 opacity-60 ring-2 ring-cyan-300' : 'hover:-translate-y-1 hover:shadow-2xl'} ${dragOver ? 'ring-2 ring-amber-300' : ''}`} draggable={draggable} onDragEnd={onDragEnd} onDragOver={onDragOver} onDragStart={onDragStart} onDrop={onDrop}>
+      {draggable && <div className="absolute left-4 top-4 z-20 inline-flex h-9 w-9 cursor-grab items-center justify-center rounded-xl border border-slate-200 bg-white/90 text-slate-500 shadow-sm backdrop-blur active:cursor-grabbing dark:border-white/10 dark:bg-slate-900/90 dark:text-slate-300" title="กดค้างแล้วลากเพื่อย้ายลำดับ"><GripVertical size={17} /></div>}
       <div className="absolute right-4 top-4 z-20 flex items-center gap-1.5">
         <button aria-label={item.pinned ? `เลิกปักหมุด ${item.title}` : `ปักหมุด ${item.title}`} className={`grid h-9 w-9 place-items-center rounded-xl border shadow-sm backdrop-blur transition ${item.pinned ? 'border-amber-300/60 bg-amber-100/95 text-amber-700 dark:bg-amber-300/20 dark:text-amber-300' : 'border-slate-200 bg-white/90 text-slate-500 dark:border-white/10 dark:bg-slate-900/90 dark:text-slate-300'}`} disabled={!editable} onClick={onPin} type="button"><Pin className={item.pinned ? 'fill-current' : ''} size={16} /></button>
         {editable && <div className="relative">
@@ -273,7 +377,7 @@ function ServiceCard({ item, onDelete, onEdit, onOpen, onPin }: { item: ServiceI
 
       <div className="px-1 pb-1 pt-3">
         <div className="flex items-start justify-between gap-2"><h2 className="line-clamp-1 min-w-0 text-lg font-black text-slate-950 dark:text-white">{item.title}</h2>{item.source !== 'demo' && <ExternalLink className="mt-1 shrink-0 text-cyan-600 dark:text-cyan-300" size={15} />}</div>
-        <p className="mt-1 line-clamp-1 text-xs font-bold text-slate-500 dark:text-slate-400">{item.category}{item.description ? ` · ${item.description}` : ''}</p>
+        <p className="mt-1 line-clamp-1 text-xs font-bold text-slate-500 dark:text-slate-400">{item.description || item.category}</p>
       </div>
     </article>
   )

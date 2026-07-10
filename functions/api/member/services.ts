@@ -3,7 +3,9 @@ import { writeAuditLog, writeErrorLog } from '../../_lib/admin'
 import { ensureSchema, getSql, type Env } from '../../_lib/db'
 
 type ServiceBody = {
+  action?: string
   id?: number
+  ids?: number[]
   title?: string
   url?: string
   description?: string
@@ -40,6 +42,7 @@ function serviceRow(row: Record<string, unknown>) {
     iconDataUrl: String(row.icon_data_url ?? ''),
     source: row.source === 'purchased' ? 'purchased' : 'custom',
     pinned: Boolean(row.pinned),
+    sortOrder: Number(row.sort_order ?? 0),
     createdAt: String(row.created_at),
     updatedAt: String(row.updated_at),
   }
@@ -75,9 +78,9 @@ export const onRequestGet = async ({ env, request }: { env: Env; request: Reques
   const ctx = await context(env, request)
   if (!ctx) return Response.json({ ok: false, error: 'กรุณาเข้าสู่ระบบ' }, { status: 401 })
   const rows = await ctx.sql`
-    select id, title, url, description, category, icon_data_url, source, pinned, created_at, updated_at
+    select id, title, url, description, category, icon_data_url, source, pinned, sort_order, created_at, updated_at
     from user_services where user_id = ${ctx.user.id}
-    order by pinned desc, sort_order, created_at desc
+    order by category, sort_order, pinned desc, created_at desc
   `
   return Response.json({ ok: true, services: rows.map(serviceRow), quota: await quota(ctx.sql, ctx.user) })
 }
@@ -98,10 +101,15 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
     if (currentQuota.limit !== null && currentQuota.used >= currentQuota.limit) {
       return Response.json({ ok: false, error: `ใช้ช่องเพิ่มเองครบ ${currentQuota.limit} ช่องแล้ว` }, { status: 409 })
     }
+    const [nextOrder] = await ctx.sql`
+      select coalesce(max(sort_order), 0) + 10 as value
+      from user_services
+      where user_id = ${ctx.user.id} and category = ${category}
+    `
     const [created] = await ctx.sql`
-      insert into user_services (user_id, title, url, description, category, icon_data_url, source)
-      values (${ctx.user.id}, ${title}, ${url}, ${description}, ${category}, ${icon ?? ''}, 'custom')
-      returning id, title, url, description, category, icon_data_url, source, pinned, created_at, updated_at
+      insert into user_services (user_id, title, url, description, category, icon_data_url, source, sort_order)
+      values (${ctx.user.id}, ${title}, ${url}, ${description}, ${category}, ${icon ?? ''}, 'custom', ${Number(nextOrder?.value ?? 10)})
+      returning id, title, url, description, category, icon_data_url, source, pinned, sort_order, created_at, updated_at
     `
     await writeAuditLog(env, ctx.viewer, 'create_eservice', 'user_service', created.id, { title })
     return Response.json({ ok: true, service: serviceRow(created), quota: await quota(ctx.sql, ctx.user) }, { status: 201 })
@@ -117,13 +125,39 @@ export const onRequestPatch = async ({ env, request }: { env: Env; request: Requ
   if (!ctx) return Response.json({ ok: false, error: 'กรุณาเข้าสู่ระบบ' }, { status: 401 })
   try {
     const body = (await request.json().catch(() => ({}))) as ServiceBody
+    if (body.action === 'reorder') {
+      const category = String(body.category ?? '').trim().slice(0, 40) || 'งานทั่วไป'
+      const ids = Array.isArray(body.ids) ? body.ids.map(Number).filter((id) => Number.isInteger(id) && id > 0).slice(0, 200) : []
+      if (!ids.length) return Response.json({ ok: false, error: 'ไม่มีรายการสำหรับจัดลำดับ' }, { status: 400 })
+      const rows = await ctx.sql`
+        select id
+        from user_services
+        where user_id = ${ctx.user.id} and category = ${category} and id = any(${ids})
+      `
+      const allowed = new Set(rows.map((row) => Number(row.id)))
+      if (allowed.size !== ids.length) return Response.json({ ok: false, error: 'พบรายการที่ไม่ได้อยู่ในหมวดนี้' }, { status: 400 })
+      for (const [index, itemId] of ids.entries()) {
+        await ctx.sql`
+          update user_services
+          set sort_order = ${(index + 1) * 10}, updated_at = now()
+          where id = ${itemId} and user_id = ${ctx.user.id}
+        `
+      }
+      const updatedRows = await ctx.sql`
+        select id, title, url, description, category, icon_data_url, source, pinned, sort_order, created_at, updated_at
+        from user_services where user_id = ${ctx.user.id}
+        order by category, sort_order, pinned desc, created_at desc
+      `
+      await writeAuditLog(env, ctx.viewer, 'reorder_eservice', 'user_service', ctx.user.id, { category, count: ids.length })
+      return Response.json({ ok: true, services: updatedRows.map(serviceRow) })
+    }
     const id = Number(body.id)
     if (!Number.isInteger(id) || id < 1) return Response.json({ ok: false, error: 'ไม่พบรายการ' }, { status: 400 })
     if (typeof body.pinned === 'boolean') {
       const [updated] = await ctx.sql`
         update user_services set pinned = ${body.pinned}, updated_at = now()
         where id = ${id} and user_id = ${ctx.user.id} and source = 'custom'
-        returning id, title, url, description, category, icon_data_url, source, pinned, created_at, updated_at
+        returning id, title, url, description, category, icon_data_url, source, pinned, sort_order, created_at, updated_at
       `
       if (!updated) return Response.json({ ok: false, error: 'ไม่พบรายการที่แก้ไขได้' }, { status: 404 })
       return Response.json({ ok: true, service: serviceRow(updated) })
@@ -137,7 +171,7 @@ export const onRequestPatch = async ({ env, request }: { env: Env; request: Requ
     const [updated] = await ctx.sql`
       update user_services set title = ${title}, url = ${url}, description = ${description}, category = ${category}, icon_data_url = ${icon ?? ''}, updated_at = now()
       where id = ${id} and user_id = ${ctx.user.id} and source = 'custom'
-      returning id, title, url, description, category, icon_data_url, source, pinned, created_at, updated_at
+      returning id, title, url, description, category, icon_data_url, source, pinned, sort_order, created_at, updated_at
     `
     if (!updated) return Response.json({ ok: false, error: 'ไม่พบรายการที่แก้ไขได้' }, { status: 404 })
     await writeAuditLog(env, ctx.viewer, 'update_eservice', 'user_service', id, { title })

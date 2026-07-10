@@ -369,6 +369,7 @@ export type EServiceItem = {
   category: string
   iconDataUrl: string
   pinned: boolean
+  sortOrder: number
   source: 'custom' | 'purchased'
   createdAt: string
   updatedAt: string
