@@ -308,10 +308,16 @@ export function EServicePanel({ currentUser, setView }: { currentUser: CurrentUs
     pressIdRef.current = String(item.id)
     pressPointRef.current = { x: event.clientX, y: event.clientY }
     longPressActiveRef.current = false
-    event.currentTarget.setPointerCapture(event.pointerId)
+    const targetCard = event.currentTarget
+    const pointerId = event.pointerId
     pressTimerRef.current = window.setTimeout(() => {
       longPressActiveRef.current = true
       suppressOpenRef.current = true
+      try {
+        if (targetCard.isConnected) targetCard.setPointerCapture(pointerId)
+      } catch {
+        // Some browsers may reject capture if the pointer already ended.
+      }
       setDraggingId(String(item.id))
       setDragOverId(String(item.id))
     }, 420)
