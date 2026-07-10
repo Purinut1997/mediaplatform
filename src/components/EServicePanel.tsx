@@ -304,6 +304,7 @@ export function EServicePanel({ currentUser, setView }: { currentUser: CurrentUs
     if (!currentUser || item.source === 'demo') return
     const target = event.target as HTMLElement
     if (target.closest('[data-eservice-control="true"]')) return
+    if (target.closest('[data-eservice-open="true"]')) return
     clearLongPress()
     pressIdRef.current = String(item.id)
     pressPointRef.current = { x: event.clientX, y: event.clientY }
@@ -417,7 +418,7 @@ function ServiceCard({ reorderable, dragging, dragOver, item, onDelete, onEdit, 
 
   return (
     <article className={`nexus-card group relative flex flex-col overflow-visible rounded-3xl border p-2.5 backdrop-blur-xl transition sm:p-3 ${dragging ? 'scale-95 opacity-60 ring-2 ring-cyan-300' : 'hover:-translate-y-1 hover:shadow-2xl'} ${dragOver ? 'ring-2 ring-amber-300' : ''}`} data-service-category={item.category} data-service-id={String(item.id)} data-service-pinned={String(item.pinned)} onPointerCancel={onPointerCancel} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp}>
-      {reorderable && <div className="absolute left-4 top-4 z-20 inline-flex h-9 w-9 cursor-grab items-center justify-center rounded-xl border border-slate-200 bg-white/90 text-slate-500 shadow-sm backdrop-blur active:cursor-grabbing dark:border-white/10 dark:bg-slate-900/90 dark:text-slate-300" title="กดค้างแล้วลากเพื่อย้ายลำดับ"><GripVertical size={17} /></div>}
+      {reorderable && <div className="absolute left-4 top-4 z-20 inline-flex h-10 w-10 cursor-grab touch-none items-center justify-center rounded-xl border border-cyan-200 bg-slate-950/90 text-cyan-100 shadow-lg shadow-slate-950/20 backdrop-blur active:cursor-grabbing dark:border-white/10 dark:bg-slate-900/95 dark:text-cyan-200" title="กดค้างตรงนี้แล้วลากเพื่อย้ายลำดับ"><GripVertical size={18} /></div>}
       <div className="absolute right-4 top-4 z-20 flex items-center gap-1.5">
         <button aria-label={item.pinned ? `เลิกปักหมุด ${item.title}` : `ปักหมุด ${item.title}`} className={`grid h-9 w-9 place-items-center rounded-xl border shadow-sm backdrop-blur transition ${item.pinned ? 'border-amber-300/60 bg-amber-100/95 text-amber-700 dark:bg-amber-300/20 dark:text-amber-300' : 'border-slate-200 bg-white/90 text-slate-500 dark:border-white/10 dark:bg-slate-900/90 dark:text-slate-300'}`} data-eservice-control="true" disabled={!editable} onClick={onPin} type="button"><Pin className={item.pinned ? 'fill-current' : ''} size={16} /></button>
         {editable && <div className="relative">
@@ -429,7 +430,7 @@ function ServiceCard({ reorderable, dragging, dragOver, item, onDelete, onEdit, 
         </div>}
       </div>
 
-      <button aria-label={item.source === 'demo' ? `ตัวอย่าง ${item.title}` : `เปิดระบบ ${item.title}`} className="group/icon relative grid aspect-square w-full place-items-center overflow-hidden rounded-2xl border border-white/90 bg-white text-3xl font-black text-cyan-700 shadow-lg shadow-slate-900/10 transition hover:scale-[1.015] hover:shadow-cyan-500/20 disabled:cursor-default" disabled={item.source === 'demo'} onClick={onOpen} title={item.source === 'demo' ? 'รายการตัวอย่าง' : `คลิกเพื่อเปิด ${item.title}`} type="button">
+      <button aria-label={item.source === 'demo' ? `ตัวอย่าง ${item.title}` : `เปิดระบบ ${item.title}`} className="group/icon relative grid aspect-square w-full place-items-center overflow-hidden rounded-2xl border border-white/90 bg-white text-3xl font-black text-cyan-700 shadow-lg shadow-slate-900/10 transition hover:scale-[1.015] hover:shadow-cyan-500/20 disabled:cursor-default" data-eservice-open="true" disabled={item.source === 'demo'} onClick={onOpen} title={item.source === 'demo' ? 'รายการตัวอย่าง' : `คลิกเพื่อเปิด ${item.title}`} type="button">
         {item.iconDataUrl ? <img alt={`ไอคอน ${item.title}`} className="h-full w-full object-contain p-2" loading="lazy" src={item.iconDataUrl} /> : initials}
         <span className="absolute inset-0 grid place-items-center bg-slate-950/65 opacity-0 transition group-hover/icon:opacity-100">{item.source === 'demo' ? <LockKeyhole size={28} /> : <ExternalLink size={28} />}</span>
         <span className={`absolute bottom-2 left-2 rounded-full px-2.5 py-1 text-[9px] font-black shadow-sm ${item.source === 'purchased' ? 'bg-emerald-100 text-emerald-700' : item.source === 'demo' ? 'bg-violet-100 text-violet-700' : 'bg-cyan-100 text-cyan-700'}`}>{sourceLabel(item.source)}</span>
