@@ -38,6 +38,7 @@ import { PortalTiles, type HomeSection } from './components/PortalTiles'
 import { AuthBotCheck } from './components/AuthBotCheck'
 import { Header, Hero, HomeJourney, MaintenanceScreen } from './components/PublicShell'
 import { MemberLibraryPanel, MemberProfilePanel } from './components/MemberLibrary'
+import { SupportWidget } from './components/SupportWidget'
 import { MediaDetail } from './components/MediaDetail'
 import { VipTermsDialog } from './components/VipTermsDialog'
 import { DiscoverySpotlight, SmartSearchDialog } from './components/HomeExperience'
@@ -415,6 +416,7 @@ function App() {
     <div className="theme-shell relative min-h-screen overflow-hidden text-slate-900 transition-colors duration-300 dark:text-slate-100">
       <TechBackground />
       {(loading || !sessionReady) && <LoadingOverlay />}
+      <SupportWidget pageName={view} />
 
       <div className="relative z-10">
         <Header
