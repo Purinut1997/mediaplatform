@@ -1041,8 +1041,8 @@ export function AdminPanel({
           ...form,
           price: Number(form.price || 0),
           source: primaryLink?.type ?? form.source,
-          resourceUrl: primaryLink?.url ?? form.resourceUrl,
-          previewUrl: primaryLink?.previewUrl ?? form.previewUrl,
+          resourceUrl: primaryLink?.url || form.resourceUrl,
+          previewUrl: primaryLink?.previewUrl || form.previewUrl,
           links: cleanLinks.length ? cleanLinks : form.links,
           tags: form.tags
             .split(',')
@@ -3298,12 +3298,15 @@ export function AdminPanel({
                 <div className="mb-4 flex items-start gap-3">
                   <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-sky-300/12 text-sky-200"><ImageIcon size={19} /></span>
                   <div>
-                    <h3 className="text-lg font-black text-white">3. หน้าปก</h3>
-                    <p className="mt-1 text-sm font-semibold text-slate-400">ใช้เป็นภาพหลักบนการ์ดและหน้ารายละเอียดสื่อ</p>
+                    <h3 className="text-lg font-black text-white">3. หน้าปกและปุ่มดูตัวอย่าง</h3>
+                    <p className="mt-1 text-sm font-semibold text-slate-400">ใช้เป็นภาพหลักบนการ์ด และตั้งค่าลิงก์สำหรับปุ่ม "ดูตัวอย่าง"</p>
                   </div>
                 </div>
                 <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
-                  <AdminField label="URL หน้าปก" name="cover" onChange={updateForm} placeholder="https://..." value={form.cover} />
+                  <div className="grid gap-4 h-max">
+                    <AdminField label="URL หน้าปก" name="cover" onChange={updateForm} placeholder="https://..." value={form.cover} />
+                    <AdminField label="URL ปุ่มดูตัวอย่าง (Preview URL)" name="previewUrl" onChange={updateForm} placeholder="ปล่อยว่างไว้เพื่อใช้จากไฟล์จริง" value={form.previewUrl} />
+                  </div>
                   <div className="rounded-2xl border border-cyan-300/15 bg-cyan-300/[0.04] p-4">
                     <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                       <p className="text-sm font-black text-cyan-100">ตัวอย่างหน้าปก</p>
