@@ -956,9 +956,11 @@ export function AdminPanel({
             placeholder="ปล่อยว่างได้"
             value={link.previewUrl}
           />
-          <span className="mt-2 block rounded-xl bg-cyan-300/[0.06] px-3 py-2 text-[11px] font-bold leading-5 text-cyan-100">
-            Preview ที่ระบบสร้างให้: <span className="break-all text-slate-300">{(link.type === 'Preview Image' ? getImageDisplayUrl(link.previewUrl || link.url) : getEmbeddableUrl(link.previewUrl || link.url, link.type)) || 'ยังไม่มีลิงก์สำหรับ preview'}</span>
-          </span>
+          {link.previewUrl && (
+            <span className="mt-2 block rounded-xl bg-cyan-300/[0.06] px-3 py-2 text-[11px] font-bold leading-5 text-cyan-100">
+              Preview ที่ระบบสร้างให้: <span className="break-all text-slate-300">{link.type === 'Preview Image' ? getImageDisplayUrl(link.previewUrl) : getEmbeddableUrl(link.previewUrl, link.type)}</span>
+            </span>
+          )}
         </label>
       </div>
     </div>
@@ -3305,7 +3307,7 @@ export function AdminPanel({
                 <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
                   <div className="grid gap-4 h-max">
                     <AdminField label="URL หน้าปก" name="cover" onChange={updateForm} placeholder="https://..." value={form.cover} />
-                    <AdminField label="URL ปุ่มดูตัวอย่าง (Preview URL)" name="previewUrl" onChange={updateForm} placeholder="ปล่อยว่างไว้เพื่อใช้จากไฟล์จริง" value={form.previewUrl} />
+                    <AdminField label="URL ปุ่มดูตัวอย่าง (Preview URL)" name="previewUrl" onChange={updateForm} placeholder="ปล่อยว่างได้ถ้าไม่มีตัวอย่าง" value={form.previewUrl} />
                   </div>
                   <div className="rounded-2xl border border-cyan-300/15 bg-cyan-300/[0.04] p-4">
                     <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
