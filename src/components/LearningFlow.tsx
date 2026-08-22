@@ -1,4 +1,5 @@
-import { ArrowRight, CheckCircle2, Clock3, Eye, Layers3, Play, Route } from 'lucide-react'
+import { ArrowRight, BookOpenCheck, CheckCircle2, Clock3, Download, Eye, Layers3, LockKeyhole, Play, Route, Sparkles, Star, X } from 'lucide-react'
+import { getPreviewUrl } from '../lib/media'
 import type { MediaItem } from '../types'
 
 type LearningPath = {
@@ -45,12 +46,14 @@ export function LearningFlow({
   isLoading,
   mode = 'all',
   openDetail,
+  openPreview,
   recentMediaIds,
 }: {
   mediaItems: MediaItem[]
   isLoading?: boolean
   mode?: 'all' | 'continue' | 'paths'
   openDetail: (item: MediaItem) => void
+  openPreview: (item: MediaItem) => void
   recentMediaIds: number[]
 }) {
   const paths = buildLearningPaths(mediaItems)
@@ -136,7 +139,7 @@ export function LearningFlow({
               <div className="p-4">
                 <div className="grid gap-2">
                   {path.items.map((item, index) => (
-                    <button className="group flex min-h-14 items-center gap-3 rounded-2xl px-3 text-left transition hover:bg-cyan-50 dark:hover:bg-white/5" key={item.id} onClick={() => openDetail(item)} type="button">
+                    <button className="group flex min-h-14 items-center gap-3 rounded-2xl px-3 text-left transition hover:bg-cyan-50 dark:hover:bg-white/5" key={item.id} onClick={() => openPreview(item)} type="button">
                       <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-full text-xs font-black ${completed.has(item.id) ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-300/10 dark:text-emerald-300' : 'bg-slate-100 text-slate-500 dark:bg-white/10 dark:text-slate-300'}`}>
                         {completed.has(item.id) ? <CheckCircle2 size={17} /> : index + 1}
                       </span>
@@ -154,6 +157,60 @@ export function LearningFlow({
         })}
       </div></>}
     </section>
+  )
+}
+
+export function QuickPreviewDialog({
+  item,
+  onClose,
+  openDetail,
+}: {
+  item: MediaItem | null
+  onClose: () => void
+  openDetail: (item: MediaItem) => void
+}) {
+  if (!item) return null
+  const previewUrl = getPreviewUrl(item)
+
+  return (
+    <div aria-label={`ดูตัวอย่าง ${item.title}`} aria-modal="true" className="fixed inset-0 z-[85] flex items-center justify-center bg-slate-950/75 p-4 backdrop-blur-xl" role="dialog">
+      <button aria-label="ปิดตัวอย่าง" className="absolute inset-0 cursor-default" onClick={onClose} type="button" />
+      <div className="relative max-h-[92vh] w-full max-w-5xl overflow-y-auto rounded-[2rem] border border-white/20 bg-white shadow-2xl dark:bg-slate-950">
+        <button aria-label="ปิด" className="absolute right-4 top-4 z-20 grid h-11 w-11 place-items-center rounded-2xl bg-slate-950/75 text-white backdrop-blur" onClick={onClose} type="button"><X size={19} /></button>
+        <div className="grid lg:grid-cols-[1.15fr_0.85fr]">
+          <div className="relative min-h-72 overflow-hidden bg-slate-900 lg:min-h-[520px]">
+            {previewUrl ? (
+              <iframe allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" className="absolute inset-0 h-full w-full" referrerPolicy="strict-origin-when-cross-origin" src={previewUrl} title={`ตัวอย่าง ${item.title}`} />
+            ) : (
+              <>
+                <img alt={item.title} className="absolute inset-0 h-full w-full object-cover" src={item.cover} />
+                <div className="absolute inset-0 bg-gradient-to-t from-slate-950/85 via-slate-950/15 to-transparent" />
+                <div className="absolute inset-x-0 bottom-0 p-6 text-white">
+                  <p className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-black/25 px-3 py-1 text-xs font-black backdrop-blur"><LockKeyhole size={14} /> ตัวอย่างแบบปลอดภัย</p>
+                  <p className="mt-3 text-sm font-semibold text-slate-200">ลิงก์จริงจะแสดงหลังระบบตรวจสอบสิทธิ์ในหน้ารายละเอียด</p>
+                </div>
+              </>
+            )}
+          </div>
+          <div className="flex flex-col p-6 sm:p-8">
+            <div className="flex flex-wrap gap-2">
+              <span className="rounded-full bg-cyan-100 px-3 py-1 text-xs font-black text-cyan-800 dark:bg-cyan-300/10 dark:text-cyan-200">{item.topic}</span>
+              <span className="rounded-full bg-violet-100 px-3 py-1 text-xs font-black text-violet-800 dark:bg-violet-300/10 dark:text-violet-200">{item.access}</span>
+              <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-600 dark:bg-white/10 dark:text-slate-300">{item.source}</span>
+            </div>
+            <p className="mt-6 inline-flex items-center gap-2 text-xs font-black tracking-[0.18em] text-cyan-700 dark:text-cyan-300"><Sparkles size={15} /> QUICK PREVIEW</p>
+            <h2 className="mt-2 text-3xl font-black leading-tight text-slate-950 dark:text-white">{item.title}</h2>
+            <p className="mt-4 leading-7 text-slate-600 dark:text-slate-300">{item.description}</p>
+            <div className="mt-6 grid grid-cols-3 gap-2">
+              <div className="rounded-2xl bg-slate-100 p-3 text-center dark:bg-white/5"><Eye className="mx-auto text-cyan-600" size={18} /><p className="mt-1 font-black">{item.views.toLocaleString('th-TH')}</p><p className="text-[10px] font-bold text-slate-500">เข้าชม</p></div>
+              <div className="rounded-2xl bg-slate-100 p-3 text-center dark:bg-white/5"><Download className="mx-auto text-cyan-600" size={18} /><p className="mt-1 font-black">{item.downloads.toLocaleString('th-TH')}</p><p className="text-[10px] font-bold text-slate-500">ดาวน์โหลด</p></div>
+              <div className="rounded-2xl bg-slate-100 p-3 text-center dark:bg-white/5"><Star className="mx-auto fill-amber-400 text-amber-400" size={18} /><p className="mt-1 font-black">{item.rating.toFixed(1)}</p><p className="text-[10px] font-bold text-slate-500">คะแนน</p></div>
+            </div>
+            <button className="mt-auto inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-slate-950 px-5 font-black text-cyan-200 dark:bg-cyan-300 dark:text-slate-950" onClick={() => { openDetail(item); onClose() }} type="button"><BookOpenCheck size={19} /> เปิดรายละเอียดและเริ่มเรียน</button>
+          </div>
+        </div>
+      </div>
+    </div>
   )
 }
 
