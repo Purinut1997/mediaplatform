@@ -55,11 +55,13 @@ function scoreGuideResult(item: MediaItem, query: string) {
 
 export function NexusExpansion({
   mediaItems,
+  isLoading,
   mode = 'all',
   openDetail,
   recentMediaIds,
 }: {
   mediaItems: MediaItem[]
+  isLoading?: boolean
   mode?: 'all' | 'discover' | 'personal' | 'about'
   openDetail: (item: MediaItem) => void
   recentMediaIds: number[]
@@ -73,6 +75,17 @@ export function NexusExpansion({
   const [copied, setCopied] = useState(false)
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null)
   const [installMessage, setInstallMessage] = useState('')
+
+  if (isLoading) {
+    return (
+      <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:py-12">
+        <div className="grid gap-4 lg:grid-cols-[1.3fr_0.7fr]">
+          <div className="h-96 animate-pulse rounded-[2rem] bg-slate-200 dark:bg-slate-800"></div>
+          <div className="h-96 animate-pulse rounded-[2rem] bg-slate-200 dark:bg-slate-800"></div>
+        </div>
+      </section>
+    )
+  }
 
   useEffect(() => {
     const handleInstallPrompt = (event: Event) => {

@@ -1,0 +1,34 @@
+เริ่มทำงานต่อจากโปรเจคนี้
+========================
+
+นี่คือสำเนาโค้ดต้นฉบับของ MIKPURINUT Media Platform
+
+ถ้าย้ายเครื่องมาแล้ว ให้เปิดไฟล์นี้ก่อน
+
+ไฟล์ที่ต้องอ่านก่อนเริ่มงาน:
+1. SYSTEM_STATUS_TH.md
+2. D:\MIKPURINUT_PROJECT_HANDOFF\MIKPURINUT_MEDIA_PLATFORM_HANDOFF_TH.md
+
+คำสั่งเริ่มต้น:
+
+cd /d D:\MIKPURINUT_PROJECT_HANDOFF\mediaplatform-source
+npm install
+npm run dev
+
+คำสั่งตรวจงานก่อน push:
+
+npm run lint
+npm test -- --run
+npm run build
+
+คำสั่งตรวจ Production:
+
+npm run smoke
+
+Prompt สำหรับ Codex:
+
+โปรเจคนี้คือ MIKPURINUT Media Platform
+ก่อนทำอะไรให้คุณอ่านไฟล์ SYSTEM_STATUS_TH.md และ D:\MIKPURINUT_PROJECT_HANDOFF\MIKPURINUT_MEDIA_PLATFORM_HANDOFF_TH.md ก่อน
+หลังอ่านแล้วให้สรุปสถานะระบบปัจจุบันว่า ทำอะไรได้แล้ว เหลืออะไร และควรทำอะไรต่อ
+จากนั้นให้ทำงานต่อจากรายการที่สำคัญที่สุด
+กติกา: ห้ามลบเครดิต Created by MIKPURINUT, ห้าม hardcode secret, ก่อน push ต้องรัน lint/test/build และหลัง deploy ต้องรัน smoke

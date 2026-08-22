@@ -112,3 +112,39 @@ export function CreditBadge() {
     </div>
   )
 }
+
+export function MediaCardSkeleton() {
+  return (
+    <article className="nexus-card grid overflow-hidden rounded-3xl border border-slate-200/50 bg-white/50 backdrop-blur-xl sm:grid-cols-[210px_1fr] dark:border-white/5 dark:bg-white/5">
+      <div className="relative min-h-52 animate-pulse bg-slate-200 sm:min-h-full dark:bg-slate-800"></div>
+      <div className="flex flex-col p-5">
+        <div className="mb-3 flex gap-2">
+          <div className="h-6 w-20 animate-pulse rounded-xl bg-slate-200 dark:bg-slate-800"></div>
+          <div className="h-6 w-24 animate-pulse rounded-xl bg-slate-200 dark:bg-slate-800"></div>
+        </div>
+        <div className="mb-3 flex gap-2">
+          <div className="h-5 w-16 animate-pulse rounded-full bg-slate-200 dark:bg-slate-800"></div>
+          <div className="h-5 w-16 animate-pulse rounded-full bg-slate-200 dark:bg-slate-800"></div>
+        </div>
+        <div className="mb-2 h-7 w-3/4 animate-pulse rounded-lg bg-slate-200 dark:bg-slate-800"></div>
+        <div className="mb-4 h-4 w-full animate-pulse rounded bg-slate-200 dark:bg-slate-800"></div>
+        <div className="mt-auto flex items-center justify-between">
+          <div className="flex gap-2">
+            <div className="h-10 w-24 animate-pulse rounded-xl bg-slate-200 dark:bg-slate-800"></div>
+            <div className="h-10 w-24 animate-pulse rounded-xl bg-slate-200 dark:bg-slate-800"></div>
+          </div>
+        </div>
+      </div>
+    </article>
+  )
+}
+
+export function ServiceCardSkeleton() {
+  return (
+    <div className="relative grid aspect-square w-full place-items-center overflow-hidden rounded-2xl border border-slate-200/50 bg-white/50 shadow-sm dark:border-white/5 dark:bg-white/5">
+      <div className="h-12 w-12 animate-pulse rounded-full bg-slate-200 dark:bg-slate-800"></div>
+      <div className="absolute bottom-2 left-2 h-4 w-12 animate-pulse rounded-full bg-slate-200 dark:bg-slate-800"></div>
+      <div className="absolute top-2 right-2 h-6 w-6 animate-pulse rounded-full bg-slate-200 dark:bg-slate-800"></div>
+    </div>
+  )
+}

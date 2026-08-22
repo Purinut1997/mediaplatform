@@ -29,7 +29,12 @@ import type {
   View,
 } from './types'
 import { readJson } from './lib/api'
-import { canAccessAdmin, canViewMedia, normalizeAssetUrl } from './lib/media'
+import {
+  canAccessAdmin,
+  canViewMedia,
+  getPreviewUrl,
+  normalizeAssetUrl,
+} from './lib/media'
 import { paymentProofAccept, paymentProofHelpText, readPaymentProof } from './lib/payment-proof'
 import { LOGO_URL } from './brand'
 import { TechBackground } from './components/TechBackground'
@@ -42,7 +47,7 @@ import { SupportWidget } from './components/SupportWidget'
 import { MediaDetail } from './components/MediaDetail'
 import { VipTermsDialog } from './components/VipTermsDialog'
 import { DiscoverySpotlight, SmartSearchDialog } from './components/HomeExperience'
-import { LearningFlow, QuickPreviewDialog } from './components/LearningFlow'
+import { LearningFlow } from './components/LearningFlow'
 import { NexusExpansion } from './components/NexusExpansion'
 import { EServicePanel } from './components/EServicePanel'
 import { defaultSiteSettings, mediaItems, topics } from './defaults'
@@ -111,7 +116,6 @@ function App() {
   const [menuOpen, setMenuOpen] = useState(false)
   const [smartSearchOpen, setSmartSearchOpen] = useState(false)
   const [homeSection, setHomeSection] = useState<HomeSection>('overview')
-  const [previewItem, setPreviewItem] = useState<MediaItem | null>(null)
   const [recentMediaIds, setRecentMediaIds] = useState<number[]>(() => {
     try {
       const value = JSON.parse(window.localStorage.getItem('nexus-recent-media') ?? '[]')
@@ -424,6 +428,7 @@ function App() {
           menuOpen={menuOpen}
           onLogout={logout}
           onOpenSearch={() => setSmartSearchOpen(true)}
+          sessionReady={sessionReady}
           setMenuOpen={setMenuOpen}
           setTheme={setTheme}
           setView={setView}
@@ -440,30 +445,31 @@ function App() {
           {view === 'home' && (
             <>
               <Hero
-                mediaCount={mediaTotal || mediaRecords.length || mediaItems.length}
+                isLoading={dataStatus === 'loading'}
+                mediaCount={mediaTotal || mediaRecords.length}
                 settings={siteSettings}
                 setView={setView}
-                totalDownloads={(mediaRecords.length ? mediaRecords : mediaItems).reduce((sum, item) => sum + item.downloads, 0)}
+                totalDownloads={mediaRecords.reduce((sum, item) => sum + item.downloads, 0)}
               />
               <PortalTiles active={homeSection} onSelect={setHomeSection} />
-              {(homeSection === 'overview' || homeSection === 'discover') && <DiscoverySpotlight mediaItems={mediaRecords.length ? mediaRecords : mediaItems} openDetail={openDetail} openSearch={() => setSmartSearchOpen(true)} />}
+              {(homeSection === 'overview' || homeSection === 'discover') && <DiscoverySpotlight isLoading={dataStatus === 'loading'} mediaItems={mediaRecords} openDetail={openDetail} openSearch={() => setSmartSearchOpen(true)} />}
               {homeSection === 'overview' && <LearningFlow
-                mediaItems={mediaRecords.length ? mediaRecords : mediaItems}
+                isLoading={dataStatus === 'loading'}
+                mediaItems={mediaRecords}
                 mode="continue"
                 openDetail={openDetail}
-                openPreview={setPreviewItem}
                 recentMediaIds={recentMediaIds}
               />}
               {homeSection === 'learn' && <LearningFlow
-                mediaItems={mediaRecords.length ? mediaRecords : mediaItems}
+                isLoading={dataStatus === 'loading'}
+                mediaItems={mediaRecords}
                 mode="paths"
                 openDetail={openDetail}
-                openPreview={setPreviewItem}
                 recentMediaIds={recentMediaIds}
               />}
-              {homeSection === 'discover' && <NexusExpansion mediaItems={mediaRecords.length ? mediaRecords : mediaItems} mode="discover" openDetail={openDetail} recentMediaIds={recentMediaIds} />}
-              {homeSection === 'personal' && <NexusExpansion mediaItems={mediaRecords.length ? mediaRecords : mediaItems} mode="personal" openDetail={openDetail} recentMediaIds={recentMediaIds} />}
-              {homeSection === 'about' && <><NexusExpansion mediaItems={mediaRecords.length ? mediaRecords : mediaItems} mode="about" openDetail={openDetail} recentMediaIds={recentMediaIds} /><HomeJourney currentUser={currentUser} setView={setView} /></>}
+              {homeSection === 'discover' && <NexusExpansion isLoading={dataStatus === 'loading'} mediaItems={mediaRecords} mode="discover" openDetail={openDetail} recentMediaIds={recentMediaIds} />}
+              {homeSection === 'personal' && <NexusExpansion isLoading={dataStatus === 'loading'} mediaItems={mediaRecords} mode="personal" openDetail={openDetail} recentMediaIds={recentMediaIds} />}
+              {homeSection === 'about' && <><NexusExpansion isLoading={dataStatus === 'loading'} mediaItems={mediaRecords} mode="about" openDetail={openDetail} recentMediaIds={recentMediaIds} /><HomeJourney currentUser={currentUser} setView={setView} /></>}
             </>
           )}
           {view === 'media' && (
@@ -483,7 +489,6 @@ function App() {
               mediaTag={mediaTag}
               onLoadMore={() => void loadMoreMedia()}
               openDetail={openDetail}
-              openPreview={setPreviewItem}
               query={query}
               setQuery={setQuery}
               setMediaAccess={setMediaAccess}
@@ -603,7 +608,7 @@ function App() {
         open={smartSearchOpen}
         openDetail={openDetail}
       />
-      <QuickPreviewDialog item={previewItem} onClose={() => setPreviewItem(null)} openDetail={openDetail} />
+
       {toast && <Toast message={toast} />}
       {showSuccess && (
         <Popup
@@ -650,7 +655,6 @@ function MediaSection({
   topic,
   topics,
   openDetail,
-  openPreview,
   expanded,
 }: {
   currentUser: CurrentUser | null
@@ -677,7 +681,6 @@ function MediaSection({
   topic: string
   topics: string[]
   openDetail: (item: MediaItem) => void
-  openPreview: (item: MediaItem) => void
   expanded?: boolean
 }) {
   const [showFilters, setShowFilters] = useState(false)
@@ -759,7 +762,7 @@ function MediaSection({
       ) : (
         <div className="mt-6 grid gap-4 lg:grid-cols-2">
           {filteredMedia.map((item) => (
-            <MediaCard item={item} key={item.id} openDetail={openDetail} openPreview={openPreview} />
+            <MediaCard item={item} key={item.id} openDetail={openDetail} />
           ))}
         </div>
       )}
@@ -893,13 +896,11 @@ function MediaCard({
   isFavorite,
   item,
   openDetail,
-  openPreview,
   onToggleFavorite,
 }: {
   isFavorite?: boolean
   item: MediaItem
   openDetail: (item: MediaItem) => void
-  openPreview?: (item: MediaItem) => void
   onToggleFavorite?: (item: MediaItem) => void
 }) {
   return (
@@ -969,9 +970,9 @@ function MediaCard({
           </span>
         </div>
         <div className="mt-5 grid gap-2 sm:grid-cols-2">
-          {openPreview && <button className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 font-black text-slate-700 transition hover:border-cyan-300 dark:border-white/10 dark:bg-white/5 dark:text-white" onClick={() => openPreview(item)} type="button"><Eye size={18} />ดูตัวอย่าง</button>}
+          {getPreviewUrl(item) && <a className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 font-black text-slate-700 transition hover:border-cyan-300 dark:border-white/10 dark:bg-white/5 dark:text-white" href={getPreviewUrl(item)} rel="noopener noreferrer" target="_blank"><Eye size={18} />ดูตัวอย่าง</a>}
           <button
-            className={`inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-slate-950 px-4 font-black text-cyan-200 shadow-lg shadow-slate-900/10 transition hover:-translate-y-0.5 dark:bg-cyan-300 dark:text-slate-950 ${openPreview ? '' : 'sm:col-span-2'}`}
+            className={`inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-slate-950 px-4 font-black text-cyan-200 shadow-lg shadow-slate-900/10 transition hover:-translate-y-0.5 dark:bg-cyan-300 dark:text-slate-950 ${getPreviewUrl(item) ? '' : 'sm:col-span-2'}`}
             onClick={() => openDetail(item)}
             type="button"
           >

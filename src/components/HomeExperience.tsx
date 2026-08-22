@@ -22,10 +22,12 @@ function metric(value: number) {
 
 export function DiscoverySpotlight({
   mediaItems,
+  isLoading,
   openDetail,
   openSearch,
 }: {
   mediaItems: MediaItem[]
+  isLoading?: boolean
   openDetail: (item: MediaItem) => void
   openSearch: () => void
 }) {
@@ -35,6 +37,21 @@ export function DiscoverySpotlight({
   )
   const featured = ranked[0]
   const trending = ranked.slice(0, 3)
+
+  if (isLoading) {
+    return (
+      <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:py-12">
+        <div className="mb-5 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+          <div className="h-12 w-64 animate-pulse rounded-2xl bg-slate-200 dark:bg-slate-800"></div>
+          <div className="h-12 w-40 animate-pulse rounded-2xl bg-slate-200 dark:bg-slate-800"></div>
+        </div>
+        <div className="grid gap-4 lg:grid-cols-[1.25fr_0.75fr]">
+          <div className="min-h-[420px] animate-pulse rounded-[2rem] bg-slate-200 dark:bg-slate-800"></div>
+          <div className="min-h-[200px] rounded-[2rem] animate-pulse border bg-slate-200 p-5 dark:bg-slate-800 sm:p-6"></div>
+        </div>
+      </section>
+    )
+  }
 
   if (!featured) return null
 

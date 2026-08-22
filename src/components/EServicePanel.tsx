@@ -18,8 +18,8 @@ import {
   Trash2,
   X,
 } from 'lucide-react'
-import { LOGO_URL } from '../brand'
 import type { CurrentUser, EServiceItem, EServiceQuota, View } from '../types'
+import { ServiceCardSkeleton } from './SharedUI'
 
 type ServiceSource = 'purchased' | 'custom' | 'demo'
 
@@ -39,14 +39,7 @@ const emptyForm: ServiceForm = { category: defaultCategory, description: '', ico
 const maxIconSourceBytes = 12 * 1024 * 1024
 const maxIconOutputBytes = 80 * 1024
 
-const demoServices: ServiceItem[] = [
-  { id: 'demo-student', title: 'ระบบดูแลนักเรียน', description: 'ข้อมูลนักเรียนและงานดูแลช่วยเหลือ', category: 'นักเรียน', url: 'https://example.com', iconDataUrl: LOGO_URL, pinned: true, source: 'demo', sortOrder: 10 },
-  { id: 'demo-bigdata', title: 'School Big Data', description: 'แดชบอร์ดข้อมูลเพื่อการบริหาร', category: 'บริหาร', url: 'https://example.com', iconDataUrl: '', pinned: true, source: 'demo', sortOrder: 20 },
-  { id: 'demo-attendance', title: 'ระบบเช็กชื่อออนไลน์', description: 'บันทึกเวลาเรียนและสรุปการมาเรียน', category: 'นักเรียน', url: 'https://example.com', iconDataUrl: '', pinned: false, source: 'demo', sortOrder: 30 },
-  { id: 'demo-safety', title: 'แจ้งเตือนภัยในโรงเรียน', description: 'ช่องทางแจ้งเหตุและติดตามสถานะ', category: 'ความปลอดภัย', url: 'https://example.com', iconDataUrl: '', pinned: false, source: 'demo', sortOrder: 40 },
-  { id: 'demo-mis', title: 'School MIS', description: 'ศูนย์รวมงานสารสนเทศโรงเรียน', category: 'บริหาร', url: 'https://example.com', iconDataUrl: '', pinned: false, source: 'demo', sortOrder: 50 },
-  { id: 'demo-dmc', title: 'DMC Portal', description: 'ทางลัดเข้าสู่ระบบข้อมูลนักเรียน', category: 'ภายนอก', url: 'https://example.com', iconDataUrl: '', pinned: false, source: 'demo', sortOrder: 60 },
-]
+
 
 function safeServiceUrl(value: string) {
   try {
@@ -122,7 +115,7 @@ export function EServicePanel({ currentUser, setView }: { currentUser: CurrentUs
   const [error, setError] = useState('')
   const [iconStatus, setIconStatus] = useState('')
 
-  const allServices = currentUser ? services : demoServices
+  const allServices = currentUser ? services : []
   const customLimit = quota.limit ?? Number.POSITIVE_INFINITY
   const customCount = quota.used
   const quotaReached = Number.isFinite(customLimit) && customCount >= customLimit
@@ -322,7 +315,7 @@ export function EServicePanel({ currentUser, setView }: { currentUser: CurrentUs
         {categories.map((item) => <button className={`inline-flex min-h-11 shrink-0 items-center gap-2 rounded-2xl px-4 text-sm font-black transition ${category === item ? 'bg-slate-950 text-cyan-200 shadow-lg shadow-cyan-500/10 dark:bg-cyan-300 dark:text-slate-950' : 'border border-slate-200 bg-white/70 text-slate-600 hover:border-cyan-300 dark:border-white/10 dark:bg-white/5 dark:text-slate-300'}`} key={item} onClick={() => setCategory(item)} type="button"><FolderKanban size={16} />{item}<span className={`rounded-full px-2 py-0.5 text-[10px] ${category === item ? 'bg-white/20' : 'bg-cyan-100 text-cyan-700 dark:bg-cyan-300/10 dark:text-cyan-200'}`}>{item === allCategory ? allServices.length : (categoryCounts[item] ?? 0)}</span></button>)}
       </div>
 
-      {loading && !services.length ? <div className="mt-6 rounded-[2rem] border border-dashed border-cyan-300/30 p-12 text-center font-black text-cyan-700">กำลังโหลด E‑Service...</div> : groupedSections.length ? <div className="mt-6 space-y-7">{groupedSections.map((section) => (
+      {loading ? <div className="mt-6 space-y-7"><section className="rounded-[2rem] border border-cyan-300/15 bg-white/55 p-4 shadow-xl shadow-cyan-950/5 backdrop-blur dark:bg-slate-950/35"><div className="mb-4"><div className="h-6 w-32 animate-pulse rounded bg-slate-200 dark:bg-slate-800"></div></div><div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">{Array.from({ length: 5 }).map((_, i) => <ServiceCardSkeleton key={i} />)}</div></section></div> : groupedSections.length ? <div className="mt-6 space-y-7">{groupedSections.map((section) => (
         <section className="rounded-[2rem] border border-cyan-300/15 bg-white/55 p-4 shadow-xl shadow-cyan-950/5 backdrop-blur dark:bg-slate-950/35" key={section.name}>
           <div className="mb-4 flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
             <div>

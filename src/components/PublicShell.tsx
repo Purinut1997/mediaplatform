@@ -122,24 +122,26 @@ function NotificationInbox({ setView }: { setView: (view: View) => void }) {
 
 export function Header({
   currentUser,
-  theme,
-  view,
   menuOpen,
   onLogout,
   onOpenSearch,
   setMenuOpen,
   setTheme,
   setView,
+  theme,
+  view,
+  sessionReady,
 }: {
   currentUser: CurrentUser | null
-  theme: Theme
-  view: View
   menuOpen: boolean
   onLogout: () => void
   onOpenSearch: () => void
   setMenuOpen: (value: boolean) => void
   setTheme: (theme: Theme) => void
   setView: (view: View) => void
+  theme: Theme
+  view: View
+  sessionReady?: boolean
 }) {
   const nav = [
     { label: 'หน้าหลัก', value: 'home' as View },
@@ -185,7 +187,9 @@ export function Header({
             {theme === 'dark' ? <Sun size={19} /> : <Moon size={19} />}
           </button>
           {canAccessAdmin(currentUser) && <NotificationInbox setView={setView} />}
-          {currentUser ? (
+          {sessionReady === false ? (
+            <div className="hidden min-h-11 w-32 animate-pulse rounded-xl bg-slate-200 dark:bg-slate-800 sm:inline-flex"></div>
+          ) : currentUser ? (
             <button aria-label={`เปิดโปรไฟล์ ${currentUser.name}`} className={`hidden min-h-11 max-w-52 items-center rounded-xl px-4 text-sm font-black shadow-lg transition hover:-translate-y-0.5 sm:inline-flex ${view === 'profile' ? 'bg-cyan-500 text-white ring-2 ring-cyan-300/40 dark:bg-cyan-300 dark:text-slate-950' : 'bg-slate-950 text-cyan-200 shadow-slate-900/15 dark:bg-cyan-300 dark:text-slate-950'}`} onClick={() => setView('profile')} title={`โปรไฟล์: ${currentUser.name}`} type="button">
               <UserCircle2 className="mr-2 shrink-0" size={18} />
               <span className="truncate whitespace-nowrap">{currentUser.name}</span>
@@ -228,12 +232,23 @@ export function Hero({
   totalDownloads,
   setView,
   settings,
+  isLoading,
 }: {
   mediaCount: number
   totalDownloads: number
   setView: (view: View) => void
   settings: SiteSettings
+  isLoading?: boolean
 }) {
+  if (isLoading) {
+    return (
+      <section className="mx-auto max-w-7xl px-4 pb-8 pt-8 sm:px-6 lg:pt-12">
+        <div className="nexus-hero grid h-[500px] animate-pulse overflow-hidden rounded-[2rem] border bg-slate-200 dark:bg-slate-800 lg:grid-cols-[0.9fr_1.1fr]">
+        </div>
+      </section>
+    )
+  }
+
   return (
     <section className="mx-auto max-w-7xl px-4 pb-8 pt-8 sm:px-6 lg:pt-12">
       <div className="nexus-hero grid overflow-hidden rounded-[2rem] border backdrop-blur-2xl lg:grid-cols-[0.9fr_1.1fr]">
