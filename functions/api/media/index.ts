@@ -82,7 +82,7 @@ function readLinks(body: MediaPayload, title: string) {
       previewUrl: optionalHttpUrl(link.previewUrl, `ลิงก์ตัวอย่างรายการที่ ${index + 1}`),
       access: mediaAccess(link.access, mediaAccess(body.access)),
     }))
-    .filter((link) => link.url)
+    .filter((link) => link.url || link.previewUrl)
 
   const resourceUrl = optionalHttpUrl(body.resourceUrl, 'ลิงก์ไฟล์หลัก')
   if (!normalized.length && resourceUrl) {

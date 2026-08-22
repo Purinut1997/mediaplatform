@@ -1045,7 +1045,9 @@ export function AdminPanel({
           source: primaryLink?.type ?? form.source,
           resourceUrl: primaryLink?.url || form.resourceUrl,
           previewUrl: primaryLink?.previewUrl || form.previewUrl,
-          links: cleanLinks.length ? cleanLinks : form.links,
+          links: (cleanLinks.length ? cleanLinks : form.links).map((link, i) => 
+            i === 0 && !link.previewUrl && form.previewUrl ? { ...link, previewUrl: form.previewUrl.trim() } : link
+          ),
           tags: form.tags
             .split(',')
             .map((tag) => tag.trim())
