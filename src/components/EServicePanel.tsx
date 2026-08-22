@@ -115,7 +115,7 @@ export function EServicePanel({ currentUser, setView }: { currentUser: CurrentUs
   const [error, setError] = useState('')
   const [iconStatus, setIconStatus] = useState('')
 
-  const allServices = currentUser ? services : []
+  const allServices = useMemo(() => currentUser ? services : [], [currentUser, services])
   const customLimit = quota.limit ?? Number.POSITIVE_INFINITY
   const customCount = quota.used
   const quotaReached = Number.isFinite(customLimit) && customCount >= customLimit
