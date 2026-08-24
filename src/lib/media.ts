@@ -165,9 +165,9 @@ export function getEmbeddableUrl(link = '', source = '') {
 export function getPreviewUrl(item: MediaItem) {
   const primaryLink =
     item.links?.find((link) => link.type !== 'Preview Image' && link.previewUrl && !isPreviewImageUrl(link.previewUrl)) ??
-    item.links?.find((link) => link.type === 'YouTube' && link.previewUrl) ??
+    item.links?.find((link) => link.type === 'YouTube') ??
     item.links?.find((link) => link.type !== 'Preview Image')
-  const link = primaryLink?.previewUrl || item.previewUrl || ''
+  const link = primaryLink?.previewUrl || item.previewUrl || primaryLink?.url || item.resourceUrl || ''
   if (!link) return ''
 
   const source = primaryLink?.type || item.source

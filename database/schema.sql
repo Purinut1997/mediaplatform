@@ -164,6 +164,24 @@ create table if not exists media_issue_reports (
   updated_at timestamptz not null default now()
 );
 
+create table if not exists support_tickets (
+  id serial primary key,
+  user_id integer references users(id) on delete set null,
+  name varchar(80) not null,
+  email varchar(254) not null,
+  category text not null default 'general' check (category in ('general', 'bug', 'account', 'payment', 'suggestion')),
+  subject varchar(120) not null,
+  detail text not null,
+  page_url text not null default '',
+  status text not null default 'pending' check (status in ('pending', 'reviewing', 'resolved', 'rejected')),
+  admin_note text not null default '',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists support_tickets_status_idx on support_tickets(status, created_at desc);
+create index if not exists support_tickets_email_idx on support_tickets(email, created_at desc);
+
 create index if not exists media_status_topic_idx on media(status, topic);
 create index if not exists media_deleted_updated_idx on media(deleted_at, updated_at desc);
 create index if not exists media_access_idx on media(access_level);
