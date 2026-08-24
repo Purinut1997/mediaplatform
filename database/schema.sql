@@ -151,6 +151,20 @@ create table if not exists app_settings (
   updated_at timestamptz not null default now()
 );
 
+create table if not exists notifications (
+  id serial primary key,
+  audience text not null default 'superadmin',
+  type text not null,
+  title text not null,
+  detail text not null,
+  tone text not null default 'sky',
+  target_type text,
+  target_id text,
+  fingerprint text not null unique,
+  read_at timestamptz,
+  created_at timestamptz not null default now()
+);
+
 create table if not exists media_issue_reports (
   id serial primary key,
   media_id integer not null references media(id) on delete cascade,

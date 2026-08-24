@@ -115,6 +115,40 @@ export async function ensureSchema(env: Env) {
       await sql`create index if not exists refund_requests_user_idx on refund_requests(user_id, created_at desc)`
       await sql`create index if not exists refund_requests_status_idx on refund_requests(status, created_at desc)`
       await sql`
+        create table if not exists notifications (
+          id serial primary key,
+          audience text not null default 'superadmin',
+          type text not null,
+          title text not null,
+          detail text not null,
+          tone text not null default 'sky',
+          target_type text,
+          target_id text,
+          fingerprint text not null unique,
+          read_at timestamptz,
+          created_at timestamptz not null default now()
+        )
+      `
+      await sql`create index if not exists notifications_inbox_idx on notifications(audience, read_at, created_at desc)`
+      await sql`
+        create table if not exists support_tickets (
+          id serial primary key,
+          user_id integer references users(id) on delete set null,
+          name varchar(80) not null,
+          email varchar(254) not null,
+          category text not null default 'general' check (category in ('general', 'bug', 'account', 'payment', 'suggestion')),
+          subject varchar(120) not null,
+          detail text not null,
+          page_url text not null default '',
+          status text not null default 'pending' check (status in ('pending', 'reviewing', 'resolved', 'rejected')),
+          admin_note text not null default '',
+          created_at timestamptz not null default now(),
+          updated_at timestamptz not null default now()
+        )
+      `
+      await sql`create index if not exists support_tickets_status_idx on support_tickets(status, created_at desc)`
+      await sql`create index if not exists support_tickets_email_idx on support_tickets(email, created_at desc)`
+      await sql`
         update app_settings
         set value = jsonb_set(value, '{vipLifetimeEnabled}', 'false'::jsonb, true),
             updated_at = now()
