@@ -8,7 +8,12 @@ import {
   BarChart3,
   Bell,
   CalendarDays,
+  Check,
   CheckCircle2,
+  ChevronDown,
+  ChevronUp,
+  ChevronsLeft,
+  ChevronsRight,
   Copy,
   Crown,
   Database,
@@ -20,12 +25,15 @@ import {
   Gauge,
   ImageIcon,
   Layers3,
+  LayoutGrid,
   Link2,
+  List,
   Loader2,
   Mail,
   PlayCircle,
   Plus,
   Pencil,
+  RotateCcw,
   Search,
   Settings,
   ShieldCheck,
@@ -75,8 +83,6 @@ type MemberAccessFilter = 'all' | 'member' | 'vip' | 'expiring' | 'expired'
 type MemberStatusFilter = 'all' | 'active' | 'disabled'
 type MemberRoleFilter = 'all' | 'member' | 'staff' | 'manageable'
 
-const memberPageSize = 24
-
 export function AdminPanel({
   currentUser,
   mediaItems,
@@ -110,6 +116,18 @@ export function AdminPanel({
   const [adminMediaTotal, setAdminMediaTotal] = useState(mediaItems.length)
   const [loadingAdminMedia, setLoadingAdminMedia] = useState(false)
   const [showMediaTrash, setShowMediaTrash] = useState(false)
+  const [mediaViewMode, setMediaViewMode] = useState<'table' | 'grid'>('table')
+  const [showMediaForm, setShowMediaForm] = useState(false)
+  const [showAdvancedToken, setShowAdvancedToken] = useState(false)
+  const [memberPageSize, setMemberPageSize] = useState(24)
+  const [memberTableViewMode, setMemberTableViewMode] = useState<'table' | 'grid'>('table')
+  const [taxonomySearch, setTaxonomySearch] = useState('')
+  const [tagSortOrder, setTagSortOrder] = useState<'count' | 'alpha'>('count')
+  const [showAllTags, setShowAllTags] = useState(false)
+  const [linkFilterStatus, setLinkFilterStatus] = useState<'all' | 'ok' | 'warning' | 'error'>('all')
+  const [linkSearchQuery, setLinkSearchQuery] = useState('')
+  const [linkPage, setLinkPage] = useState(1)
+  const linkPageSize = 20
   const [selectedMediaIds, setSelectedMediaIds] = useState<Set<number>>(() => new Set())
   const [bulkMediaStatus, setBulkMediaStatus] = useState<MediaStatus>('ฉบับร่าง')
   const [bulkMediaTopic, setBulkMediaTopic] = useState(topics[0] ?? 'โรงเรียน')
@@ -174,6 +192,7 @@ export function AdminPanel({
   const [errorQuery, setErrorQuery] = useState('')
   const [errorDate, setErrorDate] = useState<AdminDateFilter>('ทั้งหมด')
   const [errorSeverity, setErrorSeverity] = useState<'ทั้งหมด' | 'Auth' | 'Bot' | 'API' | 'Telegram'>('ทั้งหมด')
+  const [copiedErrorId, setCopiedErrorId] = useState<number | null>(null)
   const [loadingMembers, setLoadingMembers] = useState(false)
   const [loadingOps, setLoadingOps] = useState(false)
   const [error, setError] = useState('')
@@ -336,11 +355,13 @@ export function AdminPanel({
     page = memberPage,
     query = memberQuery,
     filters: Partial<{ access: MemberAccessFilter; status: MemberStatusFilter; role: MemberRoleFilter }> = {},
+    customPageSize?: number,
   ) => {
     setLoadingMembers(true)
     setMemberError('')
     try {
-      const params = new URLSearchParams({ page: String(page), pageSize: String(memberPageSize) })
+      const activeSize = customPageSize ?? memberPageSize
+      const params = new URLSearchParams({ page: String(page), pageSize: String(activeSize) })
       if (query.trim()) params.set('query', query.trim())
       params.set('access', filters.access ?? memberAccessFilter)
       params.set('status', filters.status ?? memberStatusFilter)
@@ -980,6 +1001,7 @@ export function AdminPanel({
   const startEditMedia = (item: MediaItem) => {
     setAdminSection('media')
     setEditingMediaId(item.id)
+    setShowMediaForm(true)
     setForm({
       title: item.title,
       topic: item.topic,
@@ -1016,12 +1038,15 @@ export function AdminPanel({
       changelog: item.changelog || '',
       notifyUpdate: false,
     })
-    document.getElementById('admin-create-media')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    setTimeout(() => {
+      document.getElementById('admin-create-media')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 50)
   }
 
   const resetMediaForm = () => {
     setEditingMediaId(null)
     setForm(createEmptyMediaForm(topics[0]))
+    setShowMediaForm(false)
   }
 
   const handleDownloadCsvTemplate = () => {
@@ -1236,8 +1261,8 @@ export function AdminPanel({
     setSelectedMediaIds(allSelected ? new Set() : new Set(visibleIds))
   }
 
-  const runBulkMediaAction = async (action: 'status' | 'topic' | 'delete', value = '') => {
-    const ids = Array.from(selectedMediaIds)
+  const runBulkMediaAction = async (action: 'status' | 'topic' | 'delete', value = '', targetIds?: number[]) => {
+    const ids = targetIds ?? Array.from(selectedMediaIds)
     if (!ids.length) return
     if (action === 'delete' && !window.confirm(`ลบสื่อที่เลือก ${ids.length} รายการใช่ไหม? การดำเนินการนี้ย้อนกลับไม่ได้`)) return
 
@@ -1252,7 +1277,7 @@ export function AdminPanel({
       })
       const result = await readJson<{ updated?: number; error?: string }>(response)
       if (!response.ok) throw new Error(result.error ?? 'จัดการสื่อหลายรายการไม่สำเร็จ')
-      setSelectedMediaIds(new Set())
+      if (!targetIds) setSelectedMediaIds(new Set())
       await loadAdminMediaPage(adminMediaPage)
       onCreated()
     } catch (bulkError) {
@@ -1374,14 +1399,22 @@ export function AdminPanel({
               ศูนย์ควบคุมคลังสื่อ สิทธิ์สมาชิก VIP และข้อความหน้าเว็บ ใช้ตรวจงาน อนุมัติสื่อ และดูแลระบบจากพื้นที่เดียว
             </p>
           </div>
-          <a
-            onClick={() => setAdminSection('media')}
-            className="admin-primary-action inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl px-5 font-black transition"
-            href="#admin-create-media"
+          <button
+            onClick={() => {
+              setAdminSection('media')
+              setEditingMediaId(null)
+              setForm(createEmptyMediaForm(topics[0]))
+              setShowMediaForm(true)
+              setTimeout(() => {
+                document.getElementById('admin-create-media')?.scrollIntoView({ behavior: 'smooth' })
+              }, 50)
+            }}
+            className="admin-primary-action inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl px-5 font-black transition cursor-pointer"
+            type="button"
           >
             <Plus size={20} />
             เพิ่มสื่อใหม่
-          </a>
+          </button>
         </div>
 
         <div className="admin-stat-grid grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -1738,20 +1771,156 @@ export function AdminPanel({
 
               {memberView !== 'requests' && (
               <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-                <div className="mb-3 flex flex-col gap-3">
-                  <div className="flex items-center justify-between gap-3">
+                <div className="mb-4 flex flex-col gap-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div>
-                      <p className="font-black text-white">
+                      <p className="font-black text-white text-lg">
                         {memberView === 'vip' ? 'สมาชิก VIP' : memberView === 'admins' ? 'บัญชีผู้ดูแลระบบ' : 'รายชื่อสมาชิก'}
                       </p>
-                      <p className="mt-1 text-xs font-semibold text-slate-400">
-                        แสดงครั้งละ {memberPageSize.toLocaleString('th-TH')} บัญชี และแบ่งหน้าอัตโนมัติ
+                      <p className="mt-0.5 text-xs font-semibold text-slate-400">
+                        ค้นหา ตรวจสอบอายุ VIP ปรับบทบาท และดูแลสถานะบัญชี
                       </p>
                     </div>
-                    <span className="text-xs font-bold text-slate-400">
-                      {memberTotal.toLocaleString('th-TH')} บัญชี
-                    </span>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <div className="flex items-center rounded-xl border border-white/10 bg-black/20 p-1">
+                        <button
+                          type="button"
+                          onClick={() => setMemberTableViewMode('table')}
+                          className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-black transition ${
+                            memberTableViewMode === 'table' ? 'bg-cyan-300 text-slate-950 shadow-sm' : 'text-slate-400 hover:text-white'
+                          }`}
+                          title="มุมมองตาราง (กะทัดรัด)"
+                        >
+                          <List size={14} />
+                          ตาราง
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setMemberTableViewMode('grid')}
+                          className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-black transition ${
+                            memberTableViewMode === 'grid' ? 'bg-cyan-300 text-slate-950 shadow-sm' : 'text-slate-400 hover:text-white'
+                          }`}
+                          title="มุมมองการ์ด"
+                        >
+                          <LayoutGrid size={14} />
+                          การ์ด
+                        </button>
+                      </div>
+                      <span className="rounded-xl bg-cyan-300/10 px-3 py-1.5 text-xs font-bold text-cyan-200">
+                        {memberTotal.toLocaleString('th-TH')} บัญชี
+                      </span>
+                    </div>
                   </div>
+
+                  {/* Quick Filter Chips for Members */}
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMemberAccessFilter('all')
+                        setMemberStatusFilter('all')
+                        setMemberRoleFilter('all')
+                        void loadMembers(1, memberQuery, { access: 'all', status: 'all', role: 'all' })
+                      }}
+                      className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-black transition ${
+                        memberAccessFilter === 'all' && memberStatusFilter === 'all' && memberRoleFilter === 'all'
+                          ? 'bg-cyan-300 text-slate-950 shadow-sm'
+                          : 'bg-white/5 text-slate-300 hover:bg-white/10'
+                      }`}
+                    >
+                      ทั้งหมด ({memberTotal})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMemberAccessFilter('vip')
+                        setMemberStatusFilter('active')
+                        void loadMembers(1, memberQuery, { access: 'vip', status: 'active' })
+                      }}
+                      className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-black transition ${
+                        memberAccessFilter === 'vip' && memberStatusFilter === 'active'
+                          ? 'bg-emerald-400 text-slate-950 shadow-sm'
+                          : 'bg-emerald-400/10 text-emerald-200 hover:bg-emerald-400/20'
+                      }`}
+                    >
+                      <Crown size={12} />
+                      VIP ใช้งาน ({vipMemberSummary.active})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMemberAccessFilter('expiring')
+                        void loadMembers(1, memberQuery, { access: 'expiring' })
+                      }}
+                      className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-black transition ${
+                        memberAccessFilter === 'expiring'
+                          ? 'bg-amber-400 text-slate-950 shadow-sm'
+                          : 'bg-amber-400/10 text-amber-200 hover:bg-amber-400/20'
+                      }`}
+                    >
+                      ใกล้หมด 7 วัน ({vipMemberSummary.expiringSoon})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMemberAccessFilter('expired')
+                        void loadMembers(1, memberQuery, { access: 'expired' })
+                      }}
+                      className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-black transition ${
+                        memberAccessFilter === 'expired'
+                          ? 'bg-red-400 text-slate-950 shadow-sm'
+                          : 'bg-red-400/10 text-red-200 hover:bg-red-400/20'
+                      }`}
+                    >
+                      หมดอายุ ({vipMemberSummary.expired})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMemberRoleFilter('staff')
+                        void loadMembers(1, memberQuery, { role: 'staff' })
+                      }}
+                      className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-black transition ${
+                        memberRoleFilter === 'staff'
+                          ? 'bg-violet-400 text-slate-950 shadow-sm'
+                          : 'bg-violet-400/10 text-violet-200 hover:bg-violet-400/20'
+                      }`}
+                    >
+                      <ShieldCheck size={12} />
+                      Admin / เจ้าของระบบ
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMemberStatusFilter('disabled')
+                        void loadMembers(1, memberQuery, { status: 'disabled' })
+                      }}
+                      className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-black transition ${
+                        memberStatusFilter === 'disabled'
+                          ? 'bg-red-500 text-white shadow-sm'
+                          : 'bg-red-500/10 text-red-200 hover:bg-red-500/20'
+                      }`}
+                    >
+                      ปิดบัญชี
+                    </button>
+                    {(memberQuery || memberAccessFilter !== 'all' || memberStatusFilter !== 'all' || memberRoleFilter !== 'manageable') && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMemberQuery('')
+                          setMemberAccessFilter('all')
+                          setMemberStatusFilter('all')
+                          setMemberRoleFilter('manageable')
+                          void loadMembers(1, '', { access: 'all', status: 'all', role: 'manageable' })
+                        }}
+                        className="inline-flex items-center gap-1 rounded-xl bg-white/10 px-2.5 py-1.5 text-xs font-bold text-slate-300 hover:bg-white/20 hover:text-white"
+                      >
+                        <RotateCcw size={12} />
+                        ล้างตัวกรอง
+                      </button>
+                    )}
+                  </div>
+
                   <form
                     className="grid gap-2 sm:grid-cols-3"
                     onSubmit={(event) => {
@@ -1803,6 +1972,143 @@ export function AdminPanel({
                     ))}
                   </div>
                 </div>
+
+                {memberTableViewMode === 'table' ? (
+                  <div className="overflow-x-auto rounded-2xl border border-white/10 bg-black/20">
+                    <table className="w-full text-left text-sm">
+                      <thead className="bg-black/40 text-xs font-black text-cyan-200 border-b border-white/10">
+                        <tr>
+                          <th className="px-4 py-3.5">สมาชิก</th>
+                          <th className="px-3 py-3.5">บทบาท</th>
+                          <th className="px-3 py-3.5">สิทธิ์ VIP / อายุ</th>
+                          <th className="px-3 py-3.5">สถานะ</th>
+                          <th className="px-3 py-3.5">E-Service</th>
+                          <th className="px-4 py-3.5 text-right">การจัดการ</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/10">
+                        {adminUsers.length === 0 ? (
+                          <tr>
+                            <td colSpan={6} className="p-8 text-center text-sm font-bold text-slate-400">
+                              ยังไม่มีข้อมูลสมาชิก
+                            </td>
+                          </tr>
+                        ) : (
+                          adminUsers.map((user) => {
+                            const isSuperAdminUser = user.role === 'superadmin'
+                            const expiryTime = user.vipExpiresAt ? Date.parse(user.vipExpiresAt) : 0
+                            const vipExpired = user.access === 'VIP' && expiryTime > 0 && expiryTime <= filterNow
+                            const vipExpiringSoon = user.access === 'VIP' && expiryTime > filterNow && expiryTime <= filterNow + 7 * 86400000
+                            return (
+                              <tr key={user.id} className="transition hover:bg-white/[0.03]">
+                                <td className="px-4 py-3">
+                                  <div className="flex items-center gap-3">
+                                    <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-cyan-400/20 to-sky-500/20 text-xs font-black text-cyan-200 border border-cyan-400/30">
+                                      {user.name ? user.name.slice(0, 1).toUpperCase() : 'U'}
+                                    </div>
+                                    <div className="min-w-0">
+                                      <p className="font-black text-white truncate max-w-[200px]">{user.name}</p>
+                                      <p className="text-xs text-slate-400 truncate max-w-[200px]">{user.email}</p>
+                                    </div>
+                                  </div>
+                                </td>
+                                <td className="px-3 py-3">
+                                  <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-black ${
+                                    isSuperAdminUser ? 'bg-cyan-400/20 text-cyan-200 border border-cyan-400/30' :
+                                    user.role === 'admin' ? 'bg-violet-400/20 text-violet-200 border border-violet-400/30' :
+                                    'bg-white/10 text-slate-300'
+                                  }`}>
+                                    {isSuperAdminUser && <ShieldCheck size={12} />}
+                                    {user.role}
+                                  </span>
+                                </td>
+                                <td className="px-3 py-3">
+                                  <div>
+                                    <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-black ${
+                                      user.access === 'VIP' ? 'bg-amber-400/20 text-amber-200 border border-amber-400/30' : 'bg-white/10 text-slate-300'
+                                    }`}>
+                                      {user.access === 'VIP' && <Crown size={12} />}
+                                      {user.access}
+                                    </span>
+                                    {user.access === 'VIP' && !user.vipExpiresAt && (
+                                      <p className="mt-1 text-[11px] font-bold text-amber-300">ตลอดชีพ</p>
+                                    )}
+                                    {user.vipExpiresAt && (
+                                      <p className={`mt-1 text-[11px] font-bold ${
+                                        vipExpired ? 'text-red-300' : vipExpiringSoon ? 'text-amber-300' : 'text-emerald-300'
+                                      }`}>
+                                        {vipExpired ? 'หมดอายุ' : vipExpiringSoon ? 'ใกล้หมด' : 'ถึง'} {new Date(user.vipExpiresAt).toLocaleDateString('th-TH')}
+                                      </p>
+                                    )}
+                                  </div>
+                                </td>
+                                <td className="px-3 py-3">
+                                  <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold ${
+                                    user.status === 'active' ? 'bg-emerald-400/15 text-emerald-200' : 'bg-red-400/15 text-red-200'
+                                  }`}>
+                                    <span className={`h-1.5 w-1.5 rounded-full ${user.status === 'active' ? 'bg-emerald-400' : 'bg-red-400'}`} />
+                                    {user.status === 'active' ? 'เปิดใช้งาน' : 'ปิดบัญชี'}
+                                  </span>
+                                </td>
+                                <td className="px-3 py-3 text-xs text-slate-300">
+                                  <span>มอบให้ {user.eservicePurchasedCount ?? 0}</span>
+                                  <span className="text-slate-500"> / เพิ่มเอง {user.eserviceCustomCount ?? 0}</span>
+                                </td>
+                                <td className="px-4 py-3 text-right">
+                                  <div className="flex items-center justify-end gap-1.5">
+                                    <button
+                                      className="inline-flex h-8 items-center gap-1 rounded-lg bg-cyan-300/10 px-2.5 text-xs font-black text-cyan-200 hover:bg-cyan-300/20 disabled:opacity-40"
+                                      disabled={loadingMembers || isSuperAdminUser}
+                                      onClick={() => openVipEditor(user)}
+                                      type="button"
+                                      title="จัดการอายุ VIP"
+                                    >
+                                      <CalendarDays size={13} />
+                                      VIP
+                                    </button>
+                                    <button
+                                      className="inline-flex h-8 items-center gap-1 rounded-lg bg-violet-300/10 px-2 text-xs font-black text-violet-200 hover:bg-violet-300/20 disabled:opacity-40"
+                                      disabled={loadingMembers || isSuperAdminUser}
+                                      onClick={() => submitMemberAction({ action: 'set-role', userId: user.id, role: user.role === 'admin' ? 'member' : 'admin' })}
+                                      type="button"
+                                      title={user.role === 'admin' ? 'ลดเป็นสมาชิก' : 'ตั้งเป็น Admin'}
+                                    >
+                                      {user.role === 'admin' ? 'ลดสิทธิ์' : 'Admin'}
+                                    </button>
+                                    <button
+                                      className="inline-flex h-8 items-center rounded-lg bg-white/10 px-2 text-xs font-black text-white hover:bg-white/20 disabled:opacity-40"
+                                      disabled={loadingMembers || isSuperAdminUser}
+                                      onClick={() => submitMemberAction({ action: 'set-status', userId: user.id, status: user.status === 'active' ? 'disabled' : 'active' })}
+                                      type="button"
+                                    >
+                                      {user.status === 'active' ? 'ปิด' : 'เปิด'}
+                                    </button>
+                                    <button
+                                      className="inline-flex h-8 items-center rounded-lg bg-emerald-400/15 px-2 text-xs font-black text-emerald-200 hover:bg-emerald-400/25 disabled:opacity-40"
+                                      disabled={loadingMembers}
+                                      onClick={() => {
+                                        const title = window.prompt('ชื่อระบบที่มอบให้ผู้ใช้')?.trim()
+                                        if (!title) return
+                                        const url = window.prompt('URL ระบบ (ต้องขึ้นต้น https://)')?.trim()
+                                        if (!url) return
+                                        const category = window.prompt('หมวดหมู่', 'ระบบจาก MIKPURINUT')?.trim() || 'ระบบจาก MIKPURINUT'
+                                        void submitMemberAction({ action: 'grant-eservice', userId: user.id, title, url, category })
+                                      }}
+                                      type="button"
+                                      title="มอบระบบ E-Service"
+                                    >
+                                      +ระบบ
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            )
+                          })
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
                 <div className="grid gap-3 lg:grid-cols-2 2xl:grid-cols-3">
                   {adminUsers.length === 0 && (
                     <div className="rounded-2xl border border-dashed border-white/15 p-5 text-sm font-bold text-slate-400">
@@ -1966,26 +2272,72 @@ export function AdminPanel({
                     )
                   })}
                 </div>
-                <div className="mt-4 flex items-center justify-between gap-3 border-t border-white/10 pt-4">
-                  <button
-                    className="min-h-10 rounded-xl bg-white/10 px-4 text-sm font-black text-white disabled:opacity-35"
-                    disabled={loadingMembers || memberPage <= 1}
-                    onClick={() => void loadMembers(memberPage - 1, memberQuery)}
-                    type="button"
-                  >
-                    ก่อนหน้า
-                  </button>
-                  <span className="text-xs font-bold text-slate-400">
-                    หน้า {memberPage.toLocaleString('th-TH')} / {Math.max(1, Math.ceil(memberTotal / memberPageSize)).toLocaleString('th-TH')}
-                  </span>
-                  <button
-                    className="min-h-10 rounded-xl bg-white/10 px-4 text-sm font-black text-white disabled:opacity-35"
-                    disabled={loadingMembers || memberPage * memberPageSize >= memberTotal}
-                    onClick={() => void loadMembers(memberPage + 1, memberQuery)}
-                    type="button"
-                  >
-                    ถัดไป
-                  </button>
+                )}
+
+                {/* Enhanced Member Pagination */}
+                <div className="mt-5 flex flex-col gap-3 border-t border-white/10 pt-5 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <p className="text-xs font-bold text-slate-400">
+                      แสดง {memberTotal ? (memberPage - 1) * memberPageSize + 1 : 0}–{Math.min(memberPage * memberPageSize, memberTotal)} จาก {memberTotal.toLocaleString('th-TH')} บัญชี
+                    </p>
+                    <label className="inline-flex items-center gap-2 text-xs font-bold text-slate-400">
+                      ต่อหน้า:
+                      <select
+                        className="min-h-9 rounded-xl border border-white/10 bg-black/24 px-2.5 font-black text-white outline-none focus:border-cyan-300"
+                        onChange={(event) => {
+                          const newSize = Number(event.target.value)
+                          setMemberPageSize(newSize)
+                          void loadMembers(1, memberQuery, {}, newSize)
+                        }}
+                        value={memberPageSize}
+                      >
+                        {[24, 48, 96].map((size) => (
+                          <option className="bg-slate-950" key={size} value={size}>
+                            {size}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <button
+                      className="min-h-9 rounded-xl bg-white/10 px-2.5 text-xs font-black text-white disabled:cursor-not-allowed disabled:opacity-35 hover:bg-white/15 transition"
+                      disabled={loadingMembers || memberPage <= 1}
+                      onClick={() => void loadMembers(1, memberQuery)}
+                      type="button"
+                      title="หน้าแรกสุด"
+                    >
+                      <ChevronsLeft size={16} />
+                    </button>
+                    <button
+                      className="min-h-9 rounded-xl bg-white/10 px-3 text-xs font-black text-white disabled:cursor-not-allowed disabled:opacity-35 hover:bg-white/15 transition"
+                      disabled={loadingMembers || memberPage <= 1}
+                      onClick={() => void loadMembers(memberPage - 1, memberQuery)}
+                      type="button"
+                    >
+                      ก่อนหน้า
+                    </button>
+                    <span className="px-2 text-xs font-black text-cyan-200">
+                      หน้า {memberPage.toLocaleString('th-TH')} / {Math.max(1, Math.ceil(memberTotal / memberPageSize)).toLocaleString('th-TH')}
+                    </span>
+                    <button
+                      className="min-h-9 rounded-xl bg-cyan-300 px-3 text-xs font-black text-slate-950 disabled:cursor-not-allowed disabled:opacity-35 hover:bg-cyan-200 transition"
+                      disabled={loadingMembers || memberPage * memberPageSize >= memberTotal}
+                      onClick={() => void loadMembers(memberPage + 1, memberQuery)}
+                      type="button"
+                    >
+                      ถัดไป
+                    </button>
+                    <button
+                      className="min-h-9 rounded-xl bg-white/10 px-2.5 text-xs font-black text-white disabled:cursor-not-allowed disabled:opacity-35 hover:bg-white/15 transition"
+                      disabled={loadingMembers || memberPage * memberPageSize >= memberTotal}
+                      onClick={() => void loadMembers(Math.max(1, Math.ceil(memberTotal / memberPageSize)), memberQuery)}
+                      type="button"
+                      title="หน้าสุดท้าย"
+                    >
+                      <ChevronsRight size={16} />
+                    </button>
+                  </div>
                 </div>
               </div>
               )}
@@ -2552,182 +2904,270 @@ export function AdminPanel({
 
           {adminSection === 'taxonomy' && (
           <section className="rounded-2xl border border-violet-300/20 bg-white/[0.07] p-4 ring-1 ring-white/[0.03]">
-            <div className="mb-4">
-              <h3 className="flex items-center gap-2 text-xl font-black">
-                <Tag className="text-violet-300" size={22} />
-                หมวดหมู่และแท็ก
-              </h3>
-              <p className="mt-1 text-sm font-semibold text-slate-400">
-                เพิ่มหมวดหลักสำหรับการ์ดสื่อ และดูแท็กจริงที่ผูกกับสื่อจากช่องแท็กในหน้าจัดการสื่อ
-              </p>
+            <div className="mb-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+              <div>
+                <h3 className="flex items-center gap-2 text-xl font-black">
+                  <Tag className="text-violet-300" size={22} />
+                  หมวดหมู่และแท็ก
+                </h3>
+                <p className="mt-1 text-sm font-semibold text-slate-400">
+                  จัดการหมวดหลักและแท็กของสื่อ ค้นหาและดูสถิติการใช้งานจริง
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="rounded-xl bg-violet-400/10 px-3 py-1.5 text-xs font-bold text-violet-200">
+                  {topics.length} หมวดหมู่ · {tagStats.length} แท็ก
+                </span>
+              </div>
             </div>
-            <form className="grid gap-3 sm:grid-cols-[1fr_auto]" onSubmit={submitCategory}>
-              <input
-                className="min-h-12 rounded-2xl border border-white/10 bg-black/24 px-4 text-base text-white outline-none placeholder:text-slate-500 focus:border-violet-300 focus:ring-4 focus:ring-violet-300/10"
-                onChange={(event) => setNewTopicName(event.target.value)}
-                placeholder="เช่น AI สำหรับครู, งานทะเบียน, คู่มืออบรม"
-                value={newTopicName}
-              />
-              <button className="min-h-12 rounded-2xl bg-violet-300 px-5 font-black text-slate-950" type="submit">
-                เพิ่มหมวด
-              </button>
-            </form>
+
+            <div className="mb-4 grid gap-3 sm:grid-cols-2">
+              <label className="relative">
+                <Search className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" size={17} />
+                <input
+                  className="min-h-12 w-full rounded-2xl border border-white/10 bg-black/24 pl-10 pr-4 text-sm text-white outline-none placeholder:text-slate-500 focus:border-violet-300 focus:ring-4 focus:ring-violet-300/10"
+                  onChange={(event) => setTaxonomySearch(event.target.value)}
+                  placeholder="ค้นหาหมวดหมู่ หรือแท็ก..."
+                  value={taxonomySearch}
+                />
+              </label>
+
+              <form className="flex gap-2" onSubmit={submitCategory}>
+                <input
+                  className="min-h-12 flex-1 rounded-2xl border border-white/10 bg-black/24 px-4 text-sm text-white outline-none placeholder:text-slate-500 focus:border-violet-300 focus:ring-4 focus:ring-violet-300/10"
+                  onChange={(event) => setNewTopicName(event.target.value)}
+                  placeholder="เพิ่มหมวดใหม่ เช่น AI, วิจัย"
+                  value={newTopicName}
+                />
+                <button className="min-h-12 shrink-0 rounded-2xl bg-violet-300 px-5 font-black text-slate-950 transition hover:bg-violet-200" type="submit">
+                  + เพิ่มหมวด
+                </button>
+              </form>
+            </div>
+
             {categoryError && (
-              <div className="mt-4 rounded-2xl border border-red-400/20 bg-red-400/10 p-3 text-sm font-bold text-red-200">
+              <div className="mt-2 mb-4 rounded-2xl border border-red-400/20 bg-red-400/10 p-3 text-sm font-bold text-red-200">
                 {categoryError}
               </div>
             )}
-            <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-              {topics.map((topicName, topicIndex) => {
-                const count = mediaItems.filter((item) => item.topic === topicName).length
-                return (
-                  <article className="rounded-2xl border border-white/10 bg-black/20 p-4" key={topicName}>
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        {editingTopic?.original === topicName ? (
-                          <input
-                            autoFocus
-                            className="min-h-10 w-full rounded-xl border border-violet-300/30 bg-black/30 px-3 font-bold text-white outline-none focus:border-violet-300"
-                            maxLength={80}
-                            onChange={(event) => setEditingTopic({ ...editingTopic, name: event.target.value })}
-                            value={editingTopic.name}
-                          />
-                        ) : (
-                          <p className="truncate font-black text-white">{topicName}</p>
-                        )}
-                        <p className="mt-1 text-sm font-semibold text-slate-400">{count} สื่อในหมวดนี้</p>
-                      </div>
-                      <div className="flex shrink-0 gap-1">
-                        <button
-                          aria-label={`เลื่อน ${topicName} ขึ้น`}
-                          className="grid size-10 place-items-center rounded-xl bg-white/5 text-slate-300 disabled:opacity-30"
-                          disabled={topicIndex === 0}
-                          onClick={() => updateCategory({ action: 'move', name: topicName, direction: 'up' })}
-                          type="button"
-                        >
-                          <ArrowUp size={16} />
-                        </button>
-                        <button
-                          aria-label={`เลื่อน ${topicName} ลง`}
-                          className="grid size-10 place-items-center rounded-xl bg-white/5 text-slate-300 disabled:opacity-30"
-                          disabled={topicIndex === topics.length - 1}
-                          onClick={() => updateCategory({ action: 'move', name: topicName, direction: 'down' })}
-                          type="button"
-                        >
-                          <ArrowDown size={16} />
-                        </button>
-                      </div>
-                    </div>
-                    <div className="mt-4 flex flex-wrap gap-2 border-t border-white/10 pt-3">
-                      {editingTopic?.original === topicName ? (
-                        <>
+
+            <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {topics
+                .filter((t) => !taxonomySearch.trim() || t.toLowerCase().includes(taxonomySearch.trim().toLowerCase()))
+                .map((topicName) => {
+                  const topicIndex = topics.indexOf(topicName)
+                  const count = mediaItems.filter((item) => item.topic === topicName).length
+                  return (
+                    <article className="rounded-2xl border border-white/10 bg-black/20 p-4 transition hover:border-violet-400/30" key={topicName}>
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          {editingTopic?.original === topicName ? (
+                            <input
+                              autoFocus
+                              className="min-h-10 w-full rounded-xl border border-violet-300/30 bg-black/30 px-3 font-bold text-white outline-none focus:border-violet-300"
+                              maxLength={80}
+                              onChange={(event) => setEditingTopic({ ...editingTopic, name: event.target.value })}
+                              value={editingTopic.name}
+                            />
+                          ) : (
+                            <p className="truncate font-black text-white">{topicName}</p>
+                          )}
+                          <p className="mt-1 text-xs font-semibold text-slate-400">{count.toLocaleString('th-TH')} สื่อในหมวดนี้</p>
+                        </div>
+                        <div className="flex shrink-0 gap-1">
                           <button
-                            className="min-h-10 rounded-xl bg-violet-300 px-4 text-sm font-black text-slate-950"
-                            onClick={() => updateCategory({ action: 'rename', name: topicName, newName: editingTopic.name })}
+                            aria-label={`เลื่อน ${topicName} ขึ้น`}
+                            className="grid size-9 place-items-center rounded-xl bg-white/5 text-slate-300 disabled:opacity-30 hover:bg-white/10"
+                            disabled={topicIndex === 0}
+                            onClick={() => updateCategory({ action: 'move', name: topicName, direction: 'up' })}
                             type="button"
                           >
-                            บันทึกชื่อ
+                            <ArrowUp size={15} />
                           </button>
-                          <button className="min-h-10 rounded-xl bg-white/5 px-4 text-sm font-black text-slate-300" onClick={() => setEditingTopic(null)} type="button">
-                            ยกเลิก
+                          <button
+                            aria-label={`เลื่อน ${topicName} ลง`}
+                            className="grid size-9 place-items-center rounded-xl bg-white/5 text-slate-300 disabled:opacity-30 hover:bg-white/10"
+                            disabled={topicIndex === topics.length - 1}
+                            onClick={() => updateCategory({ action: 'move', name: topicName, direction: 'down' })}
+                            type="button"
+                          >
+                            <ArrowDown size={15} />
                           </button>
-                        </>
-                      ) : (
-                        <button
-                          className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-violet-300/10 px-4 text-sm font-black text-violet-200"
-                          onClick={() => setEditingTopic({ original: topicName, name: topicName })}
-                          type="button"
-                        >
-                          <Pencil size={15} />
-                          เปลี่ยนชื่อ
-                        </button>
-                      )}
-                      {count === 0 && editingTopic?.original !== topicName && (
-                        <button
-                          className="min-h-10 rounded-xl bg-red-400/10 px-4 text-sm font-black text-red-200"
-                          onClick={() => deleteCategory(topicName)}
-                          type="button"
-                        >
-                          ลบหมวด
-                        </button>
-                      )}
-                    </div>
-                  </article>
-                )
-              })}
+                        </div>
+                      </div>
+                      <div className="mt-3 flex flex-wrap gap-2 border-t border-white/10 pt-3">
+                        {editingTopic?.original === topicName ? (
+                          <>
+                            <button
+                              className="min-h-9 rounded-xl bg-violet-300 px-3 text-xs font-black text-slate-950"
+                              onClick={() => updateCategory({ action: 'rename', name: topicName, newName: editingTopic.name })}
+                              type="button"
+                            >
+                              บันทึก
+                            </button>
+                            <button className="min-h-9 rounded-xl bg-white/5 px-3 text-xs font-black text-slate-300" onClick={() => setEditingTopic(null)} type="button">
+                              ยกเลิก
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            className="inline-flex min-h-9 items-center gap-1.5 rounded-xl bg-violet-300/10 px-3 text-xs font-black text-violet-200 hover:bg-violet-300/20"
+                            onClick={() => setEditingTopic({ original: topicName, name: topicName })}
+                            type="button"
+                          >
+                            <Pencil size={13} />
+                            เปลี่ยนชื่อ
+                          </button>
+                        )}
+                        {count === 0 && editingTopic?.original !== topicName && (
+                          <button
+                            className="min-h-9 rounded-xl bg-red-400/10 px-3 text-xs font-black text-red-200 hover:bg-red-400/20"
+                            onClick={() => deleteCategory(topicName)}
+                            type="button"
+                          >
+                            ลบหมวด
+                          </button>
+                        )}
+                      </div>
+                    </article>
+                  )
+                })}
             </div>
+
+            {/* Tags Cloud Section with Search and Sorting */}
             <div className="mt-6 rounded-2xl border border-sky-300/20 bg-black/20 p-4">
-              <div className="mb-3 flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
+              <div className="mb-3 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
                 <div>
                   <p className="font-black text-sky-100">แท็กที่ใช้งานจริง</p>
-                  <p className="mt-1 text-sm font-semibold text-slate-400">
-                    ระบบดึงจาก media_tags โดยอัตโนมัติเมื่อบันทึกสื่อ ไม่ต้องสร้างแท็กซ้ำด้วยมือ
+                  <p className="mt-0.5 text-xs font-semibold text-slate-400">
+                    ดึงจาก media_tags อัตโนมัติเมื่อเพิ่มหรือแก้ไขสื่อ
                   </p>
                 </div>
-                <span className="rounded-xl bg-sky-300/10 px-3 py-1 text-sm font-black text-sky-200">
-                  {tagStats.length.toLocaleString('th-TH')} แท็ก
-                </span>
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex items-center rounded-xl border border-white/10 bg-black/20 p-1 text-xs">
+                    <button
+                      type="button"
+                      onClick={() => setTagSortOrder('count')}
+                      className={`rounded-lg px-2.5 py-1 text-xs font-bold transition ${
+                        tagSortOrder === 'count' ? 'bg-sky-400 text-slate-950 font-black shadow-sm' : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      ใช้มากสุด
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setTagSortOrder('alpha')}
+                      className={`rounded-lg px-2.5 py-1 text-xs font-bold transition ${
+                        tagSortOrder === 'alpha' ? 'bg-sky-400 text-slate-950 font-black shadow-sm' : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      เรียง ก-ฮ
+                    </button>
+                  </div>
+                </div>
               </div>
+
               {tagStats.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-white/15 p-4 text-sm font-bold text-slate-400">
+                <div className="rounded-2xl border border-dashed border-white/15 p-5 text-center text-sm font-bold text-slate-400">
                   ยังไม่มีแท็ก เพิ่มแท็กจากฟอร์มสื่อ เช่น AI, อบรม, โรงเรียน
                 </div>
               ) : (
-                <div className="flex flex-wrap gap-2">
-                  {tagStats.map(([tag, count]) => (
-                    <span
-                      className="inline-flex items-center gap-2 rounded-full border border-sky-300/20 bg-sky-300/10 px-3 py-2 text-sm font-black text-sky-100"
-                      key={tag}
-                    >
-                      #{tag}
-                      <span className="rounded-full bg-black/30 px-2 py-0.5 text-xs text-sky-200">
-                        {count.toLocaleString('th-TH')}
-                      </span>
-                    </span>
-                  ))}
-                </div>
+                <>
+                  <div className="flex flex-wrap gap-2">
+                    {tagStats
+                      .filter(([tag]) => !taxonomySearch.trim() || tag.toLowerCase().includes(taxonomySearch.trim().toLowerCase()))
+                      .sort((a, b) => tagSortOrder === 'count' ? b[1] - a[1] : a[0].localeCompare(b[0], 'th'))
+                      .slice(0, showAllTags ? undefined : 32)
+                      .map(([tag, count]) => (
+                        <span
+                          className="inline-flex items-center gap-1.5 rounded-full border border-sky-300/20 bg-sky-300/10 px-3 py-1.5 text-xs font-bold text-sky-100 transition hover:bg-sky-300/20"
+                          key={tag}
+                        >
+                          #{tag}
+                          <span className="rounded-full bg-black/40 px-1.5 py-0.5 text-[10px] text-sky-200">
+                            {count.toLocaleString('th-TH')}
+                          </span>
+                        </span>
+                      ))}
+                  </div>
+                  {tagStats.filter(([tag]) => !taxonomySearch.trim() || tag.toLowerCase().includes(taxonomySearch.trim().toLowerCase())).length > 32 && (
+                    <div className="mt-4 text-center">
+                      <button
+                        type="button"
+                        onClick={() => setShowAllTags(!showAllTags)}
+                        className="inline-flex items-center gap-1.5 rounded-xl bg-white/10 px-4 py-2 text-xs font-black text-cyan-200 hover:bg-white/20 transition"
+                      >
+                        {showAllTags ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                        {showAllTags
+                          ? 'ย่อแสดง 32 แท็กแรก'
+                          : `แสดงแท็กทั้งหมด (${tagStats.filter(([tag]) => !taxonomySearch.trim() || tag.toLowerCase().includes(taxonomySearch.trim().toLowerCase())).length} แท็ก)`}
+                      </button>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </section>
           )}
 
           {adminSection === 'links' && (
+          <>
           <section className="rounded-2xl border border-cyan-300/20 bg-white/[0.07] p-4 ring-1 ring-white/[0.03]">
-            <div className="mb-4">
-              <h3 className="flex items-center gap-2 text-xl font-black">
-                <Link2 className="text-cyan-300" size={22} />
-                ลิงก์ภายนอก
-              </h3>
-              <p className="mt-1 text-sm font-semibold text-slate-400">
-                รวมสื่อที่เชื่อม Google Drive, Google Sheet, YouTube หรือเว็บภายนอก กดแก้ไขเพื่อเปลี่ยนลิงก์ได้ทันที
-              </p>
+            <div className="mb-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+              <div>
+                <h3 className="flex items-center gap-2 text-xl font-black">
+                  <Link2 className="text-cyan-300" size={22} />
+                  ลิงก์สื่อภายนอก
+                </h3>
+                <p className="mt-1 text-sm font-semibold text-slate-400">
+                  รวมสื่อทั้งหมดที่เชื่อมกับ Drive, Sheet, YouTube หรือเว็บภายนอก ({linkedMedia.length} รายการ)
+                </p>
+              </div>
+              <label className="relative min-w-[240px]">
+                <Search className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
+                <input
+                  className="min-h-10 w-full rounded-xl border border-white/10 bg-black/24 pl-10 pr-4 text-xs text-white outline-none placeholder:text-slate-500 focus:border-cyan-300"
+                  onChange={(event) => setLinkSearchQuery(event.target.value)}
+                  placeholder="ค้นหาชื่อสื่อ หรือ URL..."
+                  value={linkSearchQuery}
+                />
+              </label>
             </div>
             <div className="grid gap-3">
-              {linkedMedia.length === 0 && (
-                <div className="rounded-2xl border border-dashed border-white/15 p-5 text-sm font-bold text-slate-400">
-                  ยังไม่มีสื่อที่แปะลิงก์ภายนอก
+              {linkedMedia.filter((item) => {
+                if (!linkSearchQuery.trim()) return true
+                const q = linkSearchQuery.trim().toLowerCase()
+                return item.title.toLowerCase().includes(q) || (item.resourceUrl ?? '').toLowerCase().includes(q) || (item.previewUrl ?? '').toLowerCase().includes(q)
+              }).length === 0 && (
+                <div className="rounded-2xl border border-dashed border-white/15 p-5 text-sm font-bold text-slate-400 text-center">
+                  ไม่พบสื่อที่แปะลิงก์ตามคำค้นหา
                 </div>
               )}
-              {linkedMedia.map((item) => (
-                <article className="grid gap-3 rounded-2xl border border-white/10 bg-black/20 p-4 md:grid-cols-[1fr_auto]" key={item.id}>
-                  <div className="min-w-0">
-                    <p className="truncate font-black text-white">{item.title}</p>
-                    <p className="mt-1 truncate text-sm font-semibold text-slate-400">{item.source} · {item.resourceUrl || item.previewUrl}</p>
-                  </div>
-                  <button
-                    className="min-h-11 rounded-xl bg-cyan-300 px-4 font-black text-slate-950"
-                    onClick={() => startEditMedia(item)}
-                    type="button"
-                  >
-                    แก้ไขลิงก์
-                  </button>
-                </article>
-              ))}
+              {linkedMedia
+                .filter((item) => {
+                  if (!linkSearchQuery.trim()) return true
+                  const q = linkSearchQuery.trim().toLowerCase()
+                  return item.title.toLowerCase().includes(q) || (item.resourceUrl ?? '').toLowerCase().includes(q) || (item.previewUrl ?? '').toLowerCase().includes(q)
+                })
+                .slice(0, 30)
+                .map((item) => (
+                  <article className="grid gap-3 rounded-2xl border border-white/10 bg-black/20 p-4 transition hover:border-cyan-400/30 md:grid-cols-[1fr_auto]" key={item.id}>
+                    <div className="min-w-0">
+                      <p className="truncate font-black text-white">{item.title}</p>
+                      <p className="mt-1 truncate text-xs font-semibold text-slate-400">{item.source} · {item.resourceUrl || item.previewUrl}</p>
+                    </div>
+                    <button
+                      className="min-h-10 rounded-xl bg-cyan-300 px-4 text-xs font-black text-slate-950 transition hover:bg-cyan-200"
+                      onClick={() => startEditMedia(item)}
+                      type="button"
+                    >
+                      แก้ไขลิงก์
+                    </button>
+                  </article>
+                ))}
             </div>
           </section>
-          )}
 
-          {adminSection === 'links' && (
           <section className="rounded-2xl border border-cyan-300/20 bg-white/[0.07] p-4 ring-1 ring-white/[0.03]">
             <div className="mb-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
               <div>
@@ -2736,11 +3176,11 @@ export function AdminPanel({
                   ตรวจสุขภาพลิงก์
                 </h3>
                 <p className="mt-1 text-sm font-semibold text-slate-400">
-                  ตรวจว่า Drive, Sheet, YouTube และลิงก์ภายนอกยังเปิดได้หรือไม่
+                  ตรวจว่า Google Drive, Sheet, YouTube และเว็บภายนอกยังเข้าถึงได้ ไม่ติดหน้า 404
                 </p>
               </div>
               <button
-                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-cyan-300 px-4 font-black text-slate-950 disabled:opacity-60"
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-cyan-300 px-4 font-black text-slate-950 transition hover:bg-cyan-200 disabled:opacity-60"
                 disabled={loadingOps}
                 onClick={runLinkCheck}
                 type="button"
@@ -2749,52 +3189,154 @@ export function AdminPanel({
                 ตรวจลิงก์ตอนนี้
               </button>
             </div>
+
             {opsError && (
               <div className="mb-4 rounded-2xl border border-red-400/20 bg-red-400/10 p-3 text-sm font-bold text-red-200">
                 {opsError}
               </div>
             )}
-            <div className="grid gap-3">
-              {linkChecks.length === 0 && (
-                <div className="rounded-2xl border border-dashed border-white/15 p-5 text-sm font-bold text-slate-400">
-                  ยังไม่มีผลตรวจล่าสุด กดปุ่มตรวจลิงก์เพื่อเริ่มตรวจสุขภาพลิงก์ทั้งหมด
-                </div>
-              )}
-              {linkChecks.map((result) => (
-                <article className="grid gap-3 rounded-2xl border border-white/10 bg-black/20 p-4 md:grid-cols-[1fr_auto]" key={`${result.mediaId}-${result.linkId}-${result.url}`}>
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="truncate font-black text-white">{result.mediaTitle}</p>
-                      <span
-                        className={`rounded-full px-3 py-1 text-xs font-black ${
-                          result.status === 'ok'
-                            ? 'bg-emerald-300/15 text-emerald-200'
-                            : result.status === 'warning'
-                              ? 'bg-amber-300/15 text-amber-200'
-                              : 'bg-red-400/15 text-red-200'
-                        }`}
-                      >
-                        {result.status === 'ok' ? 'ปกติ' : result.status === 'warning' ? 'ควรตรวจ' : 'มีปัญหา'}
-                      </span>
-                    </div>
-                    <p className="mt-1 truncate text-sm font-semibold text-slate-400">
-                      {result.label} · {result.type} · {result.message}
-                    </p>
-                    <p className="mt-1 truncate text-xs font-semibold text-slate-500">{result.url}</p>
-                  </div>
-                  <a
-                    className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-white/10 px-4 font-black text-cyan-100"
-                    href={result.url}
-                    rel="noreferrer"
-                    target="_blank"
-                  >
-                    เปิดดู
-                    <ExternalLink size={16} />
-                  </a>
-                </article>
-              ))}
+
+            {/* Link Status Filter Chips */}
+            <div className="mb-3 flex flex-wrap items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => {
+                  setLinkFilterStatus('all')
+                  setLinkPage(1)
+                }}
+                className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-black transition ${
+                  linkFilterStatus === 'all' ? 'bg-cyan-300 text-slate-950 shadow-sm' : 'bg-white/5 text-slate-300 hover:bg-white/10'
+                }`}
+              >
+                ทั้งหมด ({linkChecks.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setLinkFilterStatus('ok')
+                  setLinkPage(1)
+                }}
+                className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-black transition ${
+                  linkFilterStatus === 'ok' ? 'bg-emerald-400 text-slate-950 shadow-sm' : 'bg-emerald-400/10 text-emerald-200 hover:bg-emerald-400/20'
+                }`}
+              >
+                <span className="h-2 w-2 rounded-full bg-emerald-400" />
+                ปกติ ({linkChecks.filter((c) => c.status === 'ok').length})
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setLinkFilterStatus('warning')
+                  setLinkPage(1)
+                }}
+                className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-black transition ${
+                  linkFilterStatus === 'warning' ? 'bg-amber-400 text-slate-950 shadow-sm' : 'bg-amber-400/10 text-amber-200 hover:bg-amber-400/20'
+                }`}
+              >
+                <span className="h-2 w-2 rounded-full bg-amber-400" />
+                ควรตรวจ ({linkChecks.filter((c) => c.status === 'warning').length})
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setLinkFilterStatus('error')
+                  setLinkPage(1)
+                }}
+                className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-black transition ${
+                  linkFilterStatus === 'error' ? 'bg-red-400 text-slate-950 shadow-sm' : 'bg-red-400/10 text-red-200 hover:bg-red-400/20'
+                }`}
+              >
+                <span className="h-2 w-2 rounded-full bg-red-400" />
+                มีปัญหา ({linkChecks.filter((c) => c.status === 'error').length})
+              </button>
             </div>
+
+            {/* Link Checks Paginated List */}
+            {(() => {
+              const filteredChecks = linkChecks.filter((item) => {
+                const matchStatus = linkFilterStatus === 'all' || item.status === linkFilterStatus
+                const matchQuery = !linkSearchQuery.trim() || item.mediaTitle.toLowerCase().includes(linkSearchQuery.trim().toLowerCase()) || item.url.toLowerCase().includes(linkSearchQuery.trim().toLowerCase())
+                return matchStatus && matchQuery
+              })
+              const totalChecks = filteredChecks.length
+              const totalPages = Math.max(1, Math.ceil(totalChecks / linkPageSize))
+              const pageItems = filteredChecks.slice((linkPage - 1) * linkPageSize, linkPage * linkPageSize)
+
+              return (
+                <div>
+                  <div className="grid gap-3">
+                    {totalChecks === 0 ? (
+                      <div className="rounded-2xl border border-dashed border-white/15 p-5 text-sm font-bold text-slate-400 text-center">
+                        {linkChecks.length === 0 ? 'ยังไม่มีผลตรวจล่าสุด กดปุ่มตรวจลิงก์เพื่อเริ่มตรวจสุขภาพลิงก์ทั้งหมด' : 'ไม่พบผลตรวจลิงก์ตามตัวกรอง'}
+                      </div>
+                    ) : (
+                      pageItems.map((result) => (
+                        <article className="grid gap-3 rounded-2xl border border-white/10 bg-black/20 p-4 transition hover:border-cyan-400/30 md:grid-cols-[1fr_auto]" key={`${result.mediaId}-${result.linkId}-${result.url}`}>
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="truncate font-black text-white">{result.mediaTitle}</p>
+                              <span
+                                className={`rounded-full px-2.5 py-0.5 text-xs font-black ${
+                                  result.status === 'ok'
+                                    ? 'bg-emerald-300/15 text-emerald-200 border border-emerald-400/20'
+                                    : result.status === 'warning'
+                                      ? 'bg-amber-300/15 text-amber-200 border border-amber-400/20'
+                                      : 'bg-red-400/15 text-red-200 border border-red-400/20'
+                                }`}
+                              >
+                                {result.status === 'ok' ? 'ปกติ' : result.status === 'warning' ? 'ควรตรวจ' : 'มีปัญหา'}
+                              </span>
+                            </div>
+                            <p className="mt-1 truncate text-xs font-semibold text-slate-400">
+                              {result.label} · {result.type} · {result.message}
+                            </p>
+                            <p className="mt-1 truncate text-xs font-semibold text-slate-500">{result.url}</p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <a
+                              className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-xl bg-white/10 px-3.5 text-xs font-black text-cyan-100 hover:bg-white/20 transition"
+                              href={result.url}
+                              rel="noreferrer"
+                              target="_blank"
+                            >
+                              เปิดลิงก์
+                              <ExternalLink size={14} />
+                            </a>
+                          </div>
+                        </article>
+                      ))
+                    )}
+                  </div>
+
+                  {totalChecks > linkPageSize && (
+                    <div className="mt-4 flex items-center justify-between border-t border-white/10 pt-4 text-xs font-bold text-slate-400">
+                      <span>แสดง {(linkPage - 1) * linkPageSize + 1}–{Math.min(linkPage * linkPageSize, totalChecks)} จาก {totalChecks} ผลการตรวจ</span>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          disabled={linkPage <= 1}
+                          onClick={() => setLinkPage((p) => Math.max(1, p - 1))}
+                          className="rounded-lg bg-white/10 px-3 py-1.5 text-white disabled:opacity-40 hover:bg-white/20"
+                        >
+                          ก่อนหน้า
+                        </button>
+                        <span>หน้า {linkPage} / {totalPages}</span>
+                        <button
+                          type="button"
+                          disabled={linkPage >= totalPages}
+                          onClick={() => setLinkPage((p) => Math.min(totalPages, p + 1))}
+                          className="rounded-lg bg-cyan-300 px-3 py-1.5 text-slate-950 font-black disabled:opacity-40 hover:bg-cyan-200"
+                        >
+                          ถัดไป
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )
+            })()}
           </section>
+          </>
           )}
 
           {adminSection === 'health' && (
@@ -3027,6 +3569,31 @@ export function AdminPanel({
                 </button>
               </div>
             </div>
+            {/* Quick Severity Filter Chips */}
+            <div className="mb-3 flex flex-wrap items-center gap-1.5">
+              <span className="text-xs font-bold text-slate-400 mr-1">กลุ่ม Error:</span>
+              {(['ทั้งหมด', 'Auth', 'Bot', 'API', 'Telegram'] as const).map((sev) => {
+                const isActive = errorSeverity === sev
+                const count = sev === 'ทั้งหมด'
+                  ? errorLogs.length
+                  : errorLogs.filter((l) => (l.source || '').toLowerCase().includes(sev.toLowerCase()) || (l.message || '').toLowerCase().includes(sev.toLowerCase())).length
+                return (
+                  <button
+                    key={sev}
+                    type="button"
+                    onClick={() => setErrorSeverity(sev)}
+                    className={`rounded-full px-3 py-1 text-xs font-black transition-all ${
+                      isActive
+                        ? 'bg-red-400 text-slate-950 shadow-md shadow-red-500/20'
+                        : 'bg-white/10 text-slate-300 hover:bg-white/15 hover:text-white'
+                    }`}
+                  >
+                    {sev} {count > 0 && <span className="opacity-75">({count})</span>}
+                  </button>
+                )
+              })}
+            </div>
+
             <div className="mb-4 grid gap-3 md:grid-cols-[1fr_180px_180px]">
               <label className="relative block">
                 <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
@@ -3063,13 +3630,43 @@ export function AdminPanel({
                 </div>
               )}
               {filteredErrorLogs.map((log) => (
-                <article className="rounded-2xl border border-red-300/10 bg-red-400/10 p-4" key={log.id}>
+                <article className="rounded-2xl border border-red-300/10 bg-red-400/10 p-4 transition-colors hover:border-red-300/20" key={log.id}>
                   <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-start">
-                    <div className="min-w-0">
-                      <p className="font-black text-red-100">{log.source}</p>
-                      <p className="mt-1 break-words text-sm font-semibold text-red-100/80">{log.message}</p>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="rounded-md bg-red-400/20 px-2 py-0.5 text-xs font-black text-red-200">
+                          {log.source || 'General'}
+                        </span>
+                        {log.id && <span className="text-xs text-red-100/50">#{log.id}</span>}
+                      </div>
+                      <p className="mt-1.5 break-words font-mono text-xs sm:text-sm font-medium text-red-100/90 leading-relaxed bg-black/30 p-2.5 rounded-xl border border-white/5">
+                        {log.message}
+                      </p>
+                      <div className="mt-2.5 flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            void navigator.clipboard.writeText(`[${log.source}] ${log.message} (Time: ${formatAdminDate(log.createdAt)})`)
+                            setCopiedErrorId(log.id)
+                            setTimeout(() => setCopiedErrorId(null), 2000)
+                          }}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-red-300/20 bg-red-400/15 px-2.5 py-1 text-xs font-bold text-red-100 hover:bg-red-400/25 transition-all"
+                        >
+                          {copiedErrorId === log.id ? (
+                            <>
+                              <Check size={13} className="text-emerald-400" />
+                              <span className="text-emerald-300">คัดลอกแล้ว</span>
+                            </>
+                          ) : (
+                            <>
+                              <Copy size={13} />
+                              <span>คัดลอก Error</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
                     </div>
-                    <span className="text-sm font-bold text-red-100/60">{formatAdminDate(log.createdAt)}</span>
+                    <span className="shrink-0 text-xs font-bold text-red-100/60">{formatAdminDate(log.createdAt)}</span>
                   </div>
                 </article>
               ))}
@@ -3302,15 +3899,51 @@ export function AdminPanel({
 
           {adminSection === 'media' && (
           <>
+          {!showMediaForm && !editingMediaId ? (
+            <div className="flex flex-col justify-between gap-4 rounded-2xl border border-cyan-400/25 bg-gradient-to-r from-cyan-950/40 via-slate-900/60 to-blue-950/40 p-5 shadow-lg backdrop-blur-md sm:flex-row sm:items-center">
+              <div className="flex items-center gap-3.5">
+                <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-cyan-400/20 text-cyan-300 ring-1 ring-cyan-400/30">
+                  <Layers3 size={24} />
+                </span>
+                <div>
+                  <h3 className="text-lg font-black text-white">ต้องการเพิ่มสื่อการสอนใหม่ หรือ นำเข้าสื่อแบบกลุ่ม?</h3>
+                  <p className="mt-0.5 text-xs font-semibold text-slate-300">
+                    กรอกฟอร์มเพื่อสร้างการ์ดสื่อพร้อมลิงก์ Drive, Sheet, YouTube หรืออัปโหลดไฟล์ CSV แบบทีละหลายรายการ
+                  </p>
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowBatchImport(true)
+                    setImportResult(null)
+                  }}
+                  className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-cyan-400/40 bg-cyan-400/15 px-4 text-xs font-black text-cyan-200 shadow-sm transition hover:bg-cyan-400/25"
+                >
+                  <UploadCloud size={16} />
+                  นำเข้าสื่อแบบกลุ่ม (CSV)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowMediaForm(true)}
+                  className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-gradient-to-r from-cyan-400 to-sky-400 px-5 text-sm font-black text-slate-950 shadow-md shadow-cyan-500/20 transition hover:opacity-95"
+                >
+                  <Plus size={18} />
+                  เพิ่มการ์ดสื่อใหม่
+                </button>
+              </div>
+            </div>
+          ) : (
           <form
             className="rounded-2xl border border-cyan-300/20 bg-white/[0.07] p-4 ring-1 ring-white/[0.03]"
             id="admin-create-media"
             onSubmit={submitMedia}
           >
-            <div className="mb-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+            <div className="mb-4 flex flex-col justify-between gap-3 border-b border-white/10 pb-4 sm:flex-row sm:items-center">
               <div>
-                <h3 className="text-xl font-black">
-                  {editingMediaId ? 'แก้ไขการ์ดสื่อ' : 'เพิ่มการ์ดสื่อใหม่'}
+                <h3 className="text-xl font-black text-white">
+                  {editingMediaId ? `แก้ไขการ์ดสื่อ ID ${editingMediaId}` : 'เพิ่มการ์ดสื่อใหม่'}
                 </h3>
                 <p className="mt-1 text-sm font-semibold text-slate-400">
                   แปะลิงก์ Drive, Sheet, YouTube หรือเว็บภายนอก โดยไม่ต้องแก้โค้ด
@@ -3326,15 +3959,24 @@ export function AdminPanel({
                   className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-cyan-400/40 bg-cyan-400/15 px-3.5 text-sm font-black text-cyan-200 shadow-sm transition hover:bg-cyan-400/25"
                 >
                   <UploadCloud size={16} />
-                  นำเข้าสื่อแบบกลุ่ม (CSV)
+                  นำเข้า CSV
                 </button>
-                {editingMediaId && (
+                {editingMediaId ? (
                   <button
-                    className="min-h-10 rounded-xl bg-white/10 px-4 text-sm font-black text-white"
+                    className="min-h-10 rounded-xl bg-white/10 px-4 text-sm font-black text-white hover:bg-white/20"
                     onClick={resetMediaForm}
                     type="button"
                   >
                     ยกเลิกแก้ไข
+                  </button>
+                ) : (
+                  <button
+                    className="inline-flex min-h-10 items-center gap-1.5 rounded-xl bg-white/10 px-3.5 text-xs font-black text-slate-300 hover:bg-white/20 hover:text-white"
+                    onClick={() => setShowMediaForm(false)}
+                    type="button"
+                  >
+                    <ChevronUp size={15} />
+                    ย่อเก็บฟอร์ม
                   </button>
                 )}
                 <span className="inline-flex min-h-10 items-center rounded-xl bg-cyan-300/10 px-3 py-1 text-sm font-bold text-cyan-200">
@@ -3352,17 +3994,41 @@ export function AdminPanel({
                     <p className="mt-1 text-sm font-semibold text-slate-400">ตั้งชื่อ จัดหมวด และอธิบายให้คนเข้าใจว่าสื่อนี้คืออะไร</p>
                   </div>
                 </div>
+                <div className="mb-4">
+                  <div className="rounded-xl border border-white/10 bg-black/20 p-3">
+                    <button
+                      type="button"
+                      onClick={() => setShowAdvancedToken(!showAdvancedToken)}
+                      className="flex w-full items-center justify-between text-xs font-bold text-slate-400 hover:text-cyan-300 transition"
+                    >
+                      <span className="flex items-center gap-2">
+                        <ShieldCheck size={15} className="text-cyan-300" />
+                        {isSuperAdmin
+                          ? 'เข้าสู่ระบบ Superadmin แล้ว (ไม่ต้องระบุรหัสหลังบ้าน)'
+                          : 'รหัสบันทึกหลังบ้าน (Admin Token)'}
+                      </span>
+                      <span className="flex items-center gap-1 text-[11px] text-cyan-300 font-semibold">
+                        {showAdvancedToken ? 'ซ่อน' : 'ตั้งค่ารหัสขั้นสูง'}
+                        {showAdvancedToken ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                      </span>
+                    </button>
+                    {(showAdvancedToken || (!isSuperAdmin && adminToken)) && (
+                      <div className="mt-3 pt-3 border-t border-white/10">
+                        <label>
+                          <span className="text-xs font-bold text-slate-300">รหัสผ่าน Super Admin Token (เว้นว่างได้ถ้าล็อกอินผ่านเว็บแล้ว)</span>
+                          <input
+                            className="mt-1.5 min-h-11 w-full rounded-xl border border-cyan-300/20 bg-cyan-300/10 px-3.5 text-sm text-white outline-none focus:border-cyan-300"
+                            onChange={(event) => setAdminToken(event.target.value)}
+                            placeholder="เว้นว่างได้ถ้าเข้าสู่ระบบ superadmin แล้ว"
+                            type="password"
+                            value={adminToken}
+                          />
+                        </label>
+                      </div>
+                    )}
+                  </div>
+                </div>
                 <div className="grid gap-4 md:grid-cols-2">
-                  <label className="md:col-span-2">
-                    <span className="text-sm font-black text-slate-200">รหัสบันทึกหลังบ้าน</span>
-                    <input
-                      className="mt-2 min-h-12 w-full rounded-2xl border border-cyan-300/20 bg-cyan-300/10 px-4 text-base text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-300 focus:ring-4 focus:ring-cyan-300/10"
-                      onChange={(event) => setAdminToken(event.target.value)}
-                      placeholder="เว้นว่างได้ถ้าเข้าสู่ระบบ superadmin แล้ว"
-                      type="password"
-                      value={adminToken}
-                    />
-                  </label>
                   <AdminField label="ชื่อสื่อ" name="title" onChange={updateForm} placeholder="เช่น ระบบเช็กชื่อออนไลน์" value={form.title} />
                   <AdminSelect label="หมวดหมู่" name="topic" onChange={updateForm} options={topics.length ? topics : ['โรงเรียน']} value={form.topic} />
                   <AdminField label="แท็ก" name="tags" onChange={updateForm} placeholder="AI, อบรม, โรงเรียน" value={form.tags} />
@@ -3534,6 +4200,14 @@ export function AdminPanel({
                     ))}
                   </div>
                 </div>
+
+                <div className="mb-3 flex items-start gap-2.5 rounded-xl border border-amber-400/25 bg-amber-400/10 p-3 text-xs text-amber-200">
+                  <Sparkles size={16} className="mt-0.5 shrink-0 text-amber-300" />
+                  <div>
+                    <span className="font-bold">เคล็ดลับการแชร์ไฟล์:</span> สำหรับ Google Drive หรือ Google Sheet แนะนำให้กดปุ่ม "แชร์" แล้วตั้งค่าเป็น <strong>"ทุกคนที่มีลิงก์สามารถดูได้" (Anyone with the link can view)</strong> เพื่อให้นักเรียนและสมาชิกเปิดดาวน์โหลดได้ทันที
+                  </div>
+                </div>
+
                 <div className="grid gap-3">
                   {form.links.some((link) => link.type !== 'Preview Image') ? form.links.map((link, index) => link.type !== 'Preview Image' ? renderMediaLinkCard(link, index) : null) : (
                     <div className="rounded-2xl border border-dashed border-cyan-300/20 bg-black/18 p-6 text-center text-sm font-bold text-slate-400">ยังไม่มีไฟล์หรือระบบปลายทาง</div>
@@ -3548,30 +4222,196 @@ export function AdminPanel({
               </div>
             )}
 
-            <button
-              className="mt-5 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-cyan-300 px-5 font-black text-slate-950 shadow-lg shadow-cyan-500/20 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
-              disabled={saving}
-              type="submit"
-            >
-              {saving ? <Loader2 className="animate-spin" size={20} /> : editingMediaId ? <Pencil size={20} /> : <Plus size={20} />}
-              {saving ? 'กำลังบันทึก...' : editingMediaId ? 'บันทึกการแก้ไข' : 'บันทึกสื่อใหม่'}
-            </button>
+            <div className="mt-5 flex flex-wrap items-center gap-3">
+              <button
+                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-cyan-300 px-6 font-black text-slate-950 shadow-lg shadow-cyan-500/20 disabled:cursor-not-allowed disabled:opacity-60 transition hover:bg-cyan-200"
+                disabled={saving}
+                type="submit"
+              >
+                {saving ? <Loader2 className="animate-spin" size={20} /> : editingMediaId ? <Pencil size={20} /> : <Plus size={20} />}
+                {saving ? 'กำลังบันทึก...' : editingMediaId ? 'บันทึกการแก้ไข' : 'บันทึกสื่อใหม่'}
+              </button>
+              {editingMediaId && (
+                <button
+                  type="button"
+                  onClick={resetMediaForm}
+                  className="min-h-12 rounded-2xl bg-white/10 px-5 font-black text-white hover:bg-white/20 transition"
+                >
+                  ยกเลิก
+                </button>
+              )}
+              {!editingMediaId && (
+                <button
+                  type="button"
+                  onClick={() => setShowMediaForm(false)}
+                  className="min-h-12 rounded-2xl bg-white/10 px-5 font-bold text-slate-300 hover:bg-white/20 hover:text-white transition"
+                >
+                  ย่อเก็บฟอร์ม
+                </button>
+              )}
+            </div>
           </form>
+          )}
 
           <section className="rounded-2xl border border-white/10 bg-white/[0.07] p-4 ring-1 ring-white/[0.03]">
             <div className="mb-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
               <div>
-                <h3 className="text-xl font-black">{showMediaTrash ? 'ถังขยะสื่อ' : 'รายการสื่อ'}</h3>
+                <h3 className="text-xl font-black">{showMediaTrash ? 'ถังขยะสื่อ' : 'คลังสื่อการสอน'}</h3>
                 <p className="mt-1 text-sm font-semibold text-slate-400">
-                  ค้นหาและกรองสื่อก่อนแก้ไขหรือลบ
+                  {showMediaTrash ? 'กู้คืนหรือลบสื่อออกจากระบบถาวร' : 'ค้นหา กรองข้อมูล และจัดการสื่อทั้งหมดในระบบ'}
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                <button className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-white/10 px-3 text-sm font-black text-white" onClick={() => setShowMediaTrash((value) => !value)} type="button">
-                  <Archive size={16} />{showMediaTrash ? 'กลับรายการสื่อ' : 'เปิดถังขยะ'}
+                <div className="flex items-center rounded-xl border border-white/10 bg-black/20 p-1">
+                  <button
+                    type="button"
+                    onClick={() => setMediaViewMode('table')}
+                    className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-black transition ${
+                      mediaViewMode === 'table' ? 'bg-cyan-300 text-slate-950 shadow-sm' : 'text-slate-400 hover:text-white'
+                    }`}
+                    title="มุมมองตาราง (กระชับ เหมาะกับข้อมูลเยอะ)"
+                  >
+                    <List size={14} />
+                    ตาราง
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMediaViewMode('grid')}
+                    className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-black transition ${
+                      mediaViewMode === 'grid' ? 'bg-cyan-300 text-slate-950 shadow-sm' : 'text-slate-400 hover:text-white'
+                    }`}
+                    title="มุมมองการ์ด (มีรูปตัวอย่าง)"
+                  >
+                    <LayoutGrid size={14} />
+                    การ์ด
+                  </button>
+                </div>
+                <button
+                  className={`inline-flex min-h-10 items-center gap-2 rounded-xl px-3 text-sm font-black transition ${
+                    showMediaTrash ? 'bg-amber-400 text-slate-950' : 'bg-white/10 text-white hover:bg-white/20'
+                  }`}
+                  onClick={() => setShowMediaTrash((value) => !value)}
+                  type="button"
+                >
+                  <Archive size={16} />
+                  {showMediaTrash ? 'กลับรายการสื่อ' : 'เปิดถังขยะ'}
                 </button>
-                <span className="rounded-xl bg-cyan-300/10 px-3 py-1 text-sm font-bold text-cyan-200">{loadingAdminMedia ? 'กำลังค้นหา...' : `${adminMediaTotal.toLocaleString('th-TH')} รายการ`}</span>
+                <span className="rounded-xl bg-cyan-300/10 px-3 py-1 text-sm font-bold text-cyan-200">
+                  {loadingAdminMedia ? 'กำลังค้นหา...' : `${adminMediaTotal.toLocaleString('th-TH')} รายการ`}
+                </span>
               </div>
+            </div>
+
+            {/* Quick Filter Chips */}
+            <div className="mb-3 flex flex-wrap items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => {
+                  setAdminMediaStatus('ทั้งหมด')
+                  setAdminMediaAccess('ทั้งหมด')
+                  setShowMediaTrash(false)
+                }}
+                className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-black transition ${
+                  adminMediaStatus === 'ทั้งหมด' && adminMediaAccess === 'ทั้งหมด' && !showMediaTrash
+                    ? 'bg-cyan-300 text-slate-950 shadow-sm'
+                    : 'bg-white/5 text-slate-300 hover:bg-white/10'
+                }`}
+              >
+                ทั้งหมด ({adminMediaTotal})
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setAdminMediaStatus('เผยแพร่แล้ว')
+                  setShowMediaTrash(false)
+                }}
+                className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-black transition ${
+                  adminMediaStatus === 'เผยแพร่แล้ว' && !showMediaTrash
+                    ? 'bg-emerald-400 text-slate-950 shadow-sm'
+                    : 'bg-emerald-400/10 text-emerald-200 hover:bg-emerald-400/20'
+                }`}
+              >
+                <span className="h-2 w-2 rounded-full bg-emerald-400" />
+                เผยแพร่แล้ว
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setAdminMediaStatus('ฉบับร่าง')
+                  setShowMediaTrash(false)
+                }}
+                className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-black transition ${
+                  adminMediaStatus === 'ฉบับร่าง' && !showMediaTrash
+                    ? 'bg-amber-400 text-slate-950 shadow-sm'
+                    : 'bg-amber-400/10 text-amber-200 hover:bg-amber-400/20'
+                }`}
+              >
+                <span className="h-2 w-2 rounded-full bg-amber-400" />
+                ฉบับร่าง
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setAdminMediaAccess('สาธารณะ')
+                  setShowMediaTrash(false)
+                }}
+                className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-black transition ${
+                  adminMediaAccess === 'สาธารณะ' && !showMediaTrash
+                    ? 'bg-sky-400 text-slate-950 shadow-sm'
+                    : 'bg-sky-400/10 text-sky-200 hover:bg-sky-400/20'
+                }`}
+              >
+                ฟรี / สาธารณะ
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setAdminMediaAccess('VIP')
+                  setShowMediaTrash(false)
+                }}
+                className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-black transition ${
+                  adminMediaAccess === 'VIP' && !showMediaTrash
+                    ? 'bg-violet-400 text-slate-950 shadow-sm'
+                    : 'bg-violet-400/10 text-violet-200 hover:bg-violet-400/20'
+                }`}
+              >
+                <Crown size={12} />
+                เฉพาะ VIP
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setAdminMediaSort('ดาวน์โหลดมากสุด')
+                  setShowMediaTrash(false)
+                }}
+                className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-black transition ${
+                  adminMediaSort === 'ดาวน์โหลดมากสุด' && !showMediaTrash
+                    ? 'bg-cyan-400 text-slate-950 shadow-sm'
+                    : 'bg-white/5 text-slate-300 hover:bg-white/10'
+                }`}
+              >
+                <Download size={12} />
+                ยอดโหลดสูงสุด
+              </button>
+              {(adminMediaQuery || adminMediaTagQuery || adminMediaTopic !== 'ทั้งหมด' || adminMediaAccess !== 'ทั้งหมด' || adminMediaStatus !== 'ทั้งหมด' || adminMediaDate !== 'ทั้งหมด' || showMediaTrash) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAdminMediaQuery('')
+                    setAdminMediaTagQuery('')
+                    setAdminMediaTopic('ทั้งหมด')
+                    setAdminMediaAccess('ทั้งหมด')
+                    setAdminMediaStatus('ทั้งหมด')
+                    setAdminMediaDate('ทั้งหมด')
+                    setAdminMediaSort('ล่าสุด')
+                    setShowMediaTrash(false)
+                  }}
+                  className="inline-flex items-center gap-1 rounded-xl bg-white/10 px-2.5 py-1.5 text-xs font-bold text-slate-300 hover:bg-white/20 hover:text-white"
+                >
+                  <RotateCcw size={12} />
+                  ล้างตัวกรอง
+                </button>
+              )}
             </div>
 
             <div className="mb-4 grid gap-3 lg:grid-cols-[1.35fr_0.85fr_180px_180px]">
@@ -3697,185 +4537,452 @@ export function AdminPanel({
               </div>
             )}
 
-            <div className="hidden overflow-hidden rounded-2xl border border-white/10 md:block">
-              {adminFilteredMedia.length === 0 ? (
-                <div className="p-6 text-center text-sm font-bold text-slate-400">
-                  ไม่พบสื่อตามเงื่อนไขที่เลือก
+            {/* Table or Grid View based on mediaViewMode */}
+            {mediaViewMode === 'table' ? (
+              <>
+                <div className="hidden overflow-hidden rounded-2xl border border-white/10 md:block">
+                  {adminFilteredMedia.length === 0 ? (
+                    <div className="p-8 text-center text-sm font-bold text-slate-400">
+                      ไม่พบสื่อตามเงื่อนไขที่เลือก
+                    </div>
+                  ) : (
+                    <table className="w-full table-fixed text-left text-sm">
+                      <thead className="bg-black/32 text-xs font-black text-cyan-200 border-b border-white/10">
+                        <tr>
+                          <th className="w-12 px-3 py-3.5 text-center">
+                            <input
+                              aria-label="เลือกสื่อทั้งหมดในหน้านี้"
+                              checked={adminFilteredMedia.length > 0 && adminFilteredMedia.every((item) => selectedMediaIds.has(item.id))}
+                              className="h-4 w-4 rounded accent-cyan-300 cursor-pointer"
+                              onChange={toggleAllVisibleMedia}
+                              type="checkbox"
+                            />
+                          </th>
+                          <th className="w-14 px-2 py-3.5 text-center">รูป</th>
+                          <th className="w-[34%] px-3 py-3.5">สื่อ / หมวดหมู่</th>
+                          <th className="w-24 px-3 py-3.5">สิทธิ์</th>
+                          <th className="w-32 px-3 py-3.5">สถานะ</th>
+                          <th className="w-24 px-3 py-3.5 text-center">ดาวน์โหลด</th>
+                          <th className="px-3 py-3.5 text-right">การจัดการ</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/10">
+                        {adminFilteredMedia.map((item) => (
+                          <tr key={item.id} className="transition hover:bg-white/[0.03]">
+                            <td className="px-3 py-3 text-center">
+                              <input
+                                aria-label={`เลือก ${item.title}`}
+                                checked={selectedMediaIds.has(item.id)}
+                                className="h-4 w-4 rounded accent-cyan-300 cursor-pointer"
+                                onChange={() => toggleSelectedMedia(item.id)}
+                                type="checkbox"
+                              />
+                            </td>
+                            <td className="px-2 py-3 text-center">
+                              {item.cover ? (
+                                <img
+                                  src={getImageDisplayUrl(item.cover)}
+                                  alt=""
+                                  className="h-10 w-10 rounded-lg object-cover mx-auto border border-white/10 shadow-sm"
+                                  onError={(e) => {
+                                    ;(e.target as HTMLImageElement).style.display = 'none'
+                                  }}
+                                />
+                              ) : (
+                                <div className="h-10 w-10 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-slate-500 mx-auto">
+                                  <ImageIcon size={18} />
+                                </div>
+                              )}
+                            </td>
+                            <td className="px-3 py-3">
+                              <div className="flex items-center gap-2">
+                                <span className="font-black text-white truncate">{item.title}</span>
+                                {item.version && (
+                                  <span className="rounded bg-cyan-400/15 px-1.5 py-0.5 text-[10px] font-black text-cyan-300 border border-cyan-400/20 shrink-0">
+                                    v{item.version}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-slate-400">
+                                <span className="rounded bg-white/5 px-1.5 py-0.5 font-bold text-slate-300">{item.topic}</span>
+                                {item.tags?.slice(0, 2).map((tag) => (
+                                  <span key={tag} className="text-[11px] text-sky-300/80">#{tag}</span>
+                                ))}
+                                {item.tags && item.tags.length > 2 && (
+                                  <span className="text-[10px] text-slate-500">+{item.tags.length - 2}</span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-3 py-3">
+                              <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-black ${
+                                item.access === 'VIP' ? 'bg-violet-400/15 text-violet-200 border border-violet-400/20' :
+                                item.access === 'ซื้อแยก' ? 'bg-amber-400/15 text-amber-200 border border-amber-400/20' :
+                                item.access === 'สมาชิก' ? 'bg-cyan-400/15 text-cyan-200 border border-cyan-400/20' :
+                                'bg-emerald-400/15 text-emerald-200 border border-emerald-400/20'
+                              }`}>
+                                {item.access === 'VIP' && <Crown size={11} />}
+                                {item.access}
+                              </span>
+                            </td>
+                            <td className="px-3 py-3">
+                              <select
+                                value={normalizeMediaStatus(item.status)}
+                                onChange={(e) => void runBulkMediaAction('status', e.target.value as MediaStatus, [item.id])}
+                                disabled={saving || showMediaTrash}
+                                className={`rounded-lg border px-2 py-1 text-xs font-bold outline-none cursor-pointer ${
+                                  normalizeMediaStatus(item.status) === 'เผยแพร่แล้ว'
+                                    ? 'border-emerald-400/30 bg-emerald-950/40 text-emerald-200'
+                                    : normalizeMediaStatus(item.status) === 'ฉบับร่าง'
+                                    ? 'border-amber-400/30 bg-amber-950/40 text-amber-200'
+                                    : 'border-white/10 bg-slate-900 text-slate-300'
+                                }`}
+                                title="คลิกเพื่อเปลี่ยนสถานะทันที"
+                              >
+                                {statusOptions.map((st) => (
+                                  <option key={st} value={st} className="bg-slate-950 text-white">{st}</option>
+                                ))}
+                              </select>
+                            </td>
+                            <td className="px-3 py-3 text-center">
+                              <span className="inline-flex items-center gap-1 text-xs font-bold text-slate-300">
+                                <Download size={13} className="text-slate-500" />
+                                {item.downloads.toLocaleString('th-TH')}
+                              </span>
+                            </td>
+                            <td className="px-3 py-3 text-right">
+                              <div className="flex items-center justify-end gap-1.5">
+                                {!showMediaTrash ? (
+                                  <>
+                                    <button
+                                      className="inline-flex h-8 items-center gap-1 rounded-lg bg-cyan-300/10 px-2.5 text-xs font-black text-cyan-200 hover:bg-cyan-300/20 transition"
+                                      onClick={() => startEditMedia(item)}
+                                      type="button"
+                                      title="แก้ไขสื่อนี้"
+                                    >
+                                      <Pencil size={13} />
+                                      แก้ไข
+                                    </button>
+                                    <button
+                                      className="inline-flex h-8 items-center gap-1 rounded-lg bg-sky-400/10 px-2.5 text-xs font-black text-sky-200 hover:bg-sky-400/20 disabled:opacity-50 transition"
+                                      disabled={saving}
+                                      onClick={() => void duplicateMedia(item)}
+                                      type="button"
+                                      title="ทำสำเนาการ์ดสื่อนี้"
+                                    >
+                                      <Copy size={13} />
+                                      สำเนา
+                                    </button>
+                                    <button
+                                      className="grid h-8 w-8 place-items-center rounded-lg bg-red-400/10 text-red-300 hover:bg-red-400/20 transition"
+                                      onClick={() => deleteMedia(item)}
+                                      type="button"
+                                      title="ย้ายไปถังขยะ"
+                                    >
+                                      <Trash2 size={13} />
+                                    </button>
+                                  </>
+                                ) : (
+                                  <>
+                                    <button
+                                      className="inline-flex h-8 items-center gap-1 rounded-lg bg-emerald-400/15 px-2.5 text-xs font-black text-emerald-100 hover:bg-emerald-400/25 transition"
+                                      onClick={() => void manageTrashedMedia(item, 'restore')}
+                                      type="button"
+                                    >
+                                      <Archive size={13} />
+                                      กู้คืน
+                                    </button>
+                                    <button
+                                      className="inline-flex h-8 items-center gap-1 rounded-lg bg-red-500/20 px-2.5 text-xs font-black text-red-100 hover:bg-red-500/30 transition"
+                                      onClick={() => void manageTrashedMedia(item, 'purge')}
+                                      type="button"
+                                    >
+                                      <Trash2 size={13} />
+                                      ลบถาวร
+                                    </button>
+                                  </>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
                 </div>
-              ) : (
-              <table className="w-full table-fixed text-left">
-                <thead className="bg-black/32 text-sm text-cyan-200">
-                  <tr>
-                    <th className="w-12 px-4 py-3">
-                      <input
-                        aria-label="เลือกสื่อทั้งหมดในหน้านี้"
-                        checked={adminFilteredMedia.length > 0 && adminFilteredMedia.every((item) => selectedMediaIds.has(item.id))}
-                        className="h-5 w-5 accent-cyan-300"
-                        onChange={toggleAllVisibleMedia}
-                        type="checkbox"
-                      />
-                    </th>
-                    <th className="w-[30%] px-4 py-3">สื่อ</th>
-                    <th className="px-4 py-3">สิทธิ์</th>
-                    <th className="px-4 py-3">สถานะ</th>
-                    <th className="px-4 py-3">ดาวน์โหลด</th>
-                    <th className="px-4 py-3">จัดการ</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-white/10">
+
+                {/* Mobile list view */}
+                <div className="grid gap-3 md:hidden">
+                  {adminFilteredMedia.length === 0 && (
+                    <div className="rounded-2xl border border-dashed border-white/15 p-5 text-sm font-bold text-slate-400 text-center">
+                      ไม่พบสื่อตามเงื่อนไขที่เลือก
+                    </div>
+                  )}
                   {adminFilteredMedia.map((item) => (
-                    <tr key={item.id}>
-                      <td className="px-4 py-4">
+                    <article className="rounded-2xl border border-white/10 bg-black/20 p-4" key={item.id}>
+                      <div className="flex items-start gap-3">
                         <input
                           aria-label={`เลือก ${item.title}`}
                           checked={selectedMediaIds.has(item.id)}
-                          className="h-5 w-5 accent-cyan-300"
+                          className="mt-1 h-5 w-5 shrink-0 accent-cyan-300 rounded cursor-pointer"
                           onChange={() => toggleSelectedMedia(item.id)}
                           type="checkbox"
                         />
-                      </td>
-                      <td className="px-4 py-4">
-                        <p className="truncate font-black text-white">{item.title}</p>
-                        <p className="text-sm text-slate-400">{item.topic}</p>
-                        {item.tags && item.tags.length > 0 && (
-                          <p className="mt-1 truncate text-xs font-bold text-sky-200/80">
-                            {item.tags.map((tag) => `#${tag}`).join(' ')}
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <p className="font-black text-white">{item.title}</p>
+                            {item.version && (
+                              <span className="rounded bg-cyan-400/15 px-1.5 py-0.5 text-[10px] font-black text-cyan-300 border border-cyan-400/20 shrink-0">
+                                v{item.version}
+                              </span>
+                            )}
+                          </div>
+                          <p className="mt-1 text-sm text-slate-400">
+                            {item.topic} · {item.access} · {item.status} · {item.downloads.toLocaleString('th-TH')} โหลด
                           </p>
-                        )}
-                      </td>
-                      <td className="px-4 py-4">{item.access}</td>
-                      <td className="px-4 py-4">{item.status}</td>
-                      <td className="px-4 py-4">{item.downloads}</td>
-                      <td className="px-4 py-4">
-                        <div className="flex flex-wrap gap-2">
-                          {!showMediaTrash && <button
-                            className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-cyan-300/10 px-3 text-sm font-black text-cyan-200"
-                            onClick={() => startEditMedia(item)}
-                            type="button"
-                          >
-                            <Pencil size={15} />
-                            แก้ไข
-                          </button>}
-                          {!showMediaTrash && <button
-                            className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-sky-400/10 px-3 text-sm font-black text-sky-100 disabled:opacity-50"
-                            disabled={saving}
-                            onClick={() => void duplicateMedia(item)}
-                            type="button"
-                          >
-                            <Copy size={15} />
-                            ทำสำเนา
-                          </button>}
-                          {!showMediaTrash ? <button
-                            className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-red-400/10 px-3 text-sm font-black text-red-200"
-                            onClick={() => deleteMedia(item)}
-                            type="button"
-                          >
-                            <Trash2 size={15} />
-                            ย้ายไปถังขยะ
-                          </button> : <>
-                            <button className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-emerald-400/15 px-3 text-sm font-black text-emerald-100" onClick={() => void manageTrashedMedia(item, 'restore')} type="button"><Archive size={15} />กู้คืน</button>
-                            <button className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-red-500/20 px-3 text-sm font-black text-red-100" onClick={() => void manageTrashedMedia(item, 'purge')} type="button"><Trash2 size={15} />ลบถาวร</button>
-                          </>}
+                          {item.tags && item.tags.length > 0 && (
+                            <p className="mt-1.5 text-xs font-bold text-sky-200/80 truncate">
+                              {item.tags.map((tag) => `#${tag}`).join(' ')}
+                            </p>
+                          )}
                         </div>
-                      </td>
-                    </tr>
+                      </div>
+                      <div className="mt-3 flex items-center justify-between border-t border-white/10 pt-3">
+                        <select
+                          value={normalizeMediaStatus(item.status)}
+                          onChange={(e) => void runBulkMediaAction('status', e.target.value as MediaStatus, [item.id])}
+                          disabled={saving || showMediaTrash}
+                          className="rounded-lg border border-white/10 bg-slate-900 px-2 py-1 text-xs font-bold text-white"
+                        >
+                          {statusOptions.map((st) => (
+                            <option key={st} value={st} className="bg-slate-950 text-white">{st}</option>
+                          ))}
+                        </select>
+                        <div className="flex items-center gap-1.5">
+                          {!showMediaTrash ? (
+                            <>
+                              <button
+                                className="h-8 rounded-lg bg-cyan-300 px-3 text-xs font-black text-slate-950"
+                                onClick={() => startEditMedia(item)}
+                                type="button"
+                              >
+                                แก้ไข
+                              </button>
+                              <button
+                                className="h-8 rounded-lg bg-sky-400/15 px-3 text-xs font-black text-sky-100 disabled:opacity-50"
+                                disabled={saving}
+                                onClick={() => void duplicateMedia(item)}
+                                type="button"
+                              >
+                                สำเนา
+                              </button>
+                              <button
+                                className="grid h-8 w-8 place-items-center rounded-lg bg-red-400/15 text-red-200"
+                                onClick={() => deleteMedia(item)}
+                                type="button"
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <button className="h-8 rounded-lg bg-emerald-400/15 px-3 text-xs font-black text-emerald-100" onClick={() => void manageTrashedMedia(item, 'restore')} type="button">กู้คืน</button>
+                              <button className="h-8 rounded-lg bg-red-500/20 px-3 text-xs font-black text-red-100" onClick={() => void manageTrashedMedia(item, 'purge')} type="button">ลบถาวร</button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </article>
                   ))}
-                </tbody>
-              </table>
-              )}
-            </div>
-
-            <div className="grid gap-3 md:hidden">
-              {adminFilteredMedia.length === 0 && (
-                <div className="rounded-2xl border border-dashed border-white/15 p-5 text-sm font-bold text-slate-400">
-                  ไม่พบสื่อตามเงื่อนไขที่เลือก
                 </div>
-              )}
-              {adminFilteredMedia.map((item) => (
-                <article className="rounded-2xl border border-white/10 bg-black/20 p-4" key={item.id}>
-                  <div className="flex items-start gap-3">
-                    <input
-                      aria-label={`เลือก ${item.title}`}
-                      checked={selectedMediaIds.has(item.id)}
-                      className="mt-1 h-5 w-5 shrink-0 accent-cyan-300"
-                      onChange={() => toggleSelectedMedia(item.id)}
-                      type="checkbox"
-                    />
-                    <p className="font-black text-white">{item.title}</p>
+              </>
+            ) : (
+              /* Grid view */
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                {adminFilteredMedia.length === 0 && (
+                  <div className="sm:col-span-2 xl:col-span-3 rounded-2xl border border-dashed border-white/15 p-8 text-center text-sm font-bold text-slate-400">
+                    ไม่พบสื่อตามเงื่อนไขที่เลือก
                   </div>
-                  <p className="mt-1 text-sm text-slate-400">
-                    {item.topic} · {item.access} · {item.status}
-                  </p>
-                  {item.tags && item.tags.length > 0 && (
-                    <p className="mt-2 text-xs font-bold text-sky-200/80">
-                      {item.tags.map((tag) => `#${tag}`).join(' ')}
-                    </p>
-                  )}
-                  <div className="mt-3 grid gap-2 sm:grid-cols-3">
-                    {!showMediaTrash && <button
-                      className="min-h-11 rounded-xl bg-cyan-300 px-4 font-black text-slate-950"
-                      onClick={() => startEditMedia(item)}
-                      type="button"
-                    >
-                      แก้ไข
-                    </button>}
-                    {!showMediaTrash && <button
-                      className="min-h-11 rounded-xl bg-sky-400/15 px-4 font-black text-sky-100 disabled:opacity-50"
-                      disabled={saving}
-                      onClick={() => void duplicateMedia(item)}
-                      type="button"
-                    >
-                      ทำสำเนา
-                    </button>}
-                    {!showMediaTrash ? <button
-                      className="min-h-11 rounded-xl bg-red-400/15 px-4 font-black text-red-100"
-                      onClick={() => deleteMedia(item)}
-                      type="button"
-                    >
-                      ย้ายไปถังขยะ
-                    </button> : <>
-                      <button className="min-h-11 rounded-xl bg-emerald-400/15 px-4 font-black text-emerald-100" onClick={() => void manageTrashedMedia(item, 'restore')} type="button">กู้คืน</button>
-                      <button className="min-h-11 rounded-xl bg-red-500/20 px-4 font-black text-red-100" onClick={() => void manageTrashedMedia(item, 'purge')} type="button">ลบถาวร</button>
-                    </>}
-                  </div>
-                </article>
-              ))}
-            </div>
+                )}
+                {adminFilteredMedia.map((item) => (
+                  <article className="overflow-hidden rounded-2xl border border-white/10 bg-black/20 flex flex-col justify-between transition hover:border-cyan-400/30" key={item.id}>
+                    <div>
+                      <div className="relative aspect-video w-full bg-slate-900 overflow-hidden border-b border-white/10">
+                        {item.cover ? (
+                          <img
+                            src={getImageDisplayUrl(item.cover)}
+                            alt=""
+                            className="h-full w-full object-cover"
+                            onError={(e) => {
+                              ;(e.target as HTMLImageElement).style.display = 'none'
+                            }}
+                          />
+                        ) : (
+                          <div className="grid h-full place-items-center text-slate-500">
+                            <ImageIcon size={32} />
+                          </div>
+                        )}
+                        <div className="absolute left-2.5 top-2.5 flex items-center gap-1.5">
+                          <span className={`rounded-lg px-2 py-0.5 text-[11px] font-black shadow-sm ${
+                            item.access === 'VIP' ? 'bg-violet-500 text-white' :
+                            item.access === 'ซื้อแยก' ? 'bg-amber-500 text-slate-950' :
+                            item.access === 'สมาชิก' ? 'bg-cyan-500 text-slate-950' :
+                            'bg-emerald-500 text-slate-950'
+                          }`}>
+                            {item.access}
+                          </span>
+                          {item.version && (
+                            <span className="rounded-lg bg-black/60 backdrop-blur px-2 py-0.5 text-[10px] font-bold text-white border border-white/20">
+                              v{item.version}
+                            </span>
+                          )}
+                        </div>
+                        <div className="absolute right-2.5 top-2.5">
+                          <input
+                            aria-label={`เลือก ${item.title}`}
+                            checked={selectedMediaIds.has(item.id)}
+                            className="h-5 w-5 accent-cyan-300 cursor-pointer rounded"
+                            onChange={() => toggleSelectedMedia(item.id)}
+                            type="checkbox"
+                          />
+                        </div>
+                      </div>
+                      <div className="p-4">
+                        <p className="font-black text-white text-base line-clamp-1">{item.title}</p>
+                        <div className="mt-1 flex items-center gap-2 text-xs text-slate-400">
+                          <span className="font-bold text-slate-300">{item.topic}</span>
+                          <span>·</span>
+                          <span>{item.downloads.toLocaleString('th-TH')} ดาวน์โหลด</span>
+                        </div>
+                        {item.tags && item.tags.length > 0 && (
+                          <div className="mt-2 flex flex-wrap gap-1">
+                            {item.tags.slice(0, 3).map((tag) => (
+                              <span key={tag} className="rounded bg-sky-400/10 px-1.5 py-0.5 text-[10px] font-bold text-sky-200">
+                                #{tag}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div className="p-4 pt-0">
+                      <div className="mt-2 flex items-center justify-between border-t border-white/10 pt-3">
+                        <select
+                          value={normalizeMediaStatus(item.status)}
+                          onChange={(e) => void runBulkMediaAction('status', e.target.value as MediaStatus, [item.id])}
+                          disabled={saving || showMediaTrash}
+                          className={`rounded-lg border px-2 py-1 text-xs font-bold outline-none cursor-pointer ${
+                            normalizeMediaStatus(item.status) === 'เผยแพร่แล้ว'
+                              ? 'border-emerald-400/30 bg-emerald-950/40 text-emerald-200'
+                              : normalizeMediaStatus(item.status) === 'ฉบับร่าง'
+                              ? 'border-amber-400/30 bg-amber-950/40 text-amber-200'
+                              : 'border-white/10 bg-slate-900 text-slate-300'
+                          }`}
+                        >
+                          {statusOptions.map((st) => (
+                            <option key={st} value={st} className="bg-slate-950 text-white">{st}</option>
+                          ))}
+                        </select>
+                        <div className="flex items-center gap-1.5">
+                          {!showMediaTrash ? (
+                            <>
+                              <button
+                                className="rounded-lg bg-cyan-300/10 p-2 text-cyan-200 hover:bg-cyan-300/20"
+                                onClick={() => startEditMedia(item)}
+                                type="button"
+                                title="แก้ไข"
+                              >
+                                <Pencil size={14} />
+                              </button>
+                              <button
+                                className="rounded-lg bg-sky-400/10 p-2 text-sky-200 hover:bg-sky-400/20 disabled:opacity-50"
+                                disabled={saving}
+                                onClick={() => void duplicateMedia(item)}
+                                type="button"
+                                title="ทำสำเนา"
+                              >
+                                <Copy size={14} />
+                              </button>
+                              <button
+                                className="rounded-lg bg-red-400/10 p-2 text-red-200 hover:bg-red-400/20"
+                                onClick={() => deleteMedia(item)}
+                                type="button"
+                                title="ย้ายไปถังขยะ"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <button className="rounded-lg bg-emerald-400/15 px-2.5 py-1 text-xs font-bold text-emerald-100" onClick={() => void manageTrashedMedia(item, 'restore')} type="button">กู้คืน</button>
+                              <button className="rounded-lg bg-red-500/20 px-2.5 py-1 text-xs font-bold text-red-100" onClick={() => void manageTrashedMedia(item, 'purge')} type="button">ลบถาวร</button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            )}
+
+            {/* Pagination Controls */}
             <div className="mt-5 flex flex-col gap-3 border-t border-white/10 pt-5 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex flex-wrap items-center gap-3">
                 <p className="text-xs font-bold text-slate-400">
                   แสดง {adminMediaRangeStart.toLocaleString('th-TH')}–{adminMediaRangeEnd.toLocaleString('th-TH')} จาก {adminMediaTotal.toLocaleString('th-TH')} รายการ
                 </p>
                 <label className="inline-flex items-center gap-2 text-xs font-bold text-slate-400">
-                  ต่อหน้า
+                  ต่อหน้า:
                   <select
-                    className="min-h-10 rounded-xl border border-white/10 bg-black/24 px-3 font-black text-white outline-none focus:border-cyan-300"
+                    className="min-h-9 rounded-xl border border-white/10 bg-black/24 px-2.5 font-black text-white outline-none focus:border-cyan-300"
                     onChange={(event) => setAdminMediaPageSize(Number(event.target.value))}
                     value={adminMediaPageSize}
                   >
-                    {[10, 20, 50].map((size) => <option className="bg-slate-950" key={size} value={size}>{size}</option>)}
+                    {[10, 25, 50, 100].map((size) => (
+                      <option className="bg-slate-950" key={size} value={size}>
+                        {size}
+                      </option>
+                    ))}
                   </select>
                 </label>
               </div>
-              <div className="flex items-center justify-between gap-2 sm:justify-end">
+              <div className="flex flex-wrap items-center gap-1.5">
                 <button
-                  className="min-h-10 rounded-xl bg-white/10 px-4 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-35"
+                  className="min-h-9 rounded-xl bg-white/10 px-2.5 text-xs font-black text-white disabled:cursor-not-allowed disabled:opacity-35 hover:bg-white/15 transition"
+                  disabled={loadingAdminMedia || adminMediaPage <= 1}
+                  onClick={() => void loadAdminMediaPage(1)}
+                  type="button"
+                  title="หน้าแรกสุด"
+                >
+                  <ChevronsLeft size={16} />
+                </button>
+                <button
+                  className="min-h-9 rounded-xl bg-white/10 px-3 text-xs font-black text-white disabled:cursor-not-allowed disabled:opacity-35 hover:bg-white/15 transition"
                   disabled={loadingAdminMedia || adminMediaPage <= 1}
                   onClick={() => void loadAdminMediaPage(adminMediaPage - 1)}
                   type="button"
                 >
                   ก่อนหน้า
                 </button>
-                <span className="min-w-20 text-center text-xs font-black text-cyan-200">
+                <span className="px-2 text-xs font-black text-cyan-200">
                   หน้า {adminMediaPage.toLocaleString('th-TH')} / {adminMediaPageCount.toLocaleString('th-TH')}
                 </span>
                 <button
-                  className="min-h-10 rounded-xl bg-cyan-300 px-4 text-sm font-black text-slate-950 disabled:cursor-not-allowed disabled:opacity-35"
+                  className="min-h-9 rounded-xl bg-cyan-300 px-3 text-xs font-black text-slate-950 disabled:cursor-not-allowed disabled:opacity-35 hover:bg-cyan-200 transition"
                   disabled={loadingAdminMedia || adminMediaPage >= adminMediaPageCount}
                   onClick={() => void loadAdminMediaPage(adminMediaPage + 1)}
                   type="button"
                 >
                   ถัดไป
+                </button>
+                <button
+                  className="min-h-9 rounded-xl bg-white/10 px-2.5 text-xs font-black text-white disabled:cursor-not-allowed disabled:opacity-35 hover:bg-white/15 transition"
+                  disabled={loadingAdminMedia || adminMediaPage >= adminMediaPageCount}
+                  onClick={() => void loadAdminMediaPage(adminMediaPageCount)}
+                  type="button"
+                  title="หน้าสุดท้าย"
+                >
+                  <ChevronsRight size={16} />
                 </button>
               </div>
             </div>
