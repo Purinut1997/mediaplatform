@@ -1,9 +1,12 @@
 import { lazy, Suspense, type FormEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ArrowLeft,
+  BookOpen,
+  Check,
+  CheckCircle2,
   ChevronRight,
+  Copy,
   Crown,
-  Database,
   Download,
   Eye,
   EyeOff,
@@ -450,26 +453,43 @@ function App() {
                 settings={siteSettings}
                 setView={setView}
                 totalDownloads={mediaRecords.reduce((sum, item) => sum + item.downloads, 0)}
+                onQuickSearch={(q, top) => {
+                  if (q) setQuery(q)
+                  if (top) setTopic(top)
+                  setView('media')
+                }}
               />
               <PortalTiles active={homeSection} onSelect={setHomeSection} />
-              {(homeSection === 'overview' || homeSection === 'discover') && <DiscoverySpotlight isLoading={dataStatus === 'loading'} mediaItems={mediaRecords} openDetail={openDetail} openSearch={() => setSmartSearchOpen(true)} />}
-              {homeSection === 'overview' && <LearningFlow
-                isLoading={dataStatus === 'loading'}
-                mediaItems={mediaRecords}
-                mode="continue"
-                openDetail={openDetail}
-                openPreview={setPreviewItem}
-                recentMediaIds={recentMediaIds}
-              />}
-              {homeSection === 'learn' && <LearningFlow
-                isLoading={dataStatus === 'loading'}
-                mediaItems={mediaRecords}
-                mode="paths"
-                openDetail={openDetail}
-                openPreview={setPreviewItem}
-                recentMediaIds={recentMediaIds}
-              />}
-              {homeSection === 'discover' && <NexusExpansion isLoading={dataStatus === 'loading'} mediaItems={mediaRecords} mode="discover" openDetail={openDetail} recentMediaIds={recentMediaIds} />}
+              {homeSection === 'overview' && (
+                <>
+                  <DiscoverySpotlight isLoading={dataStatus === 'loading'} mediaItems={mediaRecords} openDetail={openDetail} openSearch={() => setSmartSearchOpen(true)} />
+                  <LearningFlow
+                    isLoading={dataStatus === 'loading'}
+                    mediaItems={mediaRecords}
+                    mode="all"
+                    openDetail={openDetail}
+                    openPreview={setPreviewItem}
+                    recentMediaIds={recentMediaIds}
+                  />
+                  <HomeJourney currentUser={currentUser} setView={setView} />
+                </>
+              )}
+              {homeSection === 'discover' && (
+                <>
+                  <DiscoverySpotlight isLoading={dataStatus === 'loading'} mediaItems={mediaRecords} openDetail={openDetail} openSearch={() => setSmartSearchOpen(true)} />
+                  <NexusExpansion isLoading={dataStatus === 'loading'} mediaItems={mediaRecords} mode="discover" openDetail={openDetail} recentMediaIds={recentMediaIds} />
+                </>
+              )}
+              {homeSection === 'learn' && (
+                <LearningFlow
+                  isLoading={dataStatus === 'loading'}
+                  mediaItems={mediaRecords}
+                  mode="paths"
+                  openDetail={openDetail}
+                  openPreview={setPreviewItem}
+                  recentMediaIds={recentMediaIds}
+                />
+              )}
               {homeSection === 'personal' && <NexusExpansion isLoading={dataStatus === 'loading'} mediaItems={mediaRecords} mode="personal" openDetail={openDetail} recentMediaIds={recentMediaIds} />}
               {homeSection === 'about' && <><NexusExpansion isLoading={dataStatus === 'loading'} mediaItems={mediaRecords} mode="about" openDetail={openDetail} recentMediaIds={recentMediaIds} /><HomeJourney currentUser={currentUser} setView={setView} /></>}
             </>
@@ -710,18 +730,16 @@ function MediaSection({
       <div className="mb-6 grid gap-4 lg:grid-cols-[1fr_520px] lg:items-end">
         <div>
           <p className="mb-2 inline-flex items-center gap-2 rounded-2xl bg-violet-50 px-3 py-1 text-sm font-black text-violet-800 dark:bg-violet-400/10 dark:text-violet-200">
-            <Database size={16} />
-            {expanded ? 'คลังสื่อทั้งหมด' : 'สื่อพร้อมใช้งาน'}
+            <BookOpen size={16} />
+            {expanded ? 'คลังสื่อการสอนทั้งหมด' : 'สื่อพร้อมใช้งาน'}
           </p>
           <h2 className="text-3xl font-black text-slate-950 dark:text-white">
-            หมวดหมู่หลายชั้น สำหรับค้นหาไวบนมือถือและ PC
+            คลังสื่อการสอนและเอกสารการศึกษา
           </h2>
           <p className="mt-2 text-sm font-bold text-slate-500 dark:text-slate-400">
-            {dataStatus === 'ready'
-              ? 'ข้อมูลนี้ดึงจาก Neon ผ่าน Cloudflare Functions'
-              : dataStatus === 'fallback'
-                ? 'เชื่อมต่อ API ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง'
-                : 'กำลังโหลดข้อมูลจาก Neon...'}
+            {dataStatus === 'fallback'
+              ? 'ไม่สามารถเชื่อมต่อฐานข้อมูลได้ในขณะนี้ กำลังแสดงข้อมูลสำรอง'
+              : 'ค้นหาใบงาน แผนการสอน สไลด์บรรยาย และไฟล์เครื่องมือสำหรับคุณครูและนักเรียน'}
           </p>
         </div>
         <div className="grid gap-3 sm:grid-cols-[minmax(220px,1fr)_auto]">
@@ -747,11 +765,26 @@ function MediaSection({
       {recentSearches.length > 0 && <div className="mb-3 flex flex-wrap items-center gap-2 text-xs font-bold text-slate-500"><span>ค้นหาล่าสุด:</span>{recentSearches.map((item) => <button className="rounded-full bg-slate-100 px-3 py-1 dark:bg-white/10" key={item} onClick={() => setQuery(item)} type="button">{item}</button>)}</div>}
       {showFilters && (
         <div className="mb-4 grid gap-3 rounded-3xl border border-slate-200 bg-white/70 p-4 dark:border-white/10 dark:bg-white/[0.06] sm:grid-cols-2 lg:grid-cols-5">
-          <select className="min-h-11 rounded-xl border border-slate-200 bg-white px-3 dark:border-white/10 dark:bg-slate-900" onChange={(event) => setMediaAccess(event.target.value)} value={mediaAccess}><option>ทั้งหมด</option><option>สาธารณะ</option><option>สมาชิก</option><option>VIP</option><option>ซื้อแยก</option></select>
-          <select className="min-h-11 rounded-xl border border-slate-200 bg-white px-3 dark:border-white/10 dark:bg-slate-900" onChange={(event) => setMediaSource(event.target.value)} value={mediaSource}><option>ทั้งหมด</option><option>Google Drive</option><option>Google Sheet</option><option>YouTube</option><option>External Link</option><option>Preview Image</option></select>
-          <select className="min-h-11 rounded-xl border border-slate-200 bg-white px-3 dark:border-white/10 dark:bg-slate-900" onChange={(event) => setMediaDays(event.target.value)} value={mediaDays}><option value="0">ทุกช่วงเวลา</option><option value="7">7 วันล่าสุด</option><option value="30">30 วันล่าสุด</option><option value="365">1 ปีล่าสุด</option></select>
-          <select className="min-h-11 rounded-xl border border-slate-200 bg-white px-3 dark:border-white/10 dark:bg-slate-900" onChange={(event) => setMediaSort(event.target.value)} value={mediaSort}><option value="latest">ล่าสุด</option><option value="downloads">ดาวน์โหลดมากสุด</option><option value="views">เข้าชมมากสุด</option><option value="rating">คะแนนสูงสุด</option><option value="title">ชื่อ A-Z</option></select>
-          <input className="min-h-11 rounded-xl border border-slate-200 bg-white px-3 dark:border-white/10 dark:bg-slate-900" onChange={(event) => setMediaTag(event.target.value)} placeholder="กรองด้วยแท็ก" value={mediaTag} />
+          <div>
+            <span className="block text-xs font-bold text-slate-500 mb-1">ระดับสิทธิ์:</span>
+            <select className="min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold dark:border-white/10 dark:bg-slate-900" onChange={(event) => setMediaAccess(event.target.value)} value={mediaAccess}><option>ทั้งหมด</option><option>สาธารณะ</option><option>สมาชิก</option><option>VIP</option><option>ซื้อแยก</option></select>
+          </div>
+          <div>
+            <span className="block text-xs font-bold text-slate-500 mb-1">ประเภทไฟล์:</span>
+            <select className="min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold dark:border-white/10 dark:bg-slate-900" onChange={(event) => setMediaSource(event.target.value)} value={mediaSource}><option>ทั้งหมด</option><option>Google Drive</option><option>Google Sheet</option><option>YouTube</option><option>External Link</option><option>Preview Image</option></select>
+          </div>
+          <div>
+            <span className="block text-xs font-bold text-slate-500 mb-1">ช่วงเวลา:</span>
+            <select className="min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold dark:border-white/10 dark:bg-slate-900" onChange={(event) => setMediaDays(event.target.value)} value={mediaDays}><option value="0">ทุกช่วงเวลา</option><option value="7">7 วันล่าสุด</option><option value="30">30 วันล่าสุด</option><option value="365">1 ปีล่าสุด</option></select>
+          </div>
+          <div>
+            <span className="block text-xs font-bold text-slate-500 mb-1">การเรียงลำดับ:</span>
+            <select className="min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold dark:border-white/10 dark:bg-slate-900" onChange={(event) => setMediaSort(event.target.value)} value={mediaSort}><option value="latest">ล่าสุด</option><option value="downloads">ดาวน์โหลดมากสุด</option><option value="views">เข้าชมมากสุด</option><option value="rating">คะแนนสูงสุด</option><option value="title">ชื่อ A-Z</option></select>
+          </div>
+          <div>
+            <span className="block text-xs font-bold text-slate-500 mb-1">กรองด้วยแท็ก:</span>
+            <input className="min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold dark:border-white/10 dark:bg-slate-900" onChange={(event) => setMediaTag(event.target.value)} placeholder="พิมพ์ชื่อแท็ก..." value={mediaTag} />
+          </div>
         </div>
       )}
 
@@ -919,8 +952,16 @@ function MediaCard({
           className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
           src={item.cover}
         />
-        <span className="absolute left-3 top-3 rounded-xl bg-slate-950/86 px-3 py-1 text-xs font-black text-cyan-200 shadow">
-          {item.access}
+        <span className={`absolute left-3 top-3 rounded-xl px-3 py-1 text-xs font-black shadow backdrop-blur-md ${
+          item.access === 'สาธารณะ'
+            ? 'bg-emerald-600/90 text-white'
+            : item.access === 'VIP'
+              ? 'bg-amber-500/90 text-white'
+              : item.access === 'ซื้อแยก'
+                ? 'bg-orange-600/90 text-white'
+                : 'bg-slate-950/85 text-cyan-200'
+        }`}>
+          {item.access === 'สาธารณะ' ? '🟢 สาธารณะ' : item.access === 'VIP' ? '👑 VIP' : item.access === 'ซื้อแยก' ? '🟠 ซื้อแยก' : '🔵 สมาชิก'}
         </span>
         {onToggleFavorite && (
           <button
@@ -984,7 +1025,7 @@ function MediaCard({
             onClick={() => openDetail(item)}
             type="button"
           >
-            เปิดแฟ้มสื่อ
+            ดูรายละเอียดและดาวน์โหลด
             <ChevronRight size={19} />
           </button>
         </div>
@@ -1368,6 +1409,14 @@ function RegisterPanel({
   const [turnstileToken, setTurnstileToken] = useState('')
   const [botTrap, setBotTrap] = useState('')
   const [botStartedAt] = useState(() => Date.now())
+  const [copiedBank, setCopiedBank] = useState(false)
+
+  const copyAccountNumber = () => {
+    if (!settings.vipAccountNumber) return
+    navigator.clipboard.writeText(settings.vipAccountNumber)
+    setCopiedBank(true)
+    setTimeout(() => setCopiedBank(false), 2000)
+  }
 
   const updateForm = (name: keyof typeof form, value: string) => {
     setForm((current) => ({ ...current, [name]: value }))
@@ -1503,13 +1552,58 @@ function RegisterPanel({
         <div className="mb-6 flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
           <div>
             <h2 className="text-3xl font-black text-slate-950 dark:text-white">
-              สมัครสมาชิกใหม่
+              {vipSelected ? 'สมัครสมาชิกพร้อมสิทธิ์ VIP' : 'สมัครสมาชิกทั่วไป (ฟรี)'}
             </h2>
-            <p className="mt-1 text-sm font-black text-slate-500 dark:text-slate-400">
-              ข้อมูลบัญชี
+            <p className="mt-1 text-sm font-semibold text-slate-500 dark:text-slate-400">
+              {vipSelected
+                ? 'กรอกข้อมูลและแนบหลักฐานชำระเงินเพื่อเปิดใช้งานชุดสื่อพรีเมียม'
+                : 'กรอกข้อมูลง่ายๆ ในไม่กี่วินาที เข้าถึงสื่อสมาชิกได้ทันที'}
             </p>
           </div>
         </div>
+
+        {/* Segmented Membership Switcher */}
+        <div className="mb-6 rounded-2xl bg-slate-100 p-1.5 dark:bg-white/10 flex gap-2">
+          <button
+            type="button"
+            className={`flex-1 py-3 px-4 rounded-xl text-sm font-black transition flex items-center justify-center gap-2 ${
+              !vipSelected
+                ? 'bg-white text-slate-950 shadow-md dark:bg-cyan-300 dark:text-slate-950'
+                : 'text-slate-600 hover:text-slate-900 dark:text-slate-300'
+            }`}
+            onClick={() => updateForm('membership', 'member')}
+          >
+            <Users size={18} />
+            <span>สมาชิกทั่วไป (ฟรี)</span>
+            <span className="hidden sm:inline-block text-[11px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold dark:bg-emerald-400/20 dark:text-emerald-300">
+              แนะนำ
+            </span>
+          </button>
+          <button
+            type="button"
+            className={`flex-1 py-3 px-4 rounded-xl text-sm font-black transition flex items-center justify-center gap-2 ${
+              vipSelected
+                ? 'bg-white text-slate-950 shadow-md dark:bg-cyan-300 dark:text-slate-950'
+                : 'text-slate-600 hover:text-slate-900 dark:text-slate-300'
+            }`}
+            onClick={() => updateForm('membership', 'vip')}
+          >
+            <Crown size={18} className={vipSelected ? 'text-amber-500' : ''} />
+            <span>สมาชิก VIP</span>
+            {settings.vipRegistrationEnabled && settings.vipPrice > 0 && (
+              <span className="hidden sm:inline-block text-[11px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-bold dark:bg-amber-400/20 dark:text-amber-300">
+                {settings.vipPrice.toLocaleString('th-TH')} บาท
+              </span>
+            )}
+          </button>
+        </div>
+
+        {!vipSelected && (
+          <div className="mb-6 rounded-2xl border border-emerald-200/60 bg-emerald-50/70 p-4 text-sm font-semibold text-emerald-900 dark:border-emerald-300/20 dark:bg-emerald-300/10 dark:text-emerald-100 flex items-center gap-3">
+            <CheckCircle2 className="shrink-0 text-emerald-600 dark:text-emerald-400" size={20} />
+            <span>สมัครสมาชิกฟรีเพื่อดาวน์โหลดสื่อทั่วไป บันทึกรายการโปรด และดูประวัติการเข้าชม (สามารถอัปเกรด VIP ทีหลังได้ตลอดเวลา)</span>
+          </div>
+        )}
 
         <div className="grid gap-4 md:grid-cols-2">
           <RegisterField
@@ -1558,33 +1652,11 @@ function RegisterPanel({
           />
         </div>
 
-        <p className="mt-6 text-sm font-black text-slate-600 dark:text-slate-300">
-          เลือกประเภทสมาชิก
-        </p>
-        <div className="mt-3 grid gap-4 md:grid-cols-2">
-          <MembershipCard
-            active={form.membership === 'member'}
-            detail="ดาวน์โหลดไฟล์พื้นฐาน"
-            icon={<Users size={34} />}
-            onClick={() => updateForm('membership', 'member')}
-            title="สมาชิกทั่วไป (ฟรี)"
-          />
-          <MembershipCard
-            active={vipSelected}
-            badge="แนะนำ"
-            detail={
-              settings.vipRegistrationEnabled
-                ? settings.vipPrice > 0
-                  ? `${settings.vipPrice.toLocaleString('th-TH')} บาท / ${vipDurationText}`
-                  : 'ยังไม่ได้กำหนดราคา VIP'
-                : 'รอเปิดรับจากผู้ดูแล'
-            }
-            disabled={!settings.vipRegistrationEnabled || settings.vipPrice <= 0}
-            icon={<Crown size={36} />}
-            onClick={() => updateForm('membership', 'vip')}
-            title="สมาชิก VIP"
-          />
-        </div>
+        {vipSelected && (!settings.vipRegistrationEnabled || settings.vipPrice <= 0) && (
+          <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm font-bold text-amber-800 dark:border-amber-300/20 dark:bg-amber-300/10 dark:text-amber-200">
+            ขณะนี้ระบบยังไม่ได้เปิดรับสมัคร VIP รอบใหม่ กรุณาเลือกสมัครเป็นสมาชิกทั่วไป (ฟรี) ก่อน แล้วจึงอัปเกรดภายหลัง
+          </div>
+        )}
 
         {vipSelected && settings.vipRegistrationEnabled && (
           <div className="mt-6 rounded-3xl bg-slate-50 p-5 shadow-lg shadow-slate-950/5 dark:bg-white/[0.06]">
@@ -1613,7 +1685,19 @@ function RegisterPanel({
               </div>
               <div className="space-y-3 text-sm font-bold text-slate-700 dark:text-slate-200">
                 <p>ธนาคาร: {settings.vipBankName}</p>
-                <p>เลขที่บัญชี: {settings.vipAccountNumber || '-'}</p>
+                <div className="flex items-center gap-2">
+                  <p>เลขที่บัญชี: {settings.vipAccountNumber || '-'}</p>
+                  {settings.vipAccountNumber && (
+                    <button
+                      type="button"
+                      onClick={copyAccountNumber}
+                      className="inline-flex items-center gap-1 rounded-lg bg-white px-2 py-1 text-xs font-bold text-slate-700 shadow-sm border hover:bg-slate-50 dark:bg-white/10 dark:text-white"
+                    >
+                      {copiedBank ? <Check size={13} className="text-emerald-500" /> : <Copy size={13} />}
+                      {copiedBank ? 'คัดลอกแล้ว' : 'คัดลอก'}
+                    </button>
+                  )}
+                </div>
                 <p>ชื่อบัญชี: {settings.vipAccountName}</p>
                 <p className="text-red-500">
                   ยอดโอน: {settings.vipPrice > 0 ? `${settings.vipPrice.toLocaleString('th-TH')} บาท` : 'รอผู้ดูแลกำหนด'}
@@ -1682,12 +1766,12 @@ function RegisterPanel({
         )}
 
         <button
-          className="mt-6 inline-flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-rose-500 to-orange-500 px-5 text-lg font-black text-white shadow-2xl shadow-rose-500/20 disabled:opacity-60"
+          className="mt-6 inline-flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-rose-500 to-orange-500 px-5 text-lg font-black text-white shadow-2xl shadow-rose-500/20 disabled:opacity-60 transition hover:brightness-105"
           disabled={submitting}
           type="submit"
         >
-          {submitting ? <Loader2 className="animate-spin" size={22} /> : <UserPlus size={22} />}
-          {submitting ? 'กำลังลงทะเบียน...' : settings.vipSubmitLabel}
+          {submitting ? <Loader2 className="animate-spin" size={22} /> : vipSelected ? <Crown size={22} /> : <UserPlus size={22} />}
+          {submitting ? 'กำลังลงทะเบียน...' : vipSelected ? settings.vipSubmitLabel : 'สมัครสมาชิกฟรีและเริ่มใช้งาน'}
         </button>
         <p className="mt-5 text-center text-sm font-bold text-slate-500 dark:text-slate-300">
           มีบัญชีผู้ใช้งานแล้ว?{' '}
@@ -1736,46 +1820,5 @@ function RegisterField({
     </label>
   )
 }
-
-function MembershipCard({
-  active,
-  badge,
-  detail,
-  disabled,
-  icon,
-  onClick,
-  title,
-}: {
-  active: boolean
-  badge?: string
-  detail: string
-  disabled?: boolean
-  icon: ReactNode
-  onClick: () => void
-  title: string
-}) {
-  return (
-    <button
-      className={`relative min-h-32 rounded-2xl border p-5 text-center transition ${
-        active
-          ? 'border-pink-500 bg-pink-50 text-pink-600 shadow-xl shadow-pink-500/15'
-          : 'border-slate-200 bg-white text-slate-700 dark:border-white/10 dark:bg-white/5 dark:text-white'
-      } ${disabled ? 'cursor-not-allowed opacity-50' : 'hover:-translate-y-0.5'}`}
-      disabled={disabled}
-      onClick={onClick}
-      type="button"
-    >
-      {badge && (
-        <span className="absolute right-4 top-[-12px] rounded-lg bg-pink-500 px-3 py-1 text-xs font-black text-white">
-          {badge}
-        </span>
-      )}
-      <div className="mx-auto mb-3 grid place-items-center text-current">{icon}</div>
-      <p className="font-black">{title}</p>
-      <p className="mt-1 text-sm font-bold text-slate-500">{disabled ? 'ปิดรับสมัครชั่วคราว' : detail}</p>
-    </button>
-  )
-}
-
 
 export default App

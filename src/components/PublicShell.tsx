@@ -3,7 +3,6 @@ import {
   BadgeCheck,
   Bell,
   BookOpen,
-  BrainCircuit,
   Cloud,
   Database,
   FolderHeart,
@@ -145,14 +144,14 @@ export function Header({
 }) {
   const nav = [
     { label: 'หน้าหลัก', value: 'home' as View },
-    { label: 'คลังสื่อ', value: 'media' as View },
-    { label: 'E-Service', value: 'services' as View },
+    { label: 'คลังสื่อการสอน', value: 'media' as View },
+    { label: 'บริการ E-Service', value: 'services' as View },
   ]
   const memberNav = currentUser
     ? [...nav, { label: 'คลังของฉัน', value: 'account' as View }]
     : nav
   const visibleNav = canAccessAdmin(currentUser)
-    ? [...memberNav, { label: 'หลังบ้าน', value: 'admin' as View }]
+    ? [...memberNav, { label: 'ศูนย์ควบคุม', value: 'admin' as View }]
     : memberNav
 
   return (
@@ -162,7 +161,7 @@ export function Header({
           <img alt="MIKPURINUT logo" className="h-11 w-11 rounded-2xl border border-white object-cover shadow-lg shadow-cyan-900/15" src={LOGO_URL} />
           <span>
             <span className="block text-base font-black tracking-wide text-slate-950 dark:text-white">MIKPURINUT Nexus</span>
-            <span className="block text-xs font-semibold text-cyan-700 dark:text-cyan-300">AI School Media Portal</span>
+            <span className="block text-xs font-semibold text-cyan-700 dark:text-cyan-300">ศูนย์รวมสื่อการสอนและนวัตกรรมการศึกษา</span>
           </span>
         </button>
 
@@ -233,13 +232,17 @@ export function Hero({
   setView,
   settings,
   isLoading,
+  onQuickSearch,
 }: {
   mediaCount: number
   totalDownloads: number
   setView: (view: View) => void
   settings: SiteSettings
   isLoading?: boolean
+  onQuickSearch?: (query: string, topic?: string) => void
 }) {
+  const [quickQuery, setQuickQuery] = useState('')
+
   if (isLoading) {
     return (
       <section className="mx-auto max-w-7xl px-4 pb-8 pt-8 sm:px-6 lg:pt-12">
@@ -249,17 +252,78 @@ export function Hero({
     )
   }
 
+  const handleQuickSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (onQuickSearch) {
+      onQuickSearch(quickQuery)
+    } else {
+      setView('media')
+    }
+  }
+
+  const quickChips = [
+    { label: '📁 แผนการสอน', query: 'แผน' },
+    { label: '📑 ใบงาน', query: 'ใบงาน' },
+    { label: '📊 สไลด์การสอน', query: 'สไลด์' },
+    { label: '🤖 เครื่องมือ AI', topic: 'AI' },
+    { label: '📱 บริการ E-Service', view: 'services' as View },
+  ]
+
   return (
     <section className="mx-auto max-w-7xl px-4 pb-8 pt-8 sm:px-6 lg:pt-12">
-      <div className="nexus-hero grid overflow-hidden rounded-[2rem] border backdrop-blur-2xl lg:grid-cols-[0.9fr_1.1fr]">
+      <div className="nexus-hero grid overflow-hidden rounded-[2rem] border backdrop-blur-2xl lg:grid-cols-[1.05fr_0.95fr]">
         <div className="p-6 sm:p-9 lg:p-12">
-          <div className="mb-6 inline-flex items-center gap-2 rounded-2xl border border-cyan-500/20 bg-cyan-50 px-4 py-2 text-sm font-black text-cyan-900 dark:bg-cyan-400/10 dark:text-cyan-200"><BrainCircuit size={18} />{settings.heroEyebrow}</div>
+          <div className="mb-6 inline-flex items-center gap-2 rounded-2xl border border-sky-500/20 bg-sky-50 px-4 py-2 text-sm font-black text-sky-900 dark:bg-sky-400/10 dark:text-sky-200">
+            <Sparkles size={18} />
+            {settings.heroEyebrow || 'ศูนย์รวมสื่อการสอนและนวัตกรรมโรงเรียน'}
+          </div>
           {settings.announcementText && <div className="mb-5 rounded-2xl border border-amber-300/60 bg-amber-50 px-4 py-3 text-sm font-black text-amber-800 dark:border-amber-300/20 dark:bg-amber-300/10 dark:text-amber-100">{settings.announcementText}</div>}
           <h1 className="max-w-3xl text-4xl font-black leading-tight text-slate-950 sm:text-5xl dark:text-white">{settings.heroTitle}</h1>
-          <p className="mt-5 max-w-2xl text-base leading-8 text-slate-600 sm:text-lg dark:text-slate-300">{settings.heroDescription}</p>
-          <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-            <button className="nexus-primary inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl px-6 font-black text-white transition hover:-translate-y-0.5" onClick={() => setView('media')} type="button"><BookOpen size={20} />{settings.heroPrimaryLabel}</button>
-            <button className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-slate-300 bg-white/70 px-6 font-black text-slate-800 transition hover:-translate-y-0.5 hover:border-cyan-400 dark:border-white/10 dark:bg-white/10 dark:text-white" onClick={() => setView('media')} type="button"><ShieldCheck size={20} />{settings.heroSecondaryLabel}</button>
+          <p className="mt-4 max-w-2xl text-base leading-8 text-slate-600 sm:text-lg dark:text-slate-300">{settings.heroDescription}</p>
+
+          {/* Quick Search Hub directly in Hero */}
+          <div className="mt-7">
+            <form
+              className="relative flex items-center shadow-lg shadow-sky-900/10 rounded-2xl overflow-hidden border border-slate-200 bg-white dark:border-white/10 dark:bg-slate-900/90"
+              onSubmit={handleQuickSubmit}
+            >
+              <Search className="absolute left-4 text-slate-400" size={20} />
+              <input
+                className="w-full min-h-13 bg-transparent pl-12 pr-24 text-sm sm:text-base font-semibold outline-none text-slate-800 placeholder:text-slate-400 dark:text-white"
+                onChange={(e) => setQuickQuery(e.target.value)}
+                placeholder="ค้นหาแผนการสอน ใบงาน สื่อ หรือวิชา..."
+                value={quickQuery}
+              />
+              <button
+                className="absolute right-1.5 min-h-10 rounded-xl bg-slate-950 px-4 text-xs sm:text-sm font-black text-cyan-200 transition hover:bg-slate-800 dark:bg-cyan-300 dark:text-slate-950"
+                type="submit"
+              >
+                ค้นหา
+              </button>
+            </form>
+
+            <div className="mt-3 flex flex-wrap items-center gap-2 text-xs font-bold text-slate-500 dark:text-slate-400">
+              <span className="shrink-0">ค้นหาด่วน:</span>
+              {quickChips.map((chip) => (
+                <button
+                  className="rounded-xl border border-slate-200 bg-white/80 px-2.5 py-1 text-slate-700 transition hover:border-cyan-400 hover:text-cyan-700 dark:border-white/10 dark:bg-white/5 dark:text-slate-200"
+                  key={chip.label}
+                  onClick={() => {
+                    if (chip.view) setView(chip.view)
+                    else if (onQuickSearch) onQuickSearch(chip.query ?? '', chip.topic)
+                    else setView('media')
+                  }}
+                  type="button"
+                >
+                  {chip.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="mt-7 flex flex-col gap-3 sm:flex-row">
+            <button className="nexus-primary inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl px-6 font-black text-white transition hover:-translate-y-0.5" onClick={() => setView('media')} type="button"><BookOpen size={20} />{settings.heroPrimaryLabel || 'สำรวจคลังสื่อทั้งหมด'}</button>
+            <button className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-slate-300 bg-white/70 px-6 font-black text-slate-800 transition hover:-translate-y-0.5 hover:border-cyan-400 dark:border-white/10 dark:bg-white/10 dark:text-white" onClick={() => setView('services')} type="button"><ShieldCheck size={20} />{settings.heroSecondaryLabel || 'บริการ E-Service'}</button>
           </div>
         </div>
         <BrandShowcase imageUrl={settings.heroImageUrl} mediaCount={mediaCount} totalDownloads={totalDownloads} />
@@ -343,9 +407,9 @@ export function HomeJourney({
 
         <div className="grid border-t border-slate-200/80 bg-slate-950 text-white sm:grid-cols-3 dark:border-white/10">
           {[
-            { detail: 'สิทธิ์ตรวจสอบจาก API และ Session', icon: LockKeyhole, label: 'Server-side Security' },
-            { detail: 'ข้อมูลระบบจัดเก็บบน Neon PostgreSQL', icon: Database, label: 'Reliable Data' },
-            { detail: 'ให้บริการผ่าน Cloudflare Pages', icon: Cloud, label: 'Fast Delivery' },
+            { detail: 'ระบบ Session ตรวจสอบสิทธิ์ปลอดภัยทุกการดาวน์โหลด', icon: LockKeyhole, label: 'ความปลอดภัยสูง' },
+            { detail: 'จัดเก็บบน Neon Cloud Database เสถียรและแม่นยำ', icon: Database, label: 'ฐานข้อมูลเสถียร' },
+            { detail: 'เข้าถึงรวดเร็วผ่านเครือข่าย Cloudflare ความเร็วสูง', icon: Cloud, label: 'โหลดไวทุกอุปกรณ์' },
           ].map((item) => (
             <div className="flex items-center gap-3 border-white/10 p-5 sm:border-r sm:last:border-r-0" key={item.label}>
               <item.icon className="shrink-0 text-cyan-300" size={22} />
@@ -381,15 +445,23 @@ function formatMetric(value: number) {
 
 function BrandShowcase({ imageUrl, mediaCount, totalDownloads }: { imageUrl: string; mediaCount: number; totalDownloads: number }) {
   return (
-    <div className="relative min-h-[380px] overflow-hidden border-t border-sky-100 bg-sky-950 text-white lg:border-l lg:border-t-0">
-      <img alt="MIX The Architect brand" className="absolute inset-0 h-full w-full object-cover" src={imageUrl || BRAND_HERO_URL} />
-      <div className="absolute inset-0 bg-gradient-to-r from-sky-950/10 via-sky-950/0 to-sky-950/32" />
-      <div className="brand-code-rain absolute inset-0" />
-      <div className="absolute bottom-5 left-5 right-5 grid gap-3 sm:grid-cols-3">
-        {[[formatMetric(mediaCount), 'สื่อในระบบ'], [formatMetric(totalDownloads), 'ดาวน์โหลด'], ['VIP', 'ปลดล็อกเพิ่ม']].map(([value, label]) => (
-          <div className="rounded-2xl border border-white/25 bg-white/18 p-4 text-center shadow-xl backdrop-blur-md" key={label}>
-            <p className="text-2xl font-black text-white">{value}</p>
-            <p className="mt-1 text-xs font-bold text-sky-50">{label}</p>
+    <div className="relative min-h-[380px] overflow-hidden border-t border-sky-100 bg-gradient-to-br from-slate-950 via-sky-950 to-slate-900 text-white lg:border-l lg:border-t-0">
+      <img alt="MIX The Architect brand" className="absolute inset-0 h-full w-full object-cover opacity-80 transition duration-700 hover:scale-105" src={imageUrl || BRAND_HERO_URL} />
+      <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/40 to-transparent" />
+      <div className="absolute top-4 left-4 right-4 flex justify-between items-center z-10">
+        <span className="rounded-full border border-white/20 bg-slate-950/60 px-3 py-1 text-xs font-black backdrop-blur-md text-white">
+          คลังสื่อการสอนโรงเรียน
+        </span>
+        <span className="rounded-full bg-cyan-400/20 px-3 py-1 text-xs font-black text-cyan-200 border border-cyan-400/30 backdrop-blur-md">
+          Created by MIKPURINUT
+        </span>
+      </div>
+      <div className="brand-code-rain absolute inset-0 opacity-25" />
+      <div className="absolute bottom-5 left-5 right-5 grid gap-3 sm:grid-cols-3 z-10">
+        {[[formatMetric(mediaCount), 'สื่อในระบบ'], [formatMetric(totalDownloads), 'ยอดดาวน์โหลด'], ['VIP Member', 'สิทธิ์พรีเมียม']].map(([value, label]) => (
+          <div className="rounded-2xl border border-white/20 bg-slate-950/75 p-3.5 text-center shadow-xl backdrop-blur-md" key={label}>
+            <p className="text-xl sm:text-2xl font-black text-white">{value}</p>
+            <p className="mt-1 text-xs font-bold text-sky-200">{label}</p>
           </div>
         ))}
       </div>

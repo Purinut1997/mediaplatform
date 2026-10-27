@@ -4,8 +4,10 @@ import {
   AlertCircle,
   BookmarkCheck,
   CalendarDays,
+  Check,
   CheckCircle2,
   Clock3,
+  Copy,
   Crown,
   FileUp,
   ExternalLink,
@@ -327,6 +329,14 @@ function MembershipUpgradePanel({
   const [busy, setBusy] = useState(false)
   const [proofBusy, setProofBusy] = useState(false)
   const [notice, setNotice] = useState('')
+  const [copiedBank, setCopiedBank] = useState(false)
+
+  const copyAccountNumber = () => {
+    if (!settings.vipAccountNumber) return
+    navigator.clipboard.writeText(settings.vipAccountNumber)
+    setCopiedBank(true)
+    setTimeout(() => setCopiedBank(false), 2000)
+  }
   const request = library?.vipRequest
   const vipExpiresAt = library?.profile.vipExpiresAt ?? currentUser.vipExpiresAt
   const formatDate = (value?: string | null) =>
@@ -465,7 +475,19 @@ function MembershipUpgradePanel({
               <div className="text-sm font-bold text-slate-600 dark:text-slate-300">
                 <p className="text-lg font-black text-slate-950 dark:text-white">{settings.vipPaymentTitle}</p>
                 <p className="mt-1">{settings.vipBankName}</p>
-                {settings.vipAccountNumber && <p>เลขบัญชี: {settings.vipAccountNumber}</p>}
+                <div className="flex items-center gap-2">
+                  {settings.vipAccountNumber && <p>เลขบัญชี: {settings.vipAccountNumber}</p>}
+                  {settings.vipAccountNumber && (
+                    <button
+                      type="button"
+                      onClick={copyAccountNumber}
+                      className="inline-flex items-center gap-1 rounded-lg bg-white px-2 py-0.5 text-xs font-bold text-slate-700 shadow-sm border hover:bg-slate-50 dark:bg-white/10 dark:text-white"
+                    >
+                      {copiedBank ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />}
+                      {copiedBank ? 'คัดลอกแล้ว' : 'คัดลอก'}
+                    </button>
+                  )}
+                </div>
                 <p>ชื่อบัญชี: {settings.vipAccountName}</p>
                 <p className="mt-2 text-xl font-black text-violet-700 dark:text-violet-200">
                   {settings.vipPrice > 0 ? `${settings.vipPrice.toLocaleString('th-TH')} บาท` : 'รอผู้ดูแลแจ้งยอด'}

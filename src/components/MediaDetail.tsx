@@ -1,5 +1,26 @@
 import { useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, ChevronLeft, ChevronRight, Download, ExternalLink, Eye, FileText, Heart, ImageIcon, LockKeyhole, Maximize2, PlayCircle, Send, Star, X } from 'lucide-react'
+import {
+  AlertTriangle,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  Copy,
+  Download,
+  ExternalLink,
+  Eye,
+  FileSpreadsheet,
+  FileText,
+  FolderDown,
+  Heart,
+  ImageIcon,
+  LockKeyhole,
+  Maximize2,
+  PlayCircle,
+  Send,
+  Star,
+  Video,
+  X,
+} from 'lucide-react'
 import { readJson } from '../lib/api'
 import { canViewAccess, getImageDisplayUrl, isPreviewImageUrl, normalizeAssetUrl } from '../lib/media'
 import { paymentProofAccept, paymentProofHelpText, readPaymentProof } from '../lib/payment-proof'
@@ -57,6 +78,14 @@ export function MediaDetail({
   const [requestingPurchase, setRequestingPurchase] = useState(false)
   const canCheckPurchasedAccess = item.access === 'ซื้อแยก' && Boolean(currentUser)
   const purchaseAvailable = settings.purchaseEnabled && item.price > 0
+  const [copiedBank, setCopiedBank] = useState(false)
+
+  const copyAccountNumber = () => {
+    if (!settings.vipAccountNumber) return
+    navigator.clipboard.writeText(settings.vipAccountNumber)
+    setCopiedBank(true)
+    setTimeout(() => setCopiedBank(false), 2000)
+  }
 
   const openResource = async (linkId?: number, allowed = canDownload) => {
     if (!allowed) return onError()
@@ -143,8 +172,9 @@ export function MediaDetail({
             <InfoTile icon={LockKeyhole} label="ระดับสิทธิ์" value={item.access} />
           </div>
           <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-            <button className="inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-2xl bg-cyan-400 px-5 font-black text-slate-950 shadow-lg shadow-cyan-500/20" onClick={() => void openResource(primaryLink?.id, (canDownload && (!primaryLink || canViewAccess(currentUser, primaryLink.access))) || canCheckPurchasedAccess)} type="button">
-              <Download size={20} />ดาวน์โหลด / เปิดลิงก์
+            <button className="inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-2xl bg-cyan-400 px-5 font-black text-slate-950 shadow-lg shadow-cyan-500/20 transition hover:bg-cyan-300" onClick={() => void openResource(primaryLink?.id, (canDownload && (!primaryLink || canViewAccess(currentUser, primaryLink.access))) || canCheckPurchasedAccess)} type="button">
+              {canDownload ? <Download size={20} /> : <LockKeyhole size={20} />}
+              {canDownload ? 'ดาวน์โหลด / เปิดใช้งานสื่อนี้' : !currentUser ? 'เข้าสู่ระบบเพื่อใช้งาน' : 'สิทธิ์ยังไม่เพียงพอ'}
             </button>
             <button className={`inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-2xl px-5 font-black shadow-lg transition ${isFavorite ? 'bg-rose-500 text-white shadow-rose-500/20' : 'bg-slate-950 text-cyan-200 shadow-slate-900/10 dark:bg-cyan-300 dark:text-slate-950'}`} onClick={onFavorite} type="button">
               <Heart className={isFavorite ? 'fill-current' : ''} size={20} />
@@ -166,7 +196,19 @@ export function MediaDetail({
                       {settings.vipQrUrl && <img alt="QR Code ชำระเงิน" className="h-28 w-28 rounded-xl bg-white object-contain p-2" src={settings.vipQrUrl} />}
                       <div className="text-sm font-bold leading-6 text-amber-950 dark:text-amber-100">
                         <p>{settings.vipBankName}</p>
-                        {settings.vipAccountNumber && <p>เลขบัญชี: {settings.vipAccountNumber}</p>}
+                        <div className="flex items-center gap-2">
+                          {settings.vipAccountNumber && <p>เลขบัญชี: {settings.vipAccountNumber}</p>}
+                          {settings.vipAccountNumber && (
+                            <button
+                              type="button"
+                              onClick={copyAccountNumber}
+                              className="inline-flex items-center gap-1 rounded-lg bg-white px-2 py-0.5 text-xs font-bold text-amber-950 shadow-sm border border-amber-200 hover:bg-amber-50 dark:bg-black/40 dark:text-amber-200"
+                            >
+                              {copiedBank ? <Check size={12} className="text-emerald-600" /> : <Copy size={12} />}
+                              {copiedBank ? 'คัดลอกแล้ว' : 'คัดลอก'}
+                            </button>
+                          )}
+                        </div>
                         {settings.vipAccountName && <p>ชื่อบัญชี: {settings.vipAccountName}</p>}
                       </div>
                     </div>
@@ -194,19 +236,54 @@ export function MediaDetail({
           <div className="mb-4 flex flex-wrap items-end justify-between gap-2">
             <div>
               <h3 className="text-xl font-black text-slate-950 dark:text-white">ไฟล์และบทเรียนในชุดนี้</h3>
-              <p className="mt-1 text-sm font-semibold text-slate-500 dark:text-slate-400">เลือกเปิดเอกสาร วิดีโอ หรือลิงก์ที่ต้องการได้โดยตรง</p>
+              <p className="mt-1 text-sm font-semibold text-slate-500 dark:text-slate-400">เลือกเปิดเอกสาร วิดีโอ หรือเครื่องมือที่ต้องการได้ทันที</p>
             </div>
             <span className="rounded-full bg-cyan-100 px-3 py-1 text-xs font-black text-cyan-800 dark:bg-cyan-300/10 dark:text-cyan-200">{resourceLinks.length} รายการ</span>
           </div>
           <div className="grid gap-3 md:grid-cols-2">
             {resourceLinks.map((link, index) => {
               const allowed = (canDownload && canViewAccess(currentUser, link.access)) || canCheckPurchasedAccess
+              const isYoutube = link.type === 'YouTube'
+              const isSheet = link.type === 'Google Sheet'
+              const isDrive = link.type === 'Google Drive'
               return (
-                <button className={`flex min-h-16 items-center gap-3 rounded-2xl border px-4 py-3 text-left transition ${allowed ? 'border-cyan-200 bg-cyan-50 hover:border-cyan-400 hover:bg-cyan-100 dark:border-cyan-300/20 dark:bg-cyan-300/10 dark:hover:bg-cyan-300/15' : 'border-slate-200 bg-slate-100 text-slate-500 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-400'}`} key={link.id ?? `${link.label}-${index}`} onClick={() => void openResource(link.id, allowed)} type="button">
-                  {allowed ? <ExternalLink className="shrink-0 text-cyan-600 dark:text-cyan-300" size={21} /> : <LockKeyhole className="shrink-0" size={21} />}
+                <button
+                  className={`flex min-h-16 items-center gap-3 rounded-2xl border px-4 py-3 text-left transition ${
+                    allowed
+                      ? 'border-cyan-200 bg-cyan-50/70 hover:border-cyan-400 hover:bg-cyan-100 dark:border-cyan-300/20 dark:bg-cyan-300/10 dark:hover:bg-cyan-300/15'
+                      : 'border-slate-200 bg-slate-100/80 text-slate-500 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-400'
+                  }`}
+                  key={link.id ?? `${link.label}-${index}`}
+                  onClick={() => void openResource(link.id, allowed)}
+                  type="button"
+                >
+                  <div className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl ${
+                    allowed
+                      ? isYoutube
+                        ? 'bg-rose-100 text-rose-600 dark:bg-rose-500/20 dark:text-rose-300'
+                        : isSheet
+                          ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-300'
+                          : isDrive
+                            ? 'bg-blue-100 text-blue-600 dark:bg-blue-500/20 dark:text-blue-300'
+                            : 'bg-cyan-100 text-cyan-600 dark:bg-cyan-500/20 dark:text-cyan-300'
+                      : 'bg-slate-200 text-slate-500 dark:bg-white/10 dark:text-slate-400'
+                  }`}>
+                    {allowed ? (
+                      isYoutube ? <Video size={20} /> : isSheet ? <FileSpreadsheet size={20} /> : isDrive ? <FolderDown size={20} /> : <ExternalLink size={20} />
+                    ) : (
+                      <LockKeyhole size={20} />
+                    )}
+                  </div>
                   <span className="min-w-0 flex-1">
                     <span className="block truncate font-black text-slate-900 dark:text-white">{link.label}</span>
-                    <span className="mt-0.5 block text-xs font-bold">{link.type} · {link.access}</span>
+                    <span className="mt-0.5 flex items-center gap-2 text-xs font-bold text-slate-500 dark:text-slate-400">
+                      <span>{link.type}</span>
+                      <span>•</span>
+                      <span className={link.access === 'VIP' ? 'text-amber-600 dark:text-amber-300 font-black' : ''}>{link.access}</span>
+                    </span>
+                  </span>
+                  <span className="shrink-0 text-xs font-bold px-3 py-1.5 rounded-xl border border-slate-200 bg-white dark:border-white/10 dark:bg-white/5">
+                    {allowed ? (isYoutube ? 'รับชม' : isSheet ? 'เปิดชีต' : isDrive ? 'เปิดไฟล์' : 'เปิดดู') : 'ต้องมีสิทธิ์'}
                   </span>
                 </button>
               )
