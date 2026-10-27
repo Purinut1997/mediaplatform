@@ -52,6 +52,9 @@ export type MediaItem = {
   downloadLimit?: number
   deletedAt?: string | null
   deletedBy?: string | null
+  version?: string
+  changelog?: string
+  lastNotifiedAt?: string | null
 }
 
 export type CurrentUser = {
@@ -309,6 +312,29 @@ export type MediaFormState = {
   availableFrom: string
   availableUntil: string
   downloadLimit: string
+  version: string
+  changelog: string
+  notifyUpdate: boolean
+}
+
+export type BatchImportRow = {
+  id: number
+  title: string
+  topic: string
+  access: AccessLevel
+  status: MediaStatus
+  price: number
+  source: MediaSource
+  cover: string
+  fileUrl: string
+  fileLabel: string
+  previewUrl: string
+  tags: string
+  description: string
+  version: string
+  changelog: string
+  valid: boolean
+  error?: string
 }
 
 export type SiteSettings = {

@@ -36,6 +36,9 @@ type MediaRow = {
   download_limit?: number
   deleted_at?: string | null
   deleted_by?: string | null
+  version?: string | null
+  changelog?: string | null
+  last_notified_at?: string | null
   resource_url?: string | null
   preview_url?: string | null
   links?: Array<{
@@ -151,6 +154,9 @@ function toMedia(row: MediaRow) {
     downloadLimit: Number(row.download_limit ?? 0),
     deletedAt: row.deleted_at ?? null,
     deletedBy: row.deleted_by ?? null,
+    version: row.version || '1.0.0',
+    changelog: row.changelog || '',
+    lastNotifiedAt: row.last_notified_at ?? null,
   }
 }
 
@@ -379,6 +385,8 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
     const availableFrom = optionalDate(body.availableFrom, 'วันเริ่มเผยแพร่')
     const availableUntil = optionalDate(body.availableUntil, 'วันสิ้นสุดเผยแพร่')
     const maxDownloads = downloadLimit(body.downloadLimit)
+    const version = mediaText(body.version, 'เวอร์ชันสื่อ', 30, '1.0.0') || '1.0.0'
+    const changelog = mediaText(body.changelog, 'บันทึกการปรับปรุง', 5_000, '') || ''
     if (availableFrom && availableUntil && availableFrom >= availableUntil) {
       throw new MediaValidationError('วันสิ้นสุดต้องอยู่หลังวันเริ่มเผยแพร่')
     }
@@ -398,10 +406,10 @@ export const onRequestPost = async ({ env, request }: { env: Env; request: Reque
       tx`
         insert into media (
           title, slug, topic, access_level, status, price, cover_url, source_type, description,
-          available_from, available_until, download_limit
+          available_from, available_until, download_limit, version, changelog
         )
         values (${title}, ${slug}, ${topic}, ${access}, ${status}, ${price}, ${coverUrl}, ${source}, ${description},
-          ${availableFrom}, ${availableUntil}, ${maxDownloads})
+          ${availableFrom}, ${availableUntil}, ${maxDownloads}, ${version}, ${changelog})
       `,
       ...links.map((link, index) => tx`
         insert into media_links (media_id, label, type, url, preview_url, access_level, sort_order)

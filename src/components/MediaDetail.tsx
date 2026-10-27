@@ -17,6 +17,7 @@ import {
   Maximize2,
   PlayCircle,
   Send,
+  Sparkles,
   Star,
   Video,
   X,
@@ -158,13 +159,34 @@ export function MediaDetail({
           )}
         </div>
         <div className="p-2 sm:p-4">
-          <div className="mb-4 flex flex-wrap gap-2">
+          <div className="mb-4 flex flex-wrap items-center gap-2">
             <span className="rounded-xl bg-cyan-50 px-3 py-1 text-sm font-black text-cyan-800 dark:bg-cyan-400/10 dark:text-cyan-200">{item.topic}</span>
             <span className="rounded-xl bg-violet-50 px-3 py-1 text-sm font-black text-violet-800 dark:bg-violet-400/10 dark:text-violet-200">{item.access}</span>
+            {item.version && (
+              <span className="rounded-xl bg-emerald-50 px-3 py-1 text-sm font-black text-emerald-800 dark:bg-emerald-400/10 dark:text-emerald-200">
+                v{item.version}
+              </span>
+            )}
             {item.tags?.slice(0, 4).map((tag) => <span className="rounded-xl bg-sky-50 px-3 py-1 text-sm font-black text-sky-800 dark:bg-sky-400/10 dark:text-sky-200" key={tag}>#{tag}</span>)}
           </div>
           <h2 className="text-3xl font-black leading-tight text-slate-950 dark:text-white sm:text-4xl">{item.title}</h2>
           <p className="mt-4 leading-8 text-slate-600 dark:text-slate-300">{item.description}</p>
+          {item.changelog && (
+            <div className="mt-4 rounded-2xl border border-emerald-300/40 bg-emerald-50/70 p-4 dark:border-emerald-400/20 dark:bg-emerald-400/10">
+              <div className="flex items-center gap-2 text-emerald-900 dark:text-emerald-200">
+                <Sparkles size={18} className="text-emerald-600 dark:text-emerald-400" />
+                <span className="font-black text-sm">บันทึกการปรับปรุง (What's New in v{item.version || '1.0.0'})</span>
+              </div>
+              <p className="mt-2 text-sm leading-relaxed text-emerald-950/80 dark:text-emerald-100/90 whitespace-pre-line">
+                {item.changelog}
+              </p>
+              {item.updatedAt && (
+                <p className="mt-2 text-[11px] font-bold text-emerald-700/70 dark:text-emerald-300/60">
+                  อัปเดตล่าสุด: {new Date(item.updatedAt).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' })}
+                </p>
+              )}
+            </div>
+          )}
           <div className="mt-6 grid gap-3 sm:grid-cols-2">
             <InfoTile icon={Eye} label="เข้าชม" value={`${item.views} ครั้ง`} />
             <InfoTile icon={Download} label="ดาวน์โหลด" value={`${item.downloads} ครั้ง`} />

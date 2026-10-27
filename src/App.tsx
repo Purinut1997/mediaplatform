@@ -985,6 +985,11 @@ function MediaCard({
           <span className="rounded-xl bg-slate-100 px-3 py-1 text-slate-600 dark:bg-white/10 dark:text-slate-300">
             {item.source}
           </span>
+          {item.version && (
+            <span className="rounded-xl bg-emerald-50 px-2.5 py-1 text-xs font-black text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-300">
+              v{item.version}
+            </span>
+          )}
         </div>
         {item.tags && item.tags.length > 0 && (
           <div className="mb-3 flex flex-wrap gap-2">

@@ -23,7 +23,7 @@ import { BRAND_HERO_URL, LOGO_URL } from '../brand'
 import { canAccessAdmin } from '../lib/media'
 import type { AdminNotification, CurrentUser, SiteSettings, Theme, View } from '../types'
 
-function NotificationInbox({ setView }: { setView: (view: View) => void }) {
+function NotificationInbox({ currentUser, setView }: { currentUser?: CurrentUser | null; setView: (view: View) => void }) {
   const [open, setOpen] = useState(false)
   const [items, setItems] = useState<AdminNotification[]>([])
   const [unread, setUnread] = useState(0)
@@ -35,7 +35,7 @@ function NotificationInbox({ setView }: { setView: (view: View) => void }) {
 
   const load = async () => {
     try {
-      const response = await fetch('/api/admin/notifications?page=1&pageSize=8', { credentials: 'include' })
+      const response = await fetch('/api/notifications?page=1&pageSize=8', { credentials: 'include' })
       const result = await response.json() as { notifications?: AdminNotification[]; unread?: number; total?: number }
       if (!response.ok) return
       const next = result.notifications ?? []
@@ -77,16 +77,20 @@ function NotificationInbox({ setView }: { setView: (view: View) => void }) {
   }, [])
 
   const patch = async (action: 'mark-read' | 'mark-all-read', id?: number) => {
-    const response = await fetch('/api/admin/notifications', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ action, id }) })
+    const response = await fetch('/api/notifications', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ action, id }) })
     if (response.ok) await load()
   }
 
   const openTarget = (notice: AdminNotification) => {
     void patch('mark-read', notice.id)
-    if (notice.targetType) window.sessionStorage.setItem('nexus-admin-target', notice.targetType)
     setOpen(false)
     setToast(null)
-    setView('admin')
+    if (canAccessAdmin(currentUser ?? null)) {
+      if (notice.targetType) window.sessionStorage.setItem('nexus-admin-target', notice.targetType)
+      setView('admin')
+    } else {
+      setView('media')
+    }
   }
 
   const tone = (notice: AdminNotification) => notice.tone === 'red'
@@ -185,7 +189,7 @@ export function Header({
           <button aria-label="สลับธีม" className="grid h-11 w-11 place-items-center rounded-xl border border-white/70 bg-white/80 text-slate-700 shadow-sm transition hover:-translate-y-0.5 dark:border-white/10 dark:bg-white/10 dark:text-white" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} type="button">
             {theme === 'dark' ? <Sun size={19} /> : <Moon size={19} />}
           </button>
-          {canAccessAdmin(currentUser) && <NotificationInbox setView={setView} />}
+          {currentUser && <NotificationInbox currentUser={currentUser} setView={setView} />}
           {sessionReady === false ? (
             <div className="hidden min-h-11 w-32 animate-pulse rounded-xl bg-slate-200 dark:bg-slate-800 sm:inline-flex"></div>
           ) : currentUser ? (

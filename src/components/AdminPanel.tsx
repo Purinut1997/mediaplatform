@@ -6,6 +6,7 @@ import {
   ArrowDown,
   ArrowUp,
   BarChart3,
+  Bell,
   CalendarDays,
   CheckCircle2,
   Copy,
@@ -14,6 +15,7 @@ import {
   Download,
   ExternalLink,
   Eye,
+  FileSpreadsheet,
   FileText,
   Gauge,
   ImageIcon,
@@ -27,8 +29,10 @@ import {
   Search,
   Settings,
   ShieldCheck,
+  Sparkles,
   Tag,
   Trash2,
+  UploadCloud,
   Users,
   X,
 } from 'lucide-react'
@@ -41,6 +45,7 @@ import type {
   AdminUser,
   AnalyticsPoint,
   AuditLog,
+  BatchImportRow,
   CurrentUser,
   EmailStatus,
   ErrorLog,
@@ -62,6 +67,7 @@ import type {
 } from '../types'
 import { readJson } from '../lib/api'
 import { createEmptyMediaForm, createEmptyMediaLink, getEmbeddableUrl, getImageDisplayUrl, moveMediaLink, normalizeAssetUrl, normalizeMediaStatus } from '../lib/media'
+import { generateMediaCsvTemplate, parseMediaCsv } from '../lib/csv'
 import { accessOptions, sourceOptions, statusOptions } from '../defaults'
 
 type MemberView = 'directory' | 'vip' | 'requests' | 'admins'
@@ -123,6 +129,11 @@ export function AdminPanel({
   })
   const [editingMediaId, setEditingMediaId] = useState<number | null>(null)
   const [saving, setSaving] = useState(false)
+  const [showBatchImport, setShowBatchImport] = useState(false)
+  const [importRows, setImportRows] = useState<BatchImportRow[]>([])
+  const [importing, setImporting] = useState(false)
+  const [importFileName, setImportFileName] = useState('')
+  const [importResult, setImportResult] = useState<{ count?: number; error?: string } | null>(null)
   const [savingSettings, setSavingSettings] = useState(false)
   const [adminUsers, setAdminUsers] = useState<AdminUser[]>([])
   const [memberView, setMemberView] = useState<MemberView>('directory')
@@ -812,7 +823,7 @@ export function AdminPanel({
     }
   }
 
-  const updateForm = (name: keyof typeof form, value: string) => {
+  const updateForm = <K extends keyof typeof form>(name: K, value: (typeof form)[K]) => {
     setForm((current) => ({ ...current, [name]: value }))
   }
 
@@ -1001,6 +1012,9 @@ export function AdminPanel({
       availableFrom: item.availableFrom ? item.availableFrom.slice(0, 16) : '',
       availableUntil: item.availableUntil ? item.availableUntil.slice(0, 16) : '',
       downloadLimit: String(item.downloadLimit ?? 0),
+      version: item.version || '1.0.0',
+      changelog: item.changelog || '',
+      notifyUpdate: false,
     })
     document.getElementById('admin-create-media')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
@@ -1008,6 +1022,76 @@ export function AdminPanel({
   const resetMediaForm = () => {
     setEditingMediaId(null)
     setForm(createEmptyMediaForm(topics[0]))
+  }
+
+  const handleDownloadCsvTemplate = () => {
+    const csvString = generateMediaCsvTemplate(topics)
+    const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `mikpurinut_media_template_${new Date().toISOString().slice(0, 10)}.csv`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+  }
+
+  const handleCsvFileSelected = (file: File) => {
+    setImportFileName(file.name)
+    setImportResult(null)
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      const text = String(e.target?.result ?? '')
+      const parsed = parseMediaCsv(text, topics[0] || 'โรงเรียน')
+      setImportRows(parsed)
+    }
+    reader.readAsText(file)
+  }
+
+  const handleExecuteBatchImport = async () => {
+    const validRows = importRows.filter((r) => r.valid)
+    if (validRows.length === 0) return
+    setImporting(true)
+    setImportResult(null)
+    try {
+      const response = await fetch('/api/media/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-admin-token': adminToken },
+        credentials: 'include',
+        body: JSON.stringify({
+          items: validRows.map((row) => ({
+            title: row.title,
+            topic: row.topic,
+            access: row.access,
+            status: row.status,
+            price: row.price,
+            source: row.source,
+            cover: row.cover,
+            fileUrl: row.fileUrl,
+            fileLabel: row.fileLabel,
+            previewUrl: row.previewUrl,
+            tags: row.tags,
+            description: row.description,
+            version: row.version,
+            changelog: row.changelog,
+          })),
+        }),
+      })
+      const result = (await response.json()) as { ok?: boolean; error?: string; importedCount?: number }
+      if (!response.ok || !result.ok) {
+        throw new Error(result.error || 'นำเข้าสื่อไม่สำเร็จ')
+      }
+      setImportResult({ count: result.importedCount })
+      setImportRows([])
+      setImportFileName('')
+      onCreated()
+      setTimeout(() => setShowBatchImport(false), 2000)
+    } catch (err) {
+      setImportResult({ error: err instanceof Error ? err.message : 'เกิดข้อผิดพลาดในการนำเข้า' })
+    } finally {
+      setImporting(false)
+    }
   }
 
   const updateSettings = (
@@ -1055,6 +1139,9 @@ export function AdminPanel({
           availableFrom: form.availableFrom ? new Date(form.availableFrom).toISOString() : '',
           availableUntil: form.availableUntil ? new Date(form.availableUntil).toISOString() : '',
           downloadLimit: Number(form.downloadLimit || 0),
+          version: form.version.trim() || '1.0.0',
+          changelog: form.changelog.trim(),
+          notifyUpdate: Boolean(form.notifyUpdate),
         }),
       })
 
@@ -3229,7 +3316,18 @@ export function AdminPanel({
                   แปะลิงก์ Drive, Sheet, YouTube หรือเว็บภายนอก โดยไม่ต้องแก้โค้ด
                 </p>
               </div>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowBatchImport(true)
+                    setImportResult(null)
+                  }}
+                  className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-cyan-400/40 bg-cyan-400/15 px-3.5 text-sm font-black text-cyan-200 shadow-sm transition hover:bg-cyan-400/25"
+                >
+                  <UploadCloud size={16} />
+                  นำเข้าสื่อแบบกลุ่ม (CSV)
+                </button>
                 {editingMediaId && (
                   <button
                     className="min-h-10 rounded-xl bg-white/10 px-4 text-sm font-black text-white"
@@ -3295,6 +3393,76 @@ export function AdminPanel({
                   <AdminField label="เปิดให้ดาวน์โหลดตั้งแต่" name="availableFrom" onChange={updateForm} placeholder="ไม่กำหนด" type="datetime-local" value={form.availableFrom} />
                   <AdminField label="ปิดดาวน์โหลดเมื่อ" name="availableUntil" onChange={updateForm} placeholder="ไม่กำหนด" type="datetime-local" value={form.availableUntil} />
                   <AdminField label="จำกัดดาวน์โหลดต่อบัญชี (0 = ไม่จำกัด)" name="downloadLimit" onChange={updateForm} placeholder="0" type="number" value={form.downloadLimit} />
+                </div>
+              </section>
+
+              <section className="rounded-[1.5rem] border border-white/10 bg-black/15 p-4">
+                <div className="mb-4 flex items-start gap-3">
+                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-violet-300/12 text-violet-200"><Sparkles size={19} /></span>
+                  <div>
+                    <h3 className="text-lg font-black text-white">เวอร์ชันและการแจ้งเตือนการอัปเดต</h3>
+                    <p className="mt-1 text-sm font-semibold text-slate-400">ระบุเลขเวอร์ชัน บันทึกสิ่งที่เปลี่ยนแปลง และเลือกแจ้งเตือนไปยังสมาชิกเมื่อมีการปรับปรุง</p>
+                  </div>
+                </div>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div>
+                    <span className="text-sm font-black text-slate-200">เลขเวอร์ชัน (Version)</span>
+                    <div className="mt-2 flex gap-2">
+                      <input
+                        className="min-h-12 flex-1 rounded-2xl border border-white/10 bg-black/24 px-4 text-base text-white outline-none placeholder:text-slate-500 focus:border-cyan-300 focus:ring-4 focus:ring-cyan-300/10"
+                        placeholder="เช่น 1.0.0 หรือ 1.1.0"
+                        value={form.version}
+                        onChange={(e) => updateForm('version', e.target.value)}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const parts = (form.version || '1.0.0').split('.')
+                          if (parts.length === 3) {
+                            const minor = parseInt(parts[1], 10) || 0
+                            updateForm('version', `${parts[0]}.${minor + 1}.0`)
+                          } else {
+                            updateForm('version', '1.1.0')
+                          }
+                        }}
+                        className="rounded-2xl border border-white/10 bg-white/10 px-3 text-xs font-black text-cyan-200 hover:bg-white/20"
+                        title="เพิ่มเวอร์ชันย่อย +0.1.0"
+                      >
+                        +0.1.0
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <span className="text-sm font-black text-slate-200">บันทึกการปรับปรุง (Changelog / สิ่งที่อัปเดตใหม่)</span>
+                    <textarea
+                      className="mt-2 min-h-24 w-full rounded-2xl border border-white/10 bg-black/24 px-4 py-3 text-base text-white outline-none placeholder:text-slate-500 focus:border-cyan-300 focus:ring-4 focus:ring-cyan-300/10"
+                      placeholder="เช่น เพิ่มเฉลยข้อ 11-20, อัปเดตสไลด์เนื้อหาสำหรับเทอม 2"
+                      value={form.changelog}
+                      onChange={(e) => updateForm('changelog', e.target.value)}
+                    />
+                  </div>
+
+                  {editingMediaId && (
+                    <div className="md:col-span-2">
+                      <label className="flex cursor-pointer items-center gap-3 rounded-2xl border border-emerald-400/30 bg-emerald-400/10 p-3.5 transition hover:bg-emerald-400/15">
+                        <input
+                          type="checkbox"
+                          checked={form.notifyUpdate}
+                          onChange={(e) => updateForm('notifyUpdate', e.target.checked)}
+                          className="h-5 w-5 rounded border-white/20 bg-black/40 text-emerald-400 focus:ring-emerald-400"
+                        />
+                        <div>
+                          <span className="font-black text-emerald-200 text-sm flex items-center gap-1.5">
+                            <Bell size={16} /> ส่งการแจ้งเตือนการอัปเดตไปยังสมาชิกทุกคน (Media Update Alert)
+                          </span>
+                          <p className="mt-0.5 text-xs text-emerald-100/70">
+                            ระบบจะส่งข้อความแจ้งเตือน "สื่ออัปเดตใหม่" ไปยังกล่องข้อความของผู้ใช้ทันทีที่กดบันทึก
+                          </p>
+                        </div>
+                      </label>
+                    </div>
+                  )}
                 </div>
               </section>
 
@@ -3753,6 +3921,194 @@ export function AdminPanel({
             </div>
           </div>
         </div>, document.body,
+      )}
+      {showBatchImport && createPortal(
+        <div
+          aria-label="นำเข้าสื่อการสอนแบบกลุ่ม (CSV)"
+          aria-modal="true"
+          className="fixed inset-0 z-[130] grid place-items-center bg-slate-950/88 p-3 backdrop-blur-xl sm:p-5"
+          role="dialog"
+        >
+          <button
+            aria-label="ปิดหน้าต่างนำเข้า"
+            className="absolute inset-0 cursor-default"
+            onClick={() => !importing && setShowBatchImport(false)}
+            type="button"
+          />
+          <div className="relative flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-[2rem] border border-cyan-300/20 bg-slate-950 text-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-white/10 px-6 py-4">
+              <div className="flex items-center gap-3">
+                <span className="grid h-10 w-10 place-items-center rounded-2xl bg-cyan-400/20 text-cyan-300">
+                  <UploadCloud size={22} />
+                </span>
+                <div>
+                  <h3 className="text-xl font-black">นำเข้าสื่อแบบกลุ่มผ่าน CSV (Bulk Import)</h3>
+                  <p className="text-xs text-slate-400">อัปโหลดไฟล์ CSV เพื่อเพิ่มสื่อหลายรายการพร้อมกันในคราวเดียว</p>
+                </div>
+              </div>
+              <button
+                aria-label="ปิด"
+                className="grid h-10 w-10 place-items-center rounded-xl bg-white/10 text-white transition hover:bg-red-500"
+                disabled={importing}
+                onClick={() => setShowBatchImport(false)}
+                type="button"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-6 space-y-5">
+              <div className="grid gap-4 sm:grid-cols-[1fr_auto]">
+                <div className="rounded-2xl border border-dashed border-cyan-400/30 bg-cyan-950/20 p-5 text-center transition hover:border-cyan-400/60">
+                  <FileSpreadsheet className="mx-auto mb-2 text-cyan-300" size={32} />
+                  <p className="font-bold text-sm text-cyan-100">
+                    {importFileName ? `ไฟล์ที่เลือก: ${importFileName}` : 'ลากไฟล์ CSV มาวางที่นี่ หรือคลิกเลือกไฟล์'}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-400">รองรับไฟล์ .csv (UTF-8) ที่มีหัวตารางภาษาไทยหรืออังกฤษ</p>
+                  <label className="mt-3 inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-xl bg-cyan-400 px-4 text-xs font-black text-slate-950 transition hover:bg-cyan-300">
+                    <UploadCloud size={16} />
+                    {importFileName ? 'เปลี่ยนไฟล์ CSV' : 'เลือกไฟล์ CSV จากเครื่อง'}
+                    <input
+                      type="file"
+                      accept=".csv,text/csv"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0]
+                        if (file) handleCsvFileSelected(file)
+                      }}
+                    />
+                  </label>
+                </div>
+
+                <div className="flex flex-col justify-center rounded-2xl border border-white/10 bg-white/5 p-5 text-center">
+                  <p className="text-xs font-black uppercase tracking-wider text-slate-400">ยังไม่มีไฟล์เทมเพลต?</p>
+                  <p className="mt-1 text-xs text-slate-300">ดาวน์โหลดตัวอย่างไฟล์ที่มีหัวตารางและตัวอย่างข้อมูลพร้อมใช้</p>
+                  <button
+                    type="button"
+                    onClick={handleDownloadCsvTemplate}
+                    className="mt-3 inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 text-xs font-black text-white transition hover:bg-white/20"
+                  >
+                    <Download size={15} /> ดาวน์โหลดเทมเพลต CSV
+                  </button>
+                </div>
+              </div>
+
+              {importRows.length > 0 && (
+                <div>
+                  <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex flex-wrap items-center gap-2 text-xs font-black">
+                      <span className="rounded-lg bg-white/10 px-2.5 py-1 text-white">
+                        ทั้งหมด {importRows.length} แถว
+                      </span>
+                      <span className="rounded-lg bg-emerald-400/20 px-2.5 py-1 text-emerald-300">
+                        🟢 พร้อมนำเข้า {importRows.filter((r) => r.valid).length} รายการ
+                      </span>
+                      {importRows.filter((r) => !r.valid).length > 0 && (
+                        <span className="rounded-lg bg-rose-400/20 px-2.5 py-1 text-rose-300">
+                          🔴 พบข้อผิดพลาด {importRows.filter((r) => !r.valid).length} รายการ
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="max-h-72 overflow-auto rounded-xl border border-white/10 bg-black/40 text-left text-xs">
+                    <table className="w-full border-collapse">
+                      <thead className="sticky top-0 bg-slate-900/90 backdrop-blur font-black text-slate-300">
+                        <tr className="border-b border-white/10">
+                          <th className="p-2.5 text-center">#</th>
+                          <th className="p-2.5">สถานะ</th>
+                          <th className="p-2.5">ชื่อสื่อ</th>
+                          <th className="p-2.5">หมวดหมู่</th>
+                          <th className="p-2.5">สิทธิ์</th>
+                          <th className="p-2.5">แหล่งไฟล์</th>
+                          <th className="p-2.5">เวอร์ชัน</th>
+                          <th className="p-2.5">หมายเหตุ</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/5 font-medium">
+                        {importRows.map((row) => (
+                          <tr
+                            key={row.id}
+                            className={`transition hover:bg-white/5 ${row.valid ? '' : 'bg-rose-500/10'}`}
+                          >
+                            <td className="p-2.5 text-center text-slate-400">{row.id}</td>
+                            <td className="p-2.5">
+                              {row.valid ? (
+                                <span className="inline-flex items-center gap-1 text-emerald-400 font-bold">
+                                  <CheckCircle2 size={14} /> พร้อม
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 text-rose-400 font-bold">
+                                  <AlertCircle size={14} /> ติดขัด
+                                </span>
+                              )}
+                            </td>
+                            <td className="p-2.5 font-bold text-white max-w-xs truncate" title={row.title}>
+                              {row.title || '-'}
+                            </td>
+                            <td className="p-2.5 text-slate-300">{row.topic}</td>
+                            <td className="p-2.5">
+                              <span className="rounded bg-white/10 px-1.5 py-0.5 text-[11px] font-bold">
+                                {row.access}
+                              </span>
+                            </td>
+                            <td className="p-2.5 text-slate-400">{row.source}</td>
+                            <td className="p-2.5 text-slate-300">v{row.version}</td>
+                            <td className="p-2.5">
+                              {row.valid ? (
+                                <span className="text-slate-500">-</span>
+                              ) : (
+                                <span className="text-rose-300 font-bold">{row.error}</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {importResult?.count && (
+                <div className="rounded-xl border border-emerald-400/30 bg-emerald-400/10 p-4 text-emerald-200 flex items-center gap-2">
+                  <CheckCircle2 size={18} className="text-emerald-400 shrink-0" />
+                  <span className="font-bold text-sm">
+                    นำเข้าสื่อเรียบร้อยแล้วจำนวน {importResult.count} รายการ
+                  </span>
+                </div>
+              )}
+              {importResult?.error && (
+                <div className="rounded-xl border border-rose-400/30 bg-rose-400/10 p-4 text-rose-200 flex items-center gap-2">
+                  <AlertCircle size={18} className="text-rose-400 shrink-0" />
+                  <span className="font-bold text-sm">{importResult.error}</span>
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-end gap-3 border-t border-white/10 bg-slate-900/60 p-4">
+              <button
+                type="button"
+                disabled={importing}
+                onClick={() => setShowBatchImport(false)}
+                className="min-h-11 rounded-xl bg-white/10 px-5 text-sm font-bold text-white transition hover:bg-white/20 disabled:opacity-50"
+              >
+                ยกเลิก
+              </button>
+              <button
+                type="button"
+                disabled={importing || importRows.filter((r) => r.valid).length === 0}
+                onClick={handleExecuteBatchImport}
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-cyan-400 px-6 text-sm font-black text-slate-950 shadow-lg shadow-cyan-500/20 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {importing ? <Loader2 className="animate-spin" size={18} /> : <UploadCloud size={18} />}
+                {importing
+                  ? 'กำลังนำเข้าสื่อ...'
+                  : `ยืนยันนำเข้า (${importRows.filter((r) => r.valid).length} รายการ)`}
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body,
       )}
     </section>
   )

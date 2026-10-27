@@ -43,6 +43,9 @@ export function createEmptyMediaForm(topic = 'โรงเรียน'): MediaF
     availableFrom: '',
     availableUntil: '',
     downloadLimit: '0',
+    version: '1.0.0',
+    changelog: '',
+    notifyUpdate: false,
   }
 }
 

@@ -21,7 +21,7 @@ export type Env = {
 }
 
 let schemaReady = false
-const SCHEMA_VERSION = '2026.08.24.1'
+const SCHEMA_VERSION = '2026.10.27.1'
 
 export function getSql(env: Env) {
   if (!env.DATABASE_URL) {
@@ -155,6 +155,9 @@ export async function ensureSchema(env: Env) {
         where key = 'site'
           and not (value ? 'vipLifetimeEnabled')
       `
+      await sql`alter table media add column if not exists version text not null default '1.0.0'`
+      await sql`alter table media add column if not exists changelog text not null default ''`
+      await sql`alter table media add column if not exists last_notified_at timestamptz`
       await writeSchemaVersion()
       schemaReady = true
       return
@@ -193,6 +196,9 @@ export async function ensureSchema(env: Env) {
       download_limit integer not null default 0 check (download_limit between 0 and 1000000),
       deleted_at timestamptz,
       deleted_by text,
+      version text not null default '1.0.0',
+      changelog text not null default '',
+      last_notified_at timestamptz,
       created_at timestamptz not null default now(),
       updated_at timestamptz not null default now()
     )

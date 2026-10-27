@@ -7,6 +7,7 @@ import {
   mediaText,
 } from '../../_lib/media-validation'
 import { optionalHttpUrl } from '../../_lib/url'
+import { writeNotification } from '../../_lib/notifications'
 
 const DEFAULT_COVER_URL =
   'https://raw.githubusercontent.com/Purinut1997/web-images/ab67fea68788dc5db9514475e8f2b8cb1c32d8b3/ChatGPT%20Image%2023%20%E0%B8%9E.%E0%B8%84.%202569%2008_05_56.png'
@@ -33,6 +34,9 @@ type MediaPayload = {
   availableFrom?: string
   availableUntil?: string
   downloadLimit?: number
+  version?: string
+  changelog?: string
+  notifyUpdate?: boolean
 }
 
 type Context = {
@@ -108,6 +112,9 @@ function readMediaFields(body: MediaPayload) {
     availableFrom: availableFrom?.toISOString() ?? null,
     availableUntil: availableUntil?.toISOString() ?? null,
     maxDownloads,
+    version: mediaText(body.version, 'เวอร์ชันสื่อ', 30, '1.0.0') || '1.0.0',
+    changelog: mediaText(body.changelog, 'บันทึกการปรับปรุง', 5_000, '') || '',
+    notifyUpdate: Boolean(body.notifyUpdate),
   }
 }
 
@@ -140,7 +147,7 @@ export const onRequestPut = async ({ env, request, params }: Context) => {
       { status: 400 },
     )
   }
-  const { title, description, topic, access, status, price, source, availableFrom, availableUntil, maxDownloads } = fields
+  const { title, description, topic, access, status, price, source, availableFrom, availableUntil, maxDownloads, version, changelog, notifyUpdate } = fields
   if (!title) {
     return Response.json({ ok: false, error: 'กรุณากรอกชื่อสื่อไม่เกิน 200 ตัวอักษร' }, { status: 400 })
   }
@@ -166,7 +173,9 @@ export const onRequestPut = async ({ env, request, params }: Context) => {
       set title = ${title}, topic = ${topic}, access_level = ${access}, status = ${status},
         price = ${price}, cover_url = ${coverUrl}, source_type = ${source},
         description = ${description}, available_from = ${availableFrom}, available_until = ${availableUntil},
-        download_limit = ${maxDownloads}, updated_at = now()
+        download_limit = ${maxDownloads}, version = ${version}, changelog = ${changelog},
+        last_notified_at = case when ${notifyUpdate} then now() else last_notified_at end,
+        updated_at = now()
       where id = ${id} and deleted_at is null
     `,
     tx`delete from media_links where media_id = ${id}`,
@@ -189,9 +198,22 @@ export const onRequestPut = async ({ env, request, params }: Context) => {
     ]),
     tx`
       insert into audit_logs (actor, action, target_type, target_id, detail)
-      values (${auth.actor}, 'update', 'media', ${String(id)}, ${JSON.stringify({ title, tags })}::jsonb)
+      values (${auth.actor}, 'update', 'media', ${String(id)}, ${JSON.stringify({ title, tags, version, notifyUpdate })}::jsonb)
     `,
   ])
+
+  if (notifyUpdate) {
+    await writeNotification(env, {
+      audience: 'all',
+      type: 'media_updated',
+      title: `สื่ออัปเดตใหม่: ${title} (${version})`,
+      detail: changelog ? `${changelog}` : 'มีการปรับปรุงเนื้อหาและไฟล์ใหม่ สามารถดาวน์โหลดเวอร์ชันล่าสุดได้แล้ว',
+      tone: 'emerald',
+      targetType: 'media',
+      targetId: String(id),
+      fingerprint: `media_updated:${id}:${version}:${Date.now()}`,
+    })
+  }
 
   return Response.json({ ok: true })
 }
