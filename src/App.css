@@ -596,33 +596,47 @@ main > section {
   animation: pulse-line 3.4s ease-in-out infinite;
 }
 
-.code-rain {
-  overflow: hidden;
-  opacity: 0.10;
-  mask-image: linear-gradient(to bottom, transparent, black 18%, black 74%, transparent);
+@keyframes code-stream-scroll {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(0, -50%, 0);
+  }
 }
 
-.code-rain span {
+.developer-code-stream {
   position: absolute;
-  left: var(--left);
-  top: 0;
-  color: rgba(2, 132, 199, 0.55);
-  font-family: "Space Grotesk", ui-monospace, monospace;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.16em;
-  text-shadow: 0 0 4px rgba(14, 165, 233, 0.25);
-  animation: code-fall var(--speed) linear infinite;
-  animation-delay: var(--delay);
-  will-change: transform;
-}
-
-.dark .code-rain span {
-  color: rgba(103, 232, 249, 0.6);
-}
-
-.dark .code-rain {
+  inset: 0;
+  overflow: hidden;
   opacity: 0.16;
+  mask-image: linear-gradient(to bottom, transparent 0%, black 10%, black 88%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 10%, black 88%, transparent 100%);
+  pointer-events: none;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  font-size: 11px;
+  line-height: 1.65;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  user-select: none;
+}
+
+:root:not(.dark) .developer-code-stream {
+  opacity: 0.08;
+}
+
+.developer-code-column {
+  position: absolute;
+  top: 0;
+  width: auto;
+}
+
+.developer-code-track {
+  display: flex;
+  flex-direction: column;
+  animation: code-stream-scroll var(--duration, 40s) linear infinite;
+  animation-delay: var(--delay, 0s);
+  will-change: transform;
 }
 
 .brand-code-rain {

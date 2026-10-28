@@ -4,8 +4,12 @@
 
 ## ภาพรวมความคืบหน้า
 
-- ระบบพร้อมใช้งานหลักประมาณ **99.7%**
-- อัปเดตล่าสุด: ปรับปรุงประสิทธิภาพการใช้ทรัพยากร GPU และการแสดงผล (GPU & Motion Performance Optimization):
+- ระบบพร้อมใช้งานหลักประมาณ **99.8%**
+- อัปเดตล่าสุด: เปิดใช้งานพื้นหลัง Developer Code Stream สไตล์ Modern Cloud Developer (Zero-GPU Architecture):
+  - สร้างสายธารโค้ดแนวตั้ง 5 คอลัมน์ที่สะท้อนการทำงานจริงของโปรแกรมเมอร์ (Cloudflare Serverless API, Vite Build & Deploy logs, Neon PostgreSQL queries, Web Crypto HMAC Security, และ React Virtual Grid Hooks)
+  - ขับเคลื่อนการเคลื่อนที่ด้วย CSS `transform: translate3d` แบบ 100% Compositor-Only พร้อมเทคนิค Duplicated Seamless Loop ทำให้อนุภาคและโค้ดไหลอย่างนุ่มนวลตลอดเวลาโดย GPU ไม่ต้อง Re-paint หรือคำนวณใหม่
+  - ใช้สี Syntax Highlighter มาตรฐาน (Cyber Cyan, Emerald Green, Sky Blue, Amber, Slate) ที่ความโปร่งแสงต่ำ สบายตา ไม่รบกวนการอ่านเนื้อหาการ์ด
+- อัปเดตก่อนหน้า: ปรับปรุงประสิทธิภาพการใช้ทรัพยากร GPU และการแสดงผล (GPU & Motion Performance Optimization):
   - ลบแอนิเมชัน `background-position` บนตารางกริด `academy-grid` ทั้งจอ ทำให้ GPU ไม่ต้อง Re-paint เส้นกริดแบบ 120fps ตลอดเวลา
   - ลดภาระ Blur Cache Invalidation โดยเปลี่ยนการ์ดสื่อและปุ่มย่อยจาก `backdrop-blur-xl` มาใช้สีพื้นหลังคุณภาพสูง (`--surface` opacity 0.88-0.92) ที่คมชัด สบายตา และอ่านง่าย คง `backdrop-blur-md` ไว้เฉพาะ Header บาร์ด้านบน
   - ลดจำนวนละอองแสง Particle จาก 18 เหลือ 8 จุด พร้อมลดรัศมีเงาเบลอ `box-shadow` จาก 42px เหลือ 8px และใส่ `will-change: transform, opacity;` ส่งตรงให้ GPU Compositor จัดการโดยไม่ต้องวาดพิกเซลใหม่
