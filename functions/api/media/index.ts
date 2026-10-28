@@ -1,5 +1,5 @@
 import { getCurrentUser } from '../../_lib/auth'
-import { requireAdminPermission, writeErrorLog } from '../../_lib/admin'
+import { writeErrorLog } from '../../_lib/admin'
 import { ensureSchema, getSql, type Env } from '../../_lib/db'
 import { hideProtectedLinks } from '../../_lib/media-access'
 import {
@@ -183,9 +183,8 @@ export const onRequestGet = async ({ env, request }: { env: Env; request: Reques
   const topic = url.searchParams.get('topic')
   const query = url.searchParams.get('query')?.trim().slice(0, 120) ?? ''
   const pattern = `%${query}%`
-  const adminUser = await requireAdminPermission(env, request, 'media:read')
-  const canReadAll = Boolean(adminUser)
-  const currentUser = adminUser ?? await getCurrentUser(env, request)
+  const currentUser = await getCurrentUser(env, request)
+  const canReadAll = currentUser?.role === 'superadmin' || currentUser?.role === 'admin'
   const requestedAccess = url.searchParams.get('access')?.trim() ?? ''
   const access = MEDIA_ACCESS_LEVELS.includes(requestedAccess as (typeof MEDIA_ACCESS_LEVELS)[number])
     ? requestedAccess
@@ -343,17 +342,38 @@ export const onRequestGet = async ({ env, request }: { env: Env; request: Reques
           ))
       `
 
-  return Response.json({
-    ok: true,
-    page,
-    pageSize,
-    total: Number(countRow?.total ?? 0),
-    hasMore: offset + rows.length < Number(countRow?.total ?? 0),
-    media: (rows as MediaRow[]).map((row) => {
-      const media = toMedia(row)
-      return canReadAll ? media : hideProtectedLinks(media, currentUser)
-    }),
-  })
+  const isDefaultPublicCatalog =
+    !canReadAll &&
+    !currentUser &&
+    query === '' &&
+    (topic === 'ทั้งหมด' || !topic) &&
+    access === '' &&
+    source === '' &&
+    days === 0 &&
+    sort === 'latest' &&
+    page === 1 &&
+    tag === ''
+
+  return Response.json(
+    {
+      ok: true,
+      page,
+      pageSize,
+      total: Number(countRow?.total ?? 0),
+      hasMore: offset + rows.length < Number(countRow?.total ?? 0),
+      media: (rows as MediaRow[]).map((row) => {
+        const media = toMedia(row)
+        return canReadAll ? media : hideProtectedLinks(media, currentUser)
+      }),
+    },
+    {
+      headers: {
+        'Cache-Control': isDefaultPublicCatalog
+          ? 'public, max-age=15, s-maxage=60, stale-while-revalidate=120'
+          : 'no-store',
+      },
+    },
+  )
 }
 
 export const onRequestPost = async ({ env, request }: { env: Env; request: Request }) => {

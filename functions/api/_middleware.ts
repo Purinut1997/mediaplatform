@@ -28,7 +28,9 @@ export const onRequest = async ({ request, next }: Context) => {
 
   const response = await next()
   const headers = new Headers(response.headers)
-  headers.set('Cache-Control', 'no-store')
+  if (!headers.has('Cache-Control')) {
+    headers.set('Cache-Control', 'no-store')
+  }
   headers.set('Referrer-Policy', 'strict-origin-when-cross-origin')
   headers.set('Content-Security-Policy', "default-src 'none'; frame-ancestors 'none'; base-uri 'none'")
   headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()')

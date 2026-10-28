@@ -40,15 +40,22 @@ export const onRequestGet = async ({ env }: { env: Env }) => {
     order by sort_order asc, name asc
   `) as CategoryRow[]
 
-  return Response.json({
-    ok: true,
-    categories: rows.map((row) => ({
-      id: row.id,
-      name: row.name,
-      slug: row.slug,
-      sortOrder: row.sort_order,
-    })),
-  })
+  return Response.json(
+    {
+      ok: true,
+      categories: rows.map((row) => ({
+        id: row.id,
+        name: row.name,
+        slug: row.slug,
+        sortOrder: row.sort_order,
+      })),
+    },
+    {
+      headers: {
+        'Cache-Control': 'public, max-age=60, s-maxage=300, stale-while-revalidate=600',
+      },
+    },
+  )
 }
 
 export const onRequestPost = async ({ env, request }: { env: Env; request: Request }) => {

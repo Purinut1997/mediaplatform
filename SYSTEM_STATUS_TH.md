@@ -4,8 +4,13 @@
 
 ## ภาพรวมความคืบหน้า
 
-- ระบบพร้อมใช้งานหลักประมาณ **99%**
-- อัปเดตล่าสุด: เพิ่มระบบนำเข้าสื่อแบบกลุ่ม (Bulk / Batch Import CSV) และระบบกำหนดเวอร์ชันสื่อพร้อมแจ้งเตือนการอัปเดต (Media Versioning & Update Alert)
+- ระบบพร้อมใช้งานหลักประมาณ **99.5%**
+- อัปเดตล่าสุด: ปรับปรุงประสิทธิภาพความเร็วสูง (High Performance & Ultra-fast Loading):
+  - ปลดการหน่วงเวลาเทียม 760ms ของ LoadingOverlay และ 250ms Initial Load Debounce บนหน้าแรก ทำให้หน้าแรกแสดงผลทันทีที่ข้อมูลมาถึง
+  - เปิดใช้งาน Edge Caching บน Cloudflare Pages Functions สำหรับ `/api/settings` และ `/api/categories` (แคช 5 นาที) และ Public Media Catalog (แคช 1 นาที) ลดการยิงทะลุไป Neon ซ้ำๆ
+  - แก้ไขปัญหา Double Database Query ใน `/api/media` จากการเช็กสิทธิ์ Admin ซ้ำซ้อน ลด Round-trip ไปยัง Neon PostgreSQL
+  - ทำ Code-Splitting เพิ่มเติมด้วย React `lazy()` สำหรับ `EServicePanel`, `MediaDetail`, `MemberLibraryPanel`, และ `MemberProfilePanel` ช่วยลดขนาด Main Bundle ลงเหลือต่ำกว่า 100 KB gzipped
+- อัปเดตก่อนหน้า: เพิ่มระบบนำเข้าสื่อแบบกลุ่ม (Bulk / Batch Import CSV) และระบบกำหนดเวอร์ชันสื่อพร้อมแจ้งเตือนการอัปเดต (Media Versioning & Update Alert)
 - อัปเดต UX/UI ปรับปรุงประสบการณ์ใช้งานสำหรับทุกคนและมือใหม่:
   - เพิ่ม Quick Search Hub ใน Hero หน้าแรก พร้อมชิปค้นหาด่วนตามหมวดหมู่วิชา/สื่อ
   - ปรับปรุง PortalTiles เป็นทางลัดเข้าถึงพื้นที่ใช้งานแบบชัดเจน พร้อมปุ่มแสดงภาพรวมทั้งหมดบนหน้าหลัก

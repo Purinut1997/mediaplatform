@@ -244,7 +244,15 @@ export const onRequestGet = async ({ env, request }: { env: Env; request: Reques
   `) as Array<{ value: SiteSettings }>
 
   const settings = normalizeSettings(row?.value)
-  return Response.json({ ok: true, settings: settingsForViewer(settings, currentUser?.role === 'superadmin') })
+  const isSuperAdmin = currentUser?.role === 'superadmin'
+  const cacheControl = isSuperAdmin
+    ? 'no-store'
+    : 'public, max-age=60, s-maxage=300, stale-while-revalidate=600'
+
+  return Response.json(
+    { ok: true, settings: settingsForViewer(settings, isSuperAdmin) },
+    { headers: { 'Cache-Control': cacheControl } },
+  )
 }
 
 export const onRequestPut = async ({ env, request }: { env: Env; request: Request }) => {

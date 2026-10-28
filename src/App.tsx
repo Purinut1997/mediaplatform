@@ -44,19 +44,28 @@ import { CreditBadge, EmptyState, Footer, LoadingOverlay, Popup, Toast } from '.
 import { PortalTiles, type HomeSection } from './components/PortalTiles'
 import { AuthBotCheck } from './components/AuthBotCheck'
 import { Header, Hero, HomeJourney, MaintenanceScreen } from './components/PublicShell'
-import { MemberLibraryPanel, MemberProfilePanel } from './components/MemberLibrary'
 import { SupportWidget } from './components/SupportWidget'
-import { MediaDetail } from './components/MediaDetail'
 import { VipTermsDialog } from './components/VipTermsDialog'
 import { DiscoverySpotlight, SmartSearchDialog } from './components/HomeExperience'
 import { LearningFlow, QuickPreviewDialog } from './components/LearningFlow'
 import { NexusExpansion } from './components/NexusExpansion'
-import { EServicePanel } from './components/EServicePanel'
 import { defaultSiteSettings, mediaItems, topics } from './defaults'
 import './App.css'
 
 const AdminPanel = lazy(() =>
   import('./components/AdminPanel').then((module) => ({ default: module.AdminPanel })),
+)
+const MemberLibraryPanel = lazy(() =>
+  import('./components/MemberLibrary').then((module) => ({ default: module.MemberLibraryPanel })),
+)
+const MemberProfilePanel = lazy(() =>
+  import('./components/MemberLibrary').then((module) => ({ default: module.MemberProfilePanel })),
+)
+const MediaDetail = lazy(() =>
+  import('./components/MediaDetail').then((module) => ({ default: module.MediaDetail })),
+)
+const EServicePanel = lazy(() =>
+  import('./components/EServicePanel').then((module) => ({ default: module.EServicePanel })),
 )
 
 function trackMediaEvent(mediaId: number, eventType: 'view') {
@@ -114,7 +123,7 @@ function App() {
   })
   const [showSuccess, setShowSuccess] = useState(false)
   const [showError, setShowError] = useState(false)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [smartSearchOpen, setSmartSearchOpen] = useState(false)
   const [homeSection, setHomeSection] = useState<HomeSection>('overview')
@@ -131,6 +140,7 @@ function App() {
   const [memberLibraryLoading, setMemberLibraryLoading] = useState(false)
   const [memberLibraryRefresh, setMemberLibraryRefresh] = useState(0)
   const sharedMediaHandled = useRef(false)
+  const initialMountLoaded = useRef(false)
 
   useEffect(() => {
     const handleSmartSearch = (event: KeyboardEvent) => {
@@ -178,11 +188,6 @@ function App() {
       active = false
     }
   }, [])
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => setLoading(false), 760)
-    return () => window.clearTimeout(timer)
-  }, [refreshToken])
 
   useEffect(() => {
     if (!toast) return
@@ -266,6 +271,14 @@ function App() {
           setSelected(sharedMedia)
           setView('detail')
         }
+      }
+    }
+
+    if (!initialMountLoaded.current) {
+      initialMountLoaded.current = true
+      void loadData()
+      return () => {
+        active = false
       }
     }
 
@@ -422,7 +435,7 @@ function App() {
   return (
     <div className="theme-shell relative min-h-screen overflow-hidden text-slate-900 transition-colors duration-300 dark:text-slate-100">
       <TechBackground />
-      {(loading || !sessionReady) && <LoadingOverlay />}
+      {(loading || dataStatus === 'loading' || !sessionReady) && <LoadingOverlay />}
       <SupportWidget pageName={view} />
 
       <div className="relative z-10">
@@ -524,50 +537,60 @@ function App() {
               topics={topicOptions}
             />
           )}
-          {view === 'services' && <EServicePanel currentUser={currentUser} key={currentUser?.email ?? 'guest'} setView={setView} />}
+          {view === 'services' && (
+            <Suspense fallback={<LoadingOverlay />}>
+              <EServicePanel currentUser={currentUser} key={currentUser?.email ?? 'guest'} setView={setView} />
+            </Suspense>
+          )}
           {view === 'detail' && (
-            <MediaDetail
-              item={selected}
-              canDownload={canViewMedia(currentUser, selected)}
-              currentUser={currentUser}
-              settings={siteSettings}
-              isFavorite={favoriteIds.has(selected.id)}
-              onBack={() => setView('media')}
-              onFavorite={() => void toggleFavorite(selected)}
-              onDownloaded={() => {
-                setMemberLibraryRefresh((value) => value + 1)
-                setToast('เปิดลิงก์สื่อและบันทึกประวัติแล้ว')
-              }}
-              onError={() => setShowError(true)}
-            />
+            <Suspense fallback={<LoadingOverlay />}>
+              <MediaDetail
+                item={selected}
+                canDownload={canViewMedia(currentUser, selected)}
+                currentUser={currentUser}
+                settings={siteSettings}
+                isFavorite={favoriteIds.has(selected.id)}
+                onBack={() => setView('media')}
+                onFavorite={() => void toggleFavorite(selected)}
+                onDownloaded={() => {
+                  setMemberLibraryRefresh((value) => value + 1)
+                  setToast('เปิดลิงก์สื่อและบันทึกประวัติแล้ว')
+                }}
+                onError={() => setShowError(true)}
+              />
+            </Suspense>
           )}
           {view === 'account' && currentUser && (
-            <MemberLibraryPanel
-              library={memberLibrary}
-              loading={memberLibraryLoading}
-              onOpenDetail={openDetail}
-              renderFavorite={(media) => (
-                <MediaCard
-                  isFavorite={favoriteIds.has(media.id)}
-                  item={media}
-                  key={media.id}
-                  onToggleFavorite={(item) => void toggleFavorite(item)}
-                  openDetail={openDetail}
-                />
-              )}
-              setView={setView}
-            />
+            <Suspense fallback={<LoadingOverlay />}>
+              <MemberLibraryPanel
+                library={memberLibrary}
+                loading={memberLibraryLoading}
+                onOpenDetail={openDetail}
+                renderFavorite={(media) => (
+                  <MediaCard
+                    isFavorite={favoriteIds.has(media.id)}
+                    item={media}
+                    key={media.id}
+                    onToggleFavorite={(item) => void toggleFavorite(item)}
+                    openDetail={openDetail}
+                  />
+                )}
+                setView={setView}
+              />
+            </Suspense>
           )}
           {view === 'profile' && currentUser && (
-            <MemberProfilePanel
-              currentUser={currentUser}
-              library={memberLibrary}
-              onLibraryRefresh={() => setMemberLibraryRefresh((value) => value + 1)}
-              onLogout={logout}
-              onUserUpdated={setCurrentUser}
-              setView={setView}
-              settings={siteSettings}
-            />
+            <Suspense fallback={<LoadingOverlay />}>
+              <MemberProfilePanel
+                currentUser={currentUser}
+                library={memberLibrary}
+                onLibraryRefresh={() => setMemberLibraryRefresh((value) => value + 1)}
+                onLogout={logout}
+                onUserUpdated={setCurrentUser}
+                setView={setView}
+                settings={siteSettings}
+              />
+            </Suspense>
           )}
           {view === 'profile' && !currentUser && <LoginPanel onLogin={handleLogin} setView={setView} />}
           {view === 'account' && !currentUser && (
