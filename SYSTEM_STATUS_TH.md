@@ -4,8 +4,12 @@
 
 ## ภาพรวมความคืบหน้า
 
-- ระบบพร้อมใช้งานหลักประมาณ **99.5%**
-- อัปเดตล่าสุด: ปรับปรุงประสิทธิภาพความเร็วสูง (High Performance & Ultra-fast Loading):
+- ระบบพร้อมใช้งานหลักประมาณ **99.6%**
+- อัปเดตล่าสุด: แก้ไขระบบตั้งค่า VIP ของสมาชิกใน Admin Panel ให้สามารถจัดการได้ทันทีจากทั้ง Table View และ Card View:
+  - เพิ่มการเรนเดอร์แถวขยาย (Expanded Row) VIP Editor ในตารางสมาชิก (Table View) เมื่อคลิกปุ่ม "VIP" พร้อมแสดงปุ่มสถานะ Active ชัดเจน
+  - เพิ่มตัวเลือกต่ออายุ VIP ด่วน (+30 วัน, +90 วัน, +365 วัน), กำหนด VIP ตลอดชีพ, และระบุวันหมดอายุเจาะจงผ่าน Date Picker
+  - เพิ่มปุ่มเปิดสิทธิ์ VIP ทันทีสำหรับสมาชิกทั่วไป และปุ่มยกเลิกสิทธิ์ VIP กลับเป็นสมาชิกทั่วไป
+- อัปเดตก่อนหน้า: ปรับปรุงประสิทธิภาพความเร็วสูง (High Performance & Ultra-fast Loading):
   - ปลดการหน่วงเวลาเทียม 760ms ของ LoadingOverlay และ 250ms Initial Load Debounce บนหน้าแรก ทำให้หน้าแรกแสดงผลทันทีที่ข้อมูลมาถึง
   - เปิดใช้งาน Edge Caching บน Cloudflare Pages Functions สำหรับ `/api/settings` และ `/api/categories` (แคช 5 นาที) และ Public Media Catalog (แคช 1 นาที) ลดการยิงทะลุไป Neon ซ้ำๆ
   - แก้ไขปัญหา Double Database Query ใน `/api/media` จากการเช็กสิทธิ์ Admin ซ้ำซ้อน ลด Round-trip ไปยัง Neon PostgreSQL

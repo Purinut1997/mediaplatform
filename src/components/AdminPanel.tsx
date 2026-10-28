@@ -1,4 +1,4 @@
-import { type FormEvent, useEffect, useState } from 'react'
+import { Fragment, type FormEvent, useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
   AlertCircle,
@@ -1999,109 +1999,220 @@ export function AdminPanel({
                             const expiryTime = user.vipExpiresAt ? Date.parse(user.vipExpiresAt) : 0
                             const vipExpired = user.access === 'VIP' && expiryTime > 0 && expiryTime <= filterNow
                             const vipExpiringSoon = user.access === 'VIP' && expiryTime > filterNow && expiryTime <= filterNow + 7 * 86400000
+                            const isEditingVip = editingVipUserId === user.id && !isSuperAdminUser
                             return (
-                              <tr key={user.id} className="transition hover:bg-white/[0.03]">
-                                <td className="px-4 py-3">
-                                  <div className="flex items-center gap-3">
-                                    <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-cyan-400/20 to-sky-500/20 text-xs font-black text-cyan-200 border border-cyan-400/30">
-                                      {user.name ? user.name.slice(0, 1).toUpperCase() : 'U'}
+                              <Fragment key={user.id}>
+                                <tr className={`transition hover:bg-white/[0.03] ${isEditingVip ? 'bg-cyan-500/10' : ''}`}>
+                                  <td className="px-4 py-3">
+                                    <div className="flex items-center gap-3">
+                                      <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-cyan-400/20 to-sky-500/20 text-xs font-black text-cyan-200 border border-cyan-400/30">
+                                        {user.name ? user.name.slice(0, 1).toUpperCase() : 'U'}
+                                      </div>
+                                      <div className="min-w-0">
+                                        <p className="font-black text-white truncate max-w-[200px]">{user.name}</p>
+                                        <p className="text-xs text-slate-400 truncate max-w-[200px]">{user.email}</p>
+                                      </div>
                                     </div>
-                                    <div className="min-w-0">
-                                      <p className="font-black text-white truncate max-w-[200px]">{user.name}</p>
-                                      <p className="text-xs text-slate-400 truncate max-w-[200px]">{user.email}</p>
-                                    </div>
-                                  </div>
-                                </td>
-                                <td className="px-3 py-3">
-                                  <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-black ${
-                                    isSuperAdminUser ? 'bg-cyan-400/20 text-cyan-200 border border-cyan-400/30' :
-                                    user.role === 'admin' ? 'bg-violet-400/20 text-violet-200 border border-violet-400/30' :
-                                    'bg-white/10 text-slate-300'
-                                  }`}>
-                                    {isSuperAdminUser && <ShieldCheck size={12} />}
-                                    {user.role}
-                                  </span>
-                                </td>
-                                <td className="px-3 py-3">
-                                  <div>
+                                  </td>
+                                  <td className="px-3 py-3">
                                     <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-black ${
-                                      user.access === 'VIP' ? 'bg-amber-400/20 text-amber-200 border border-amber-400/30' : 'bg-white/10 text-slate-300'
+                                      isSuperAdminUser ? 'bg-cyan-400/20 text-cyan-200 border border-cyan-400/30' :
+                                      user.role === 'admin' ? 'bg-violet-400/20 text-violet-200 border border-violet-400/30' :
+                                      'bg-white/10 text-slate-300'
                                     }`}>
-                                      {user.access === 'VIP' && <Crown size={12} />}
-                                      {user.access}
+                                      {isSuperAdminUser && <ShieldCheck size={12} />}
+                                      {user.role}
                                     </span>
-                                    {user.access === 'VIP' && !user.vipExpiresAt && (
-                                      <p className="mt-1 text-[11px] font-bold text-amber-300">ตลอดชีพ</p>
-                                    )}
-                                    {user.vipExpiresAt && (
-                                      <p className={`mt-1 text-[11px] font-bold ${
-                                        vipExpired ? 'text-red-300' : vipExpiringSoon ? 'text-amber-300' : 'text-emerald-300'
+                                  </td>
+                                  <td className="px-3 py-3">
+                                    <div>
+                                      <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-black ${
+                                        user.access === 'VIP' ? 'bg-amber-400/20 text-amber-200 border border-amber-400/30' : 'bg-white/10 text-slate-300'
                                       }`}>
-                                        {vipExpired ? 'หมดอายุ' : vipExpiringSoon ? 'ใกล้หมด' : 'ถึง'} {new Date(user.vipExpiresAt).toLocaleDateString('th-TH')}
-                                      </p>
-                                    )}
-                                  </div>
-                                </td>
-                                <td className="px-3 py-3">
-                                  <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold ${
-                                    user.status === 'active' ? 'bg-emerald-400/15 text-emerald-200' : 'bg-red-400/15 text-red-200'
-                                  }`}>
-                                    <span className={`h-1.5 w-1.5 rounded-full ${user.status === 'active' ? 'bg-emerald-400' : 'bg-red-400'}`} />
-                                    {user.status === 'active' ? 'เปิดใช้งาน' : 'ปิดบัญชี'}
-                                  </span>
-                                </td>
-                                <td className="px-3 py-3 text-xs text-slate-300">
-                                  <span>มอบให้ {user.eservicePurchasedCount ?? 0}</span>
-                                  <span className="text-slate-500"> / เพิ่มเอง {user.eserviceCustomCount ?? 0}</span>
-                                </td>
-                                <td className="px-4 py-3 text-right">
-                                  <div className="flex items-center justify-end gap-1.5">
-                                    <button
-                                      className="inline-flex h-8 items-center gap-1 rounded-lg bg-cyan-300/10 px-2.5 text-xs font-black text-cyan-200 hover:bg-cyan-300/20 disabled:opacity-40"
-                                      disabled={loadingMembers || isSuperAdminUser}
-                                      onClick={() => openVipEditor(user)}
-                                      type="button"
-                                      title="จัดการอายุ VIP"
-                                    >
-                                      <CalendarDays size={13} />
-                                      VIP
-                                    </button>
-                                    <button
-                                      className="inline-flex h-8 items-center gap-1 rounded-lg bg-violet-300/10 px-2 text-xs font-black text-violet-200 hover:bg-violet-300/20 disabled:opacity-40"
-                                      disabled={loadingMembers || isSuperAdminUser}
-                                      onClick={() => submitMemberAction({ action: 'set-role', userId: user.id, role: user.role === 'admin' ? 'member' : 'admin' })}
-                                      type="button"
-                                      title={user.role === 'admin' ? 'ลดเป็นสมาชิก' : 'ตั้งเป็น Admin'}
-                                    >
-                                      {user.role === 'admin' ? 'ลดสิทธิ์' : 'Admin'}
-                                    </button>
-                                    <button
-                                      className="inline-flex h-8 items-center rounded-lg bg-white/10 px-2 text-xs font-black text-white hover:bg-white/20 disabled:opacity-40"
-                                      disabled={loadingMembers || isSuperAdminUser}
-                                      onClick={() => submitMemberAction({ action: 'set-status', userId: user.id, status: user.status === 'active' ? 'disabled' : 'active' })}
-                                      type="button"
-                                    >
-                                      {user.status === 'active' ? 'ปิด' : 'เปิด'}
-                                    </button>
-                                    <button
-                                      className="inline-flex h-8 items-center rounded-lg bg-emerald-400/15 px-2 text-xs font-black text-emerald-200 hover:bg-emerald-400/25 disabled:opacity-40"
-                                      disabled={loadingMembers}
-                                      onClick={() => {
-                                        const title = window.prompt('ชื่อระบบที่มอบให้ผู้ใช้')?.trim()
-                                        if (!title) return
-                                        const url = window.prompt('URL ระบบ (ต้องขึ้นต้น https://)')?.trim()
-                                        if (!url) return
-                                        const category = window.prompt('หมวดหมู่', 'ระบบจาก MIKPURINUT')?.trim() || 'ระบบจาก MIKPURINUT'
-                                        void submitMemberAction({ action: 'grant-eservice', userId: user.id, title, url, category })
-                                      }}
-                                      type="button"
-                                      title="มอบระบบ E-Service"
-                                    >
-                                      +ระบบ
-                                    </button>
-                                  </div>
-                                </td>
-                              </tr>
+                                        {user.access === 'VIP' && <Crown size={12} />}
+                                        {user.access}
+                                      </span>
+                                      {user.access === 'VIP' && !user.vipExpiresAt && (
+                                        <p className="mt-1 text-[11px] font-bold text-amber-300">ตลอดชีพ</p>
+                                      )}
+                                      {user.vipExpiresAt && (
+                                        <p className={`mt-1 text-[11px] font-bold ${
+                                          vipExpired ? 'text-red-300' : vipExpiringSoon ? 'text-amber-300' : 'text-emerald-300'
+                                        }`}>
+                                          {vipExpired ? 'หมดอายุ' : vipExpiringSoon ? 'ใกล้หมด' : 'ถึง'} {new Date(user.vipExpiresAt).toLocaleDateString('th-TH')}
+                                        </p>
+                                      )}
+                                    </div>
+                                  </td>
+                                  <td className="px-3 py-3">
+                                    <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold ${
+                                      user.status === 'active' ? 'bg-emerald-400/15 text-emerald-200' : 'bg-red-400/15 text-red-200'
+                                    }`}>
+                                      <span className={`h-1.5 w-1.5 rounded-full ${user.status === 'active' ? 'bg-emerald-400' : 'bg-red-400'}`} />
+                                      {user.status === 'active' ? 'เปิดใช้งาน' : 'ปิดบัญชี'}
+                                    </span>
+                                  </td>
+                                  <td className="px-3 py-3 text-xs text-slate-300">
+                                    <span>มอบให้ {user.eservicePurchasedCount ?? 0}</span>
+                                    <span className="text-slate-500"> / เพิ่มเอง {user.eserviceCustomCount ?? 0}</span>
+                                  </td>
+                                  <td className="px-4 py-3 text-right">
+                                    <div className="flex items-center justify-end gap-1.5">
+                                      <button
+                                        className={`inline-flex h-8 items-center gap-1 rounded-lg px-2.5 text-xs font-black transition disabled:opacity-40 ${
+                                          isEditingVip
+                                            ? 'bg-cyan-400 text-slate-950 shadow-md shadow-cyan-400/20'
+                                            : 'bg-cyan-300/10 text-cyan-200 hover:bg-cyan-300/20'
+                                        }`}
+                                        disabled={loadingMembers || isSuperAdminUser}
+                                        onClick={() => openVipEditor(user)}
+                                        type="button"
+                                        title="จัดการอายุ VIP"
+                                      >
+                                        <CalendarDays size={13} />
+                                        VIP
+                                      </button>
+                                      <button
+                                        className="inline-flex h-8 items-center gap-1 rounded-lg bg-violet-300/10 px-2 text-xs font-black text-violet-200 hover:bg-violet-300/20 disabled:opacity-40"
+                                        disabled={loadingMembers || isSuperAdminUser}
+                                        onClick={() => submitMemberAction({ action: 'set-role', userId: user.id, role: user.role === 'admin' ? 'member' : 'admin' })}
+                                        type="button"
+                                        title={user.role === 'admin' ? 'ลดเป็นสมาชิก' : 'ตั้งเป็น Admin'}
+                                      >
+                                        {user.role === 'admin' ? 'ลดสิทธิ์' : 'Admin'}
+                                      </button>
+                                      <button
+                                        className="inline-flex h-8 items-center rounded-lg bg-white/10 px-2 text-xs font-black text-white hover:bg-white/20 disabled:opacity-40"
+                                        disabled={loadingMembers || isSuperAdminUser}
+                                        onClick={() => submitMemberAction({ action: 'set-status', userId: user.id, status: user.status === 'active' ? 'disabled' : 'active' })}
+                                        type="button"
+                                      >
+                                        {user.status === 'active' ? 'ปิด' : 'เปิด'}
+                                      </button>
+                                      <button
+                                        className="inline-flex h-8 items-center rounded-lg bg-emerald-400/15 px-2 text-xs font-black text-emerald-200 hover:bg-emerald-400/25 disabled:opacity-40"
+                                        disabled={loadingMembers}
+                                        onClick={() => {
+                                          const title = window.prompt('ชื่อระบบที่มอบให้ผู้ใช้')?.trim()
+                                          if (!title) return
+                                          const url = window.prompt('URL ระบบ (ต้องขึ้นต้น https://)')?.trim()
+                                          if (!url) return
+                                          const category = window.prompt('หมวดหมู่', 'ระบบจาก MIKPURINUT')?.trim() || 'ระบบจาก MIKPURINUT'
+                                          void submitMemberAction({ action: 'grant-eservice', userId: user.id, title, url, category })
+                                        }}
+                                        type="button"
+                                        title="มอบระบบ E-Service"
+                                      >
+                                        +ระบบ
+                                      </button>
+                                    </div>
+                                  </td>
+                                </tr>
+                                {isEditingVip && (
+                                  <tr className="border-b border-cyan-400/20 bg-cyan-950/20">
+                                    <td colSpan={6} className="p-3 sm:p-4">
+                                      <div className="rounded-2xl border border-cyan-400/30 bg-black/40 p-4 shadow-xl">
+                                        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-3">
+                                          <div className="flex items-center gap-2.5">
+                                            <div className="grid h-8 w-8 place-items-center rounded-xl bg-amber-400/20 text-amber-300 border border-amber-400/30">
+                                              <Crown size={16} />
+                                            </div>
+                                            <div>
+                                              <p className="font-black text-white text-sm">
+                                                กำหนดเวลาสิทธิ์ VIP: <span className="text-cyan-300">{user.name}</span>
+                                                <span className="ml-2 text-xs font-normal text-slate-400">({user.email})</span>
+                                              </p>
+                                              <p className="text-xs font-medium text-slate-400">
+                                                สถานะปัจจุบัน: <span className={user.access === 'VIP' ? 'font-bold text-amber-300' : 'text-slate-300'}>{user.access}</span>
+                                                {user.access === 'VIP' && (
+                                                  <span className="ml-2 font-bold text-cyan-200">
+                                                    ({!user.vipExpiresAt ? 'ตลอดชีพ' : `หมดอายุ: ${new Date(user.vipExpiresAt).toLocaleDateString('th-TH')}`})
+                                                  </span>
+                                                )}
+                                              </p>
+                                            </div>
+                                          </div>
+                                          <button
+                                            className="inline-flex h-8 items-center gap-1 rounded-lg bg-white/10 px-2.5 text-xs font-bold text-slate-300 hover:bg-white/20"
+                                            onClick={() => setEditingVipUserId(null)}
+                                            type="button"
+                                            title="ปิดการตั้งค่า"
+                                          >
+                                            <X size={14} />
+                                            ปิด
+                                          </button>
+                                        </div>
+
+                                        <p className="mt-2.5 text-xs font-medium text-slate-400">
+                                          การต่ออายุจะนับเพิ่มจากวันหมดอายุเดิม หรือเริ่มจากวันนี้หากหมดอายุแล้ว
+                                        </p>
+
+                                        <div className="mt-3 flex flex-wrap items-center gap-2">
+                                          {user.access !== 'VIP' && (
+                                            <button
+                                              className="inline-flex h-9 items-center rounded-xl bg-emerald-400/20 px-3.5 text-xs font-black text-emerald-200 hover:bg-emerald-400/30 border border-emerald-400/30 disabled:opacity-40"
+                                              disabled={loadingMembers}
+                                              onClick={() => void submitMemberAction({ action: 'set-access', userId: user.id, access: 'VIP' })}
+                                              type="button"
+                                            >
+                                              ⭐ เปิดสิทธิ์ VIP ทันที
+                                            </button>
+                                          )}
+                                          {[30, 90, 365].map((days) => (
+                                            <button
+                                              key={days}
+                                              className="inline-flex h-9 items-center rounded-xl bg-cyan-400/15 px-3.5 text-xs font-black text-cyan-200 hover:bg-cyan-400/25 border border-cyan-400/30 disabled:opacity-40"
+                                              disabled={loadingMembers}
+                                              onClick={() => void submitMemberAction({ action: 'extend-vip', userId: user.id, days })}
+                                              type="button"
+                                            >
+                                              +{days.toLocaleString('th-TH')} วัน
+                                            </button>
+                                          ))}
+                                          <button
+                                            className="inline-flex h-9 items-center rounded-xl bg-amber-400/20 px-3.5 text-xs font-black text-amber-200 hover:bg-amber-400/30 border border-amber-400/30 disabled:opacity-40"
+                                            disabled={loadingMembers}
+                                            onClick={() => void submitMemberAction({ action: 'set-vip-lifetime', userId: user.id })}
+                                            type="button"
+                                          >
+                                            👑 กำหนด VIP ตลอดชีพ
+                                          </button>
+                                        </div>
+
+                                        <div className="mt-3 flex flex-wrap items-center gap-2.5 pt-2 border-t border-white/5">
+                                          <label className="text-xs font-bold text-slate-300">ระบุวันหมดอายุเจาะจง:</label>
+                                          <input
+                                            className="h-9 rounded-xl border border-white/20 bg-black/40 px-3 text-xs font-bold text-white outline-none focus:border-cyan-300"
+                                            max={maxVipExpiryDate}
+                                            min={minVipExpiryDate}
+                                            onChange={(event) => setVipExpiryDate(event.target.value)}
+                                            type="date"
+                                            value={vipExpiryDate}
+                                          />
+                                          <button
+                                            className="inline-flex h-9 items-center rounded-xl bg-cyan-300 px-3.5 text-xs font-black text-slate-950 hover:bg-cyan-200 disabled:opacity-40"
+                                            disabled={loadingMembers || !vipExpiryDate}
+                                            onClick={() => setVipExpiry(user.id)}
+                                            type="button"
+                                          >
+                                            บันทึกวันหมดอายุ
+                                          </button>
+                                          {user.access === 'VIP' && (
+                                            <button
+                                              className="inline-flex h-9 items-center rounded-xl bg-red-400/15 px-3 text-xs font-black text-red-200 hover:bg-red-400/25 border border-red-400/30 disabled:opacity-40 sm:ml-auto"
+                                              disabled={loadingMembers}
+                                              onClick={() => void submitMemberAction({ action: 'set-access', userId: user.id, access: 'สมาชิก' })}
+                                              type="button"
+                                            >
+                                              ยกเลิก VIP และเปลี่ยนเป็นสมาชิก
+                                            </button>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                )}
+                              </Fragment>
                             )
                           })
                         )}
@@ -2215,8 +2326,18 @@ export function AdminPanel({
                         </div>
                         {editingVipUserId === user.id && !isSuperAdmin && (
                           <div className="mt-3 rounded-2xl border border-cyan-300/20 bg-cyan-300/[0.06] p-3">
-                            <p className="text-sm font-black text-cyan-100">กำหนดเวลาสิทธิ์ VIP</p>
-                            <p className="mt-1 text-xs font-semibold text-slate-400">การต่ออายุจะนับเพิ่มจากวันหมดอายุเดิม หรือเริ่มจากวันนี้หากหมดอายุแล้ว</p>
+                            <div className="flex items-center justify-between gap-2 border-b border-white/10 pb-2">
+                              <p className="text-sm font-black text-cyan-100">กำหนดเวลาสิทธิ์ VIP</p>
+                              <button
+                                className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-white/10 text-xs font-bold text-slate-300 hover:bg-white/20"
+                                onClick={() => setEditingVipUserId(null)}
+                                type="button"
+                                title="ปิด"
+                              >
+                                <X size={14} />
+                              </button>
+                            </div>
+                            <p className="mt-2 text-xs font-semibold text-slate-400">การต่ออายุจะนับเพิ่มจากวันหมดอายุเดิม หรือเริ่มจากวันนี้หากหมดอายุแล้ว</p>
                             <div className="mt-3 grid grid-cols-3 gap-2">
                               {[30, 90, 365].map((days) => (
                                 <button
@@ -2230,6 +2351,16 @@ export function AdminPanel({
                                 </button>
                               ))}
                             </div>
+                            {user.access !== 'VIP' && (
+                              <button
+                                className="mt-2 min-h-10 w-full rounded-xl bg-emerald-400/20 px-3 text-sm font-black text-emerald-200 hover:bg-emerald-400/30 border border-emerald-400/30 disabled:opacity-40"
+                                disabled={loadingMembers}
+                                onClick={() => void submitMemberAction({ action: 'set-access', userId: user.id, access: 'VIP' })}
+                                type="button"
+                              >
+                                ⭐ เปิดสิทธิ์ VIP ทันที
+                              </button>
+                            )}
                             <button
                               className="mt-2 min-h-10 w-full rounded-xl bg-amber-300/15 px-3 text-sm font-black text-amber-100 disabled:opacity-40"
                               disabled={loadingMembers}
