@@ -169,7 +169,7 @@ export function NexusExpansion({
               <Zap className="shrink-0 text-fuchsia-300" size={28} />
             </div>
             <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-              <label className="flex min-h-14 flex-1 items-center gap-3 rounded-2xl border border-white/15 bg-white/10 px-4 backdrop-blur">
+              <label className="flex min-h-14 flex-1 items-center gap-3 rounded-2xl border border-white/15 bg-white/10 px-4">
                 <Search className="text-cyan-300" size={19} />
                 <input className="w-full bg-transparent font-bold text-white outline-none placeholder:text-slate-400" onChange={(event) => { setGuideQuery(event.target.value); setGuideActive(false) }} onKeyDown={(event) => { if (event.key === 'Enter') setGuideActive(true) }} placeholder="เช่น อยากทำใบงาน AI หรือระบบเช็กชื่อ..." value={guideQuery} />
               </label>
@@ -185,7 +185,7 @@ export function NexusExpansion({
             )}
           </div>
 
-          <div className="nexus-glass rounded-[2rem] border p-6 backdrop-blur-xl sm:p-8">
+          <div className="nexus-glass rounded-[2rem] border p-6 sm:p-8">
             <p className="inline-flex items-center gap-2 text-xs font-black tracking-[0.18em] text-fuchsia-700 dark:text-fuchsia-300"><BarChart3 size={16} /> NEXUS PULSE</p>
             <h2 className="mt-3 text-2xl font-black text-slate-950 dark:text-white">คลังนี้กำลังเติบโต</h2>
             <div className="mt-5 grid grid-cols-2 gap-3">
@@ -203,7 +203,7 @@ export function NexusExpansion({
           <p className="mt-2 text-sm font-semibold text-slate-500 dark:text-slate-400">คอลเลกชันเก็บบนอุปกรณ์นี้ เหมาะสำหรับเตรียมสอน เตรียมอบรม หรือวางแผนงานส่วนตัว</p>
         </div>
         <div className="grid gap-4 lg:grid-cols-[0.7fr_1.3fr]">
-          <div className="nexus-glass rounded-[2rem] border p-5 backdrop-blur-xl">
+          <div className="nexus-glass rounded-[2rem] border p-5">
             <div className="flex gap-2"><input className="min-h-12 min-w-0 flex-1 rounded-2xl border border-slate-200 bg-white px-4 font-bold dark:border-white/10 dark:bg-slate-900" onChange={(event) => setCollectionName(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') createCollection() }} placeholder="ชื่อคอลเลกชันใหม่" value={collectionName} /><button aria-label="สร้างคอลเลกชัน" className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-cyan-500 text-slate-950" onClick={createCollection} type="button"><Plus size={20} /></button></div>
             <div className="mt-4 grid gap-2">
               {collections.length ? collections.map((collection) => <button className={`flex min-h-12 items-center justify-between rounded-2xl px-4 text-left font-black ${selectedCollection?.id === collection.id ? 'bg-slate-950 text-cyan-200 dark:bg-cyan-300 dark:text-slate-950' : 'bg-slate-100 text-slate-700 dark:bg-white/5 dark:text-slate-200'}`} key={collection.id} onClick={() => setSelectedCollectionId(collection.id)} type="button"><span className="line-clamp-1">{collection.name}</span><span className="text-xs opacity-70">{collection.mediaIds.length}</span></button>) : <div className="rounded-2xl border border-dashed border-slate-300 p-8 text-center dark:border-white/15"><FolderPlus className="mx-auto text-slate-300" /><p className="mt-3 font-black text-slate-700 dark:text-slate-200">สร้างคอลเลกชันแรกของคุณ</p></div>}
@@ -213,7 +213,7 @@ export function NexusExpansion({
           <div className="grid gap-3 sm:grid-cols-2">
             {mediaItems.slice(0, 6).map((item) => {
               const saved = selectedCollection?.mediaIds.includes(item.id) ?? false
-              return <article className="nexus-card grid grid-cols-[6rem_1fr] overflow-hidden rounded-3xl border backdrop-blur-xl" key={item.id}><img alt="" className="h-full min-h-36 w-full object-cover" src={item.cover} /><div className="flex flex-col p-4"><p className="text-xs font-black text-cyan-700 dark:text-cyan-300">{item.topic}</p><h3 className="mt-1 line-clamp-2 font-black text-slate-950 dark:text-white">{item.title}</h3><div className="mt-auto flex gap-2 pt-3"><button className={`inline-flex min-h-10 flex-1 items-center justify-center gap-1 rounded-xl text-xs font-black ${saved ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-300/10 dark:text-emerald-300' : 'bg-slate-100 text-slate-600 dark:bg-white/10 dark:text-slate-300'}`} disabled={!selectedCollection} onClick={() => toggleCollectionItem(item.id)} type="button">{saved ? <Check size={15} /> : <Plus size={15} />}{saved ? 'บันทึกแล้ว' : 'เก็บไว้'}</button><button aria-label={`แชร์ ${item.title}`} className="grid h-10 w-10 place-items-center rounded-xl bg-slate-950 text-cyan-200 dark:bg-cyan-300 dark:text-slate-950" onClick={() => setShareItem(item)} type="button"><Share2 size={16} /></button></div></div></article>
+              return <article className="nexus-card grid grid-cols-[6rem_1fr] overflow-hidden rounded-3xl border" key={item.id}><img alt="" className="h-full min-h-36 w-full object-cover" src={item.cover} /><div className="flex flex-col p-4"><p className="text-xs font-black text-cyan-700 dark:text-cyan-300">{item.topic}</p><h3 className="mt-1 line-clamp-2 font-black text-slate-950 dark:text-white">{item.title}</h3><div className="mt-auto flex gap-2 pt-3"><button className={`inline-flex min-h-10 flex-1 items-center justify-center gap-1 rounded-xl text-xs font-black ${saved ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-300/10 dark:text-emerald-300' : 'bg-slate-100 text-slate-600 dark:bg-white/10 dark:text-slate-300'}`} disabled={!selectedCollection} onClick={() => toggleCollectionItem(item.id)} type="button">{saved ? <Check size={15} /> : <Plus size={15} />}{saved ? 'บันทึกแล้ว' : 'เก็บไว้'}</button><button aria-label={`แชร์ ${item.title}`} className="grid h-10 w-10 place-items-center rounded-xl bg-slate-950 text-cyan-200 dark:bg-cyan-300 dark:text-slate-950" onClick={() => setShareItem(item)} type="button"><Share2 size={16} /></button></div></div></article>
             })}
           </div>
         </div>
@@ -221,7 +221,7 @@ export function NexusExpansion({
 
       <section className={`mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:py-12 ${mode === 'all' || mode === 'personal' ? '' : 'hidden'}`}>
         <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
-          <div className="nexus-glass rounded-[2rem] border p-6 backdrop-blur-xl sm:p-8">
+          <div className="nexus-glass rounded-[2rem] border p-6 sm:p-8">
             <p className="inline-flex items-center gap-2 text-xs font-black tracking-[0.18em] text-amber-700 dark:text-amber-300"><Award size={16} /> ACHIEVEMENTS</p>
             <h2 className="mt-3 text-3xl font-black text-slate-950 dark:text-white">ทุกการสำรวจมีความหมาย</h2>
             <div className="mt-6 grid gap-3 sm:grid-cols-2">

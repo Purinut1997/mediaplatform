@@ -96,7 +96,7 @@ export function LearningFlow({
           </div>
           <div className="mt-5 grid gap-3 md:grid-cols-3">
             {recentItems.map((item, index) => (
-              <button className="group grid grid-cols-[4.5rem_1fr_auto] items-center gap-3 rounded-2xl border border-white/10 bg-white/10 p-3 text-left backdrop-blur transition hover:-translate-y-0.5 hover:bg-white/15" key={item.id} onClick={() => openDetail(item)} type="button">
+              <button className="group grid grid-cols-[4.5rem_1fr_auto] items-center gap-3 rounded-2xl border border-white/10 bg-white/10 p-3 text-left transition hover:-translate-y-0.5 hover:bg-white/15" key={item.id} onClick={() => openDetail(item)} type="button">
                 <img alt="" className="h-16 w-full rounded-xl object-cover" src={item.cover} />
                 <span className="min-w-0">
                   <span className="block text-[10px] font-black tracking-[0.14em] text-cyan-300">{index === 0 ? 'ล่าสุด' : `ก่อนหน้า ${index}`}</span>
@@ -123,10 +123,10 @@ export function LearningFlow({
           const progress = Math.round((completedCount / path.items.length) * 100)
           const nextItem = path.items.find((item) => !completed.has(item.id)) ?? path.items[0]
           return (
-            <article className="nexus-card overflow-hidden rounded-[2rem] border backdrop-blur-xl" key={path.id}>
+            <article className="nexus-card overflow-hidden rounded-[2rem] border" key={path.id}>
               <div className={`bg-gradient-to-br ${path.accent} p-6 text-white`}>
                 <div className="flex items-center justify-between">
-                  <span className="rounded-full border border-white/25 bg-white/15 px-3 py-1 text-xs font-black backdrop-blur">PATH 0{pathIndex + 1}</span>
+                  <span className="rounded-full border border-white/25 bg-white/15 px-3 py-1 text-xs font-black">PATH 0{pathIndex + 1}</span>
                   <Layers3 size={22} />
                 </div>
                 <h3 className="mt-6 text-2xl font-black leading-tight">{path.title}</h3>

@@ -11,14 +11,14 @@ export function TechBackground() {
       <div className="ai-orbit ai-orbit-alt right-[10%] top-[12%]" />
       <CodeRain />
       <div className="particle-field absolute inset-0">
-        {Array.from({ length: 18 }).map((_, index) => (
+        {Array.from({ length: 8 }).map((_, index) => (
           <span
             key={index}
             style={
               {
-                '--x': `${(index * 37) % 100}%`,
-                '--y': `${(index * 61) % 100}%`,
-                '--delay': `${index * 0.32}s`,
+                '--x': `${(index * 13 + 6) % 94}%`,
+                '--y': `${(index * 23 + 12) % 88}%`,
+                '--delay': `${index * 0.75}s`,
               } as CSSProperties
             }
           />

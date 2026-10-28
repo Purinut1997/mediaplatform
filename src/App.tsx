@@ -862,7 +862,7 @@ function AccessNotice({ currentUser }: { currentUser: CurrentUser | null }) {
           : 'ผู้เยี่ยมชมเห็นเฉพาะสื่อสาธารณะ ส่วน VIP แสดงเป็นตัวอย่างด้านล่าง'
 
   return (
-    <div className="mt-3 rounded-3xl border border-cyan-200/70 bg-cyan-50/80 p-4 text-sm font-bold text-cyan-950 shadow-sm backdrop-blur dark:border-cyan-300/10 dark:bg-cyan-300/10 dark:text-cyan-100">
+    <div className="mt-3 rounded-3xl border border-cyan-200/70 bg-cyan-50/90 p-4 text-sm font-bold text-cyan-950 shadow-sm dark:border-cyan-300/10 dark:bg-cyan-950/60 dark:text-cyan-100">
       <div className="flex items-start gap-3">
         <LockKeyhole className="mt-0.5 shrink-0" size={18} />
         <p>{text}</p>
@@ -873,7 +873,7 @@ function AccessNotice({ currentUser }: { currentUser: CurrentUser | null }) {
 
 function VipPreview({ lockedMedia }: { lockedMedia: MediaItem[] }) {
   return (
-    <section className="mt-8 rounded-[2rem] border border-violet-200/70 bg-white/70 p-4 shadow-xl shadow-slate-950/5 backdrop-blur-xl dark:border-violet-300/10 dark:bg-white/[0.06] sm:p-6">
+    <section className="mt-8 rounded-[2rem] border border-violet-200/70 bg-white/90 p-4 shadow-xl shadow-slate-950/5 dark:border-violet-300/10 dark:bg-slate-900/90 sm:p-6">
       <div className="mb-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
         <div>
           <p className="mb-2 inline-flex items-center gap-2 rounded-2xl bg-violet-50 px-3 py-1 text-sm font-black text-violet-800 dark:bg-violet-400/10 dark:text-violet-200">
@@ -968,14 +968,14 @@ function MediaCard({
   onToggleFavorite?: (item: MediaItem) => void
 }) {
   return (
-    <article className="nexus-card group grid overflow-hidden rounded-3xl border backdrop-blur-xl transition duration-300 hover:-translate-y-1 sm:grid-cols-[210px_1fr]">
+    <article className="nexus-card group grid overflow-hidden rounded-3xl border transition duration-300 hover:-translate-y-1 sm:grid-cols-[210px_1fr]">
       <div className="relative min-h-52 overflow-hidden sm:min-h-full">
         <img
           alt={item.title}
           className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
           src={item.cover}
         />
-        <span className={`absolute left-3 top-3 rounded-xl px-3 py-1 text-xs font-black shadow backdrop-blur-md ${
+        <span className={`absolute left-3 top-3 rounded-xl px-3 py-1 text-xs font-black shadow ${
           item.access === 'สาธารณะ'
             ? 'bg-emerald-600/90 text-white'
             : item.access === 'VIP'
@@ -989,8 +989,8 @@ function MediaCard({
         {onToggleFavorite && (
           <button
             aria-label={isFavorite ? 'นำออกจากรายการโปรด' : 'เพิ่มในรายการโปรด'}
-            className={`absolute right-3 top-3 grid h-11 w-11 place-items-center rounded-xl border border-white/40 shadow-lg backdrop-blur transition hover:scale-105 ${
-              isFavorite ? 'bg-rose-500 text-white' : 'bg-white/85 text-slate-700'
+            className={`absolute right-3 top-3 grid h-11 w-11 place-items-center rounded-xl border border-white/40 shadow-lg transition hover:scale-105 ${
+              isFavorite ? 'bg-rose-500 text-white' : 'bg-white/85 text-slate-700 dark:bg-slate-900/85 dark:text-white'
             }`}
             onClick={() => onToggleFavorite(item)}
             type="button"

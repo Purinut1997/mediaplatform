@@ -6,8 +6,8 @@
   color-scheme: light;
   --bg: #f5f7fb;
   --bg-soft: #eef4fb;
-  --surface: rgba(255, 255, 255, 0.82);
-  --surface-strong: rgba(255, 255, 255, 0.94);
+  --surface: rgba(255, 255, 255, 0.90);
+  --surface-strong: rgba(255, 255, 255, 0.96);
   --surface-muted: rgba(239, 246, 255, 0.74);
   --border: rgba(120, 160, 210, 0.24);
   --text: #0f2544;
@@ -34,8 +34,8 @@
   color-scheme: dark;
   --bg: #071426;
   --bg-soft: #0b1d33;
-  --surface: rgba(15, 34, 58, 0.78);
-  --surface-strong: rgba(20, 42, 70, 0.92);
+  --surface: rgba(15, 34, 58, 0.88);
+  --surface-strong: rgba(20, 42, 70, 0.95);
   --surface-muted: rgba(20, 48, 78, 0.68);
   --border: rgba(105, 190, 255, 0.25);
   --text: #eaf4ff;

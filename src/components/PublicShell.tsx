@@ -159,7 +159,7 @@ export function Header({
     : memberNav
 
   return (
-    <header className="nexus-header sticky top-0 z-40 border-b backdrop-blur-2xl">
+    <header className="nexus-header sticky top-0 z-40 border-b backdrop-blur-md">
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
         <button className="flex min-h-12 items-center gap-3 text-left" onClick={() => setView('home')} type="button">
           <img alt="MIKPURINUT logo" className="h-11 w-11 rounded-2xl border border-white object-cover shadow-lg shadow-cyan-900/15" src={LOGO_URL} />

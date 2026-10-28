@@ -27,7 +27,7 @@ export function PortalTiles({ active, onSelect }: { active: HomeSection; onSelec
           return (
             <button
               aria-pressed={selected}
-              className={`group relative min-h-32 overflow-hidden rounded-3xl border p-5 text-left backdrop-blur-xl transition hover:-translate-y-1 ${selected ? 'border-transparent bg-slate-950 text-white shadow-xl shadow-cyan-950/15 dark:bg-white dark:text-slate-950' : 'nexus-card'}`}
+              className={`group relative min-h-32 overflow-hidden rounded-3xl border p-5 text-left transition hover:-translate-y-1 ${selected ? 'border-transparent bg-slate-950 text-white shadow-xl shadow-cyan-950/15 dark:bg-white dark:text-slate-950' : 'nexus-card'}`}
               key={tile.value}
               onClick={() => onSelect(tile.value)}
               type="button"

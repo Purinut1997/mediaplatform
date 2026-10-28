@@ -83,9 +83,9 @@ export function DiscoverySpotlight({
           <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/55 to-cyan-950/5" />
           <div className="absolute inset-x-0 bottom-0 p-6 sm:p-9">
             <div className="flex flex-wrap gap-2">
-              <span className="rounded-full border border-fuchsia-300/30 bg-fuchsia-400/20 px-3 py-1 text-xs font-black text-fuchsia-100 backdrop-blur-md">SPOTLIGHT</span>
-              <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-black text-white backdrop-blur-md">{featured.topic}</span>
-              <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-black text-white backdrop-blur-md">{featured.access}</span>
+              <span className="rounded-full border border-fuchsia-300/30 bg-fuchsia-400/20 px-3 py-1 text-xs font-black text-fuchsia-100">SPOTLIGHT</span>
+              <span className="rounded-full border border-white/20 bg-white/15 px-3 py-1 text-xs font-black text-white">{featured.topic}</span>
+              <span className="rounded-full border border-white/20 bg-white/15 px-3 py-1 text-xs font-black text-white">{featured.access}</span>
             </div>
             <h3 className="mt-4 max-w-2xl text-3xl font-black leading-tight text-white sm:text-4xl">{featured.title}</h3>
             <p className="mt-3 max-w-2xl line-clamp-2 text-sm font-semibold leading-6 text-slate-200 sm:text-base">{featured.description}</p>
@@ -102,7 +102,7 @@ export function DiscoverySpotlight({
           </div>
         </article>
 
-        <div className="nexus-glass rounded-[2rem] border p-5 backdrop-blur-2xl sm:p-6">
+        <div className="nexus-glass rounded-[2rem] border p-5 sm:p-6">
           <div className="mb-4 flex items-center justify-between">
             <div>
               <p className="text-xs font-black tracking-[0.18em] text-cyan-700 dark:text-cyan-300">TRENDING NOW</p>
